@@ -51,3 +51,6 @@ env/
 .Trashes
 ehthumbs.db
 Thumbs.db 
+
+# Cursor
+.specstory/
