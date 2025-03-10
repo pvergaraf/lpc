@@ -1,0 +1,54 @@
+{% extends 'teams/base.html' %}
+
+{% block title %}Complete Registration{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Complete Your Registration</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <h6 class="alert-heading">Team Invitation</h6>
+                    <p class="mb-2">
+                        You've been invited to join <strong>{{ team.name }}</strong> as a <strong>{{ role }}</strong>.
+                        {% if is_team_admin %}
+                        You will have team admin privileges.
+                        {% endif %}
+                    </p>
+                    <p class="mb-0">
+                        <small>You will be registered with email: <strong>{{ email }}</strong></small>
+                    </p>
+                </div>
+                <form method="post">
+                    {% csrf_token %}
+                    {% for field in form %}
+                    {% if field.name != 'email' %}
+                    <div class="mb-3">
+                        <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.help_text %}
+                        <div class="form-text">{{ field.help_text }}</div>
+                        {% endif %}
+                        {% if field.errors %}
+                        <div class="invalid-feedback d-block">
+                            {% for error in field.errors %}
+                            {{ error }}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                    {{ form.email.as_hidden }}
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Complete Registration</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

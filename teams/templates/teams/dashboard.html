@@ -1,0 +1,246 @@
+{% extends "teams/base.html" %}
+{% load static %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <!-- Profile Card -->
+        <div class="col-md-3">
+            <div class="card mb-4">
+                <div class="card-body text-center">
+                    <img src="{{ request.user.profile.profile_picture.url }}" alt="Profile Picture" class="rounded-circle mb-3" style="width: 150px; height: 150px; object-fit: cover;">
+                    <h5 class="card-title">{{ request.user.get_full_name }}</h5>
+                    <p class="card-text">{{ request.user.email }}</p>
+                    {% if request.user.profile.player_number %}
+                        <p class="card-text">Player #{{ request.user.profile.player_number }}</p>
+                    {% endif %}
+                    {% if request.user.profile.position %}
+                        <div class="position-badge" style="display: inline-block; padding: 6px 12px; background-color: #000000; color: white; font-weight: bold; position: relative; margin: 2px;">
+                            {{ request.user.profile.position.code }}
+                            <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 4px; background-color: {{ request.user.profile.position.color }};"></div>
+                        </div>
+                    {% endif %}
+                    {% if request.user.profile.level %}
+                        <p class="card-text mt-2">Level: {{ request.user.profile.level }}</p>
+                    {% endif %}
+                    {% if request.user.profile.rut %}
+                        <p class="card-text">RUT: {{ request.user.profile.rut }}</p>
+                    {% endif %}
+                    {% if request.user.profile.is_official %}
+                        <span class="badge bg-success mb-2">Official Player</span>
+                    {% endif %}
+                    <a href="{% url 'edit_profile' %}" class="btn btn-primary">Edit Profile</a>
+                </div>
+            </div>
+            
+            <!-- Teams List -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">My Teams</h5>
+                </div>
+                <div class="card-body">
+                    {% if team_memberships %}
+                        <div class="list-group">
+                            {% for membership in team_memberships %}
+                                <a href="{% url 'switch_team' membership.team.id %}" 
+                                   class="list-group-item list-group-item-action {% if membership.team.id == current_team %}active{% endif %}">
+                                    {{ membership.team.name }}
+                                </a>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">You are not a member of any teams.</p>
+                    {% endif %}
+                    {% if user.is_superuser %}
+                        <a href="{% url 'create_team' %}" class="btn btn-success btn-sm mt-3">Create New Team</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="col-md-9">
+            {% if current_team %}
+                <!-- Current Season -->
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        {% if current_season %}
+                            <h5 class="card-title mb-0">Current Season: {{ current_season.name }}</h5>
+                        {% else %}
+                            <h5 class="card-title mb-0">No Active Season</h5>
+                        {% endif %}
+                        {% if is_team_admin %}
+                            <a href="{% url 'season_list' current_team %}" class="btn btn-primary btn-sm">Manage Seasons</a>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Upcoming Matches -->
+                {% if current_season %}
+                    <div class="card mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="card-title mb-0">Upcoming Matches</h5>
+                            <div>
+                                <a href="{% url 'season_detail' current_team current_season.id %}" class="btn btn-outline-secondary btn-sm">All Matches</a>
+                                {% if is_team_admin %}
+                                    <a href="{% url 'match_create' current_team current_season.id %}" class="btn btn-primary btn-sm ms-2">Add Match</a>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            {% if upcoming_matches %}
+                                <div class="table-responsive">
+                                    <table class="table">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th>Time</th>
+                                                <th>Opponent</th>
+                                                <th>Field #</th>
+                                                {% if is_team_admin %}
+                                                    <th>Actions</th>
+                                                {% endif %}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for match in upcoming_matches %}
+                                                <tr>
+                                                    <td>{{ match.match_date|date:"M d, Y" }}</td>
+                                                    <td>{{ match.match_time|time:"g:i A" }}</td>
+                                                    <td>{{ match.opponent }}</td>
+                                                    <td>{{ match.field_number }}</td>
+                                                    {% if is_team_admin %}
+                                                        <td>
+                                                            <a href="{% url 'match_edit' current_team current_season.id match.id %}" class="btn btn-sm btn-outline-primary">Edit</a>
+                                                        </td>
+                                                    {% endif %}
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <p class="text-muted">No upcoming matches scheduled.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endif %}
+
+                <!-- Team Members -->
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">Team Members</h5>
+                        {% if is_team_admin %}
+                            <a href="{% url 'add_team_member' current_team %}" class="btn btn-primary btn-sm">Add Member</a>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Email</th>
+                                        <th>Player #</th>
+                                        <th>Position</th>
+                                        <th>Level</th>
+                                        <th>RUT</th>
+                                        <th>Status</th>
+                                        <th>Role</th>
+                                        {% if is_team_admin %}
+                                            <th>Actions</th>
+                                        {% endif %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for member in team_members %}
+                                        <tr>
+                                            <td>
+                                                {% if member.user %}
+                                                    <a href="{% url 'view_profile' member.user.id %}">
+                                                        {{ member.user.get_full_name }}
+                                                    </a>
+                                                {% else %}
+                                                    Pending Invitation
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ member.user.email|default:member.email }}</td>
+                                            <td>{{ member.user.profile.player_number|default:'-' }}</td>
+                                            <td>
+                                                {% if member.user.profile.position %}
+                                                    <div class="position-badge" style="display: inline-block; padding: 6px 12px; background-color: #000000; color: white; font-weight: bold; position: relative; margin: 2px;">
+                                                        {{ member.user.profile.position.code }}
+                                                        <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 4px; background-color: {{ member.user.profile.position.color }};"></div>
+                                                    </div>
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ member.user.profile.level|default:'-' }}</td>
+                                            <td>{{ member.user.profile.rut|default:'-' }}</td>
+                                            <td>
+                                                {% if member.is_active %}
+                                                    <span class="badge bg-success">Active</span>
+                                                    {% if member.user.profile.is_official %}
+                                                        <span class="badge bg-info">Official</span>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <span class="badge bg-warning text-dark">Pending</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <span class="badge {% if member.role == 'MANAGER' %}bg-primary{% else %}bg-secondary{% endif %}">
+                                                    {{ member.get_role_display }}
+                                                </span>
+                                                {% if member.is_team_admin %}
+                                                    <span class="badge bg-info">Admin</span>
+                                                {% endif %}
+                                            </td>
+                                            {% if is_team_admin %}
+                                                <td>
+                                                    <div class="btn-group">
+                                                        {% if member.is_active %}
+                                                            <a href="{% url 'edit_member' current_team member.user.id %}" class="btn btn-sm btn-outline-primary">Edit Profile</a>
+                                                            <form method="post" action="{% url 'toggle_team_admin' current_team member.id %}" class="d-inline ms-1">
+                                                                {% csrf_token %}
+                                                                <button type="submit" class="btn btn-sm btn-outline-info">
+                                                                    {% if member.is_team_admin %}Remove Admin{% else %}Make Admin{% endif %}
+                                                                </button>
+                                                            </form>
+                                                            <form method="post" action="{% url 'remove_member' current_team member.id %}" class="d-inline ms-1">
+                                                                {% csrf_token %}
+                                                                <button type="submit" class="btn btn-sm btn-outline-danger" 
+                                                                        onclick="return confirm('Are you sure you want to remove this member?')">
+                                                                    Remove
+                                                                </button>
+                                                            </form>
+                                                        {% else %}
+                                                            <form method="post" action="{% url 'remove_pending_invitation' current_team member.id %}" class="d-inline">
+                                                                {% csrf_token %}
+                                                                <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                                        onclick="return confirm('Are you sure you want to cancel this invitation?')">
+                                                                    Cancel Invitation
+                                                                </button>
+                                                            </form>
+                                                        {% endif %}
+                                                    </div>
+                                                </td>
+                                            {% endif %}
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <div class="alert alert-info">
+                    Please join or create a team to get started.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} 
