@@ -87,11 +87,11 @@ class Position(models.Model):
         }.get(self.type, '#808080')  # Gray as default
 
 class Profile(models.Model):
-    user = models.OneToOneField('teams.User', on_delete=models.CASCADE)
-    date_of_birth = models.DateField(null=True, blank=True)
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    profile_picture = models.ImageField(upload_to='profile_pics/', default='profile_pics/castolo.png', blank=True)
     player_number = models.IntegerField(null=True, blank=True)
-    profile_picture = models.ImageField(upload_to='profile_pics/', default='profile_pics/castolo.png')
     position = models.ForeignKey(Position, on_delete=models.SET_NULL, null=True, blank=True)
+    date_of_birth = models.DateField(null=True, blank=True)
     level = models.IntegerField(
         validators=[MinValueValidator(1), MaxValueValidator(99)],
         default=1
@@ -101,20 +101,8 @@ class Profile(models.Model):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-        
-        if self.profile_picture:
+        if self.profile_picture and hasattr(self.profile_picture, 'path') and os.path.exists(self.profile_picture.path):
             img = Image.open(self.profile_picture.path)
-            
-            # Crop to square if not already square
-            if img.width != img.height:
-                min_dimension = min(img.width, img.height)
-                left = (img.width - min_dimension) // 2
-                top = (img.height - min_dimension) // 2
-                right = left + min_dimension
-                bottom = top + min_dimension
-                img = img.crop((left, top, right, bottom))
-            
-            # Resize to 300x300
             if img.height > 300 or img.width > 300:
                 output_size = (300, 300)
                 img.thumbnail(output_size)
