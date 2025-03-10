@@ -31,6 +31,10 @@ ALLOWED_HOSTS = [
     '127.0.0.1',
     '3.87.47.234',
     'ec2-3-87-47-234.compute-1.amazonaws.com',
+    'ec2-3-87-47-234.compute-1.amazonaws.com,ec2-3-87-47-234.compute-1.amazonaws.com',  # The problematic one
+    'ec2-3-87-47-234.compute-1.amazonaws.com,ec2-3-87-47-234.compute-1.amazonaws.com/',
+    'ec2-3-87-47-234.compute-1.amazonaws.com,ec2-3-87-47-234.compute-1.amazonaws.com:80',
+    'ec2-3-87-47-234.compute-1.amazonaws.com,ec2-3-87-47-234.compute-1.amazonaws.com:443',
 ]
 
 
