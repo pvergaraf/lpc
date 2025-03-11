@@ -44,13 +44,13 @@ def verify_default_profile():
             for local_path in local_paths:
                 if os.path.exists(local_path):
                     print(f"Found local file at: {local_path}")
-                    # Upload to S3
+                    # Upload to S3 without ACL
                     with open(local_path, 'rb') as f:
                         s3.upload_fileobj(
                             f,
                             settings.AWS_STORAGE_BUCKET_NAME,
                             default_path,
-                            ExtraArgs={'ACL': 'public-read', 'ContentType': 'image/png'}
+                            ExtraArgs={'ContentType': 'image/png'}  # Removed ACL
                         )
                     print(f"Successfully uploaded default profile picture to S3")
                     return True
