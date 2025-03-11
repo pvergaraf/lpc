@@ -153,13 +153,13 @@ LOGGING = {
         },
         'file': {
             'class': 'logging.FileHandler',
-            'filename': '/var/www/lpc/django.log',
+            'filename': '/var/www/lpc/logs/django.log',
         },
     },
     'loggers': {
         'django': {
             'handlers': ['console', 'file'],
-            'level': 'DEBUG',
+            'level': 'INFO',
         },
         'storages': {
             'handlers': ['console', 'file'],
