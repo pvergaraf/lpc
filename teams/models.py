@@ -88,7 +88,7 @@ class Position(models.Model):
 
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    profile_picture = models.ImageField(upload_to='profile_pics/', default='profile_pics/castolo.png', blank=True)
+    profile_picture = models.ImageField(upload_to='profile_pics/', null=True, blank=True)
     player_number = models.IntegerField(null=True, blank=True)
     position = models.ForeignKey(Position, on_delete=models.SET_NULL, null=True, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
@@ -100,13 +100,15 @@ class Profile(models.Model):
     rut = models.CharField(max_length=12, blank=True, null=True, help_text="Chilean ID number (RUT)")
 
     def save(self, *args, **kwargs):
+        # Remove old profile picture if it exists and a new one is being uploaded
+        if self.pk:  # If this is an update
+            try:
+                old_profile = Profile.objects.get(pk=self.pk)
+                if old_profile.profile_picture and self.profile_picture != old_profile.profile_picture:
+                    old_profile.profile_picture.delete(save=False)
+            except Profile.DoesNotExist:
+                pass
         super().save(*args, **kwargs)
-        if self.profile_picture and hasattr(self.profile_picture, 'path') and os.path.exists(self.profile_picture.path):
-            img = Image.open(self.profile_picture.path)
-            if img.height > 300 or img.width > 300:
-                output_size = (300, 300)
-                img.thumbnail(output_size)
-                img.save(self.profile_picture.path)
 
     def __str__(self):
         return f"{self.user.get_full_name()}'s Profile"
@@ -118,8 +120,6 @@ def create_user_profile(sender, instance, created, **kwargs):
 
 @receiver(post_save, sender=User)
 def save_user_profile(sender, instance, **kwargs):
-    if not hasattr(instance, 'profile'):
-        Profile.objects.create(user=instance)
     instance.profile.save()
 
 class Team(models.Model):
