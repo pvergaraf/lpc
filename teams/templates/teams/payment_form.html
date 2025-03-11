@@ -1,0 +1,114 @@
+{% extends 'teams/base.html' %}
+{% load crispy_forms_tags %}
+{% load currency_filters %}
+
+{% block title %}{{ title }} - {{ season.name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .payment-table th {
+        background-color: #f8f9fa;
+    }
+    .payment-status {
+        width: 120px;
+    }
+    .payment-amount {
+        width: 120px;
+    }
+    .payment-verification {
+        width: 150px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title">{{ title }}</h5>
+    </div>
+    <div class="card-body">
+        <form method="post" id="paymentForm">
+            {% csrf_token %}
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    {{ form.name|as_crispy_field }}
+                </div>
+                <div class="col-md-4">
+                    {{ form.total_amount|as_crispy_field }}
+                </div>
+                <div class="col-md-4">
+                    {{ form.due_date|as_crispy_field }}
+                </div>
+            </div>
+
+            {% if formset %}
+            <h6 class="border-bottom pb-2 mb-3">Player Payments</h6>
+            {{ formset.management_form }}
+            <div class="table-responsive">
+                <table class="table payment-table">
+                    <thead>
+                        <tr>
+                            <th>Player</th>
+                            <th class="payment-amount">Amount</th>
+                            <th class="payment-status">Player Status</th>
+                            <th class="payment-verification">Admin Verification</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for form in formset %}
+                            {{ form.id }}
+                            <tr>
+                                <td>
+                                    {{ form.instance.player.user.get_full_name }}
+                                    {% if form.instance.player.user.profile.player_number %}
+                                        <small class="text-muted">(#{{ form.instance.player.user.profile.player_number }})</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text">$</span>
+                                        {{ form.amount }}
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if form.instance.is_paid %}
+                                        {% if form.instance.admin_verified %}
+                                            <span class="badge bg-success">Verified</span>
+                                        {% else %}
+                                            <span class="badge bg-info">Pending Approval</span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark">Not Paid</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        {{ form.admin_verified }}
+                                        <small class="text-muted ms-2">{{ form.admin_verified.help_text }}</small>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+
+            <div class="mt-3">
+                <button type="submit" class="btn btn-primary">Save Payment</button>
+                <a href="{% url 'teams:payment_list' team.id season.id %}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if formset %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Add any JavaScript functionality here if needed
+});
+</script>
+{% endif %}
+{% endblock %} 

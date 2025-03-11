@@ -37,6 +37,11 @@ urlpatterns = [
     path('teams/<int:team_id>/members/<int:member_id>/remove/', views.remove_member, name='remove_member'),
     path('teams/<int:team_id>/members/<int:member_id>/toggle-admin/', views.toggle_team_admin, name='toggle_team_admin'),
     path('teams/<int:team_id>/members/<int:user_id>/edit/', views.edit_member, name='edit_member'),
+    path('team/<int:team_id>/season/<int:season_id>/payments/', views.payment_list, name='payment_list'),
+    path('team/<int:team_id>/season/<int:season_id>/payments/create/', views.payment_create, name='payment_create'),
+    path('team/<int:team_id>/season/<int:season_id>/payments/<int:payment_id>/edit/', views.payment_edit, name='payment_edit'),
+    path('team/<int:team_id>/season/<int:season_id>/payments/<int:payment_id>/delete/', views.payment_delete, name='payment_delete'),
+    path('team/<int:team_id>/season/<int:season_id>/payments/<int:payment_id>/player/<int:player_payment_id>/toggle/', views.toggle_player_payment, name='toggle_player_payment'),
 ]
 
 if settings.DEBUG:

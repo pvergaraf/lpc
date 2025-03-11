@@ -21,7 +21,7 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('teams.urls')),
+    path('', include(('teams.urls', 'teams'), namespace='teams')),
 ]
 
 # Serve media files in development

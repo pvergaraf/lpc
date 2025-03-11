@@ -7,7 +7,7 @@
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="card-title mb-0">{{ team.name }} - Seasons</h5>
         {% if is_admin %}
-        <a href="{% url 'season_create' team.id %}" class="btn btn-primary btn-sm">
+        <a href="{% url 'teams:season_create' team.id %}" class="btn btn-primary btn-sm">
             Create Season
         </a>
         {% endif %}
@@ -37,11 +37,11 @@
                         {% if season.is_active %}
                         <span class="badge bg-primary">Active</span>
                         {% endif %}
-                        <a href="{% url 'season_detail' team.id season.id %}" class="btn btn-outline-primary btn-sm ms-2">
+                        <a href="{% url 'teams:season_detail' team.id season.id %}" class="btn btn-outline-primary btn-sm ms-2">
                             View Details
                         </a>
                         {% if is_admin %}
-                        <a href="{% url 'season_edit' team.id season.id %}" class="btn btn-outline-secondary btn-sm">
+                        <a href="{% url 'teams:season_edit' team.id season.id %}" class="btn btn-outline-secondary btn-sm">
                             Edit
                         </a>
                         {% endif %}
@@ -52,7 +52,7 @@
             <div class="text-center text-muted my-4">
                 <p>No seasons created yet.</p>
                 {% if is_admin %}
-                <a href="{% url 'season_create' team.id %}" class="btn btn-primary">Create First Season</a>
+                <a href="{% url 'teams:season_create' team.id %}" class="btn btn-primary">Create First Season</a>
                 {% endif %}
             </div>
             {% endfor %}
@@ -61,6 +61,6 @@
 </div>
 
 <div class="mt-3">
-    <a href="{% url 'dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
+    <a href="{% url 'teams:dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
 </div>
 {% endblock %} 

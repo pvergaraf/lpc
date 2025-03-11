@@ -1,0 +1,48 @@
+{% extends "teams/base.html" %}
+
+{% block title %}My Teams{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">My Teams</h5>
+            {% if user.is_superuser %}
+            <a href="{% url 'teams:create_team' %}" class="btn btn-primary">Create New Team</a>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            {% if team_memberships %}
+                <div class="list-group">
+                    {% for membership in team_memberships %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">{{ membership.team.name }}</h6>
+                                <small class="text-muted">
+                                    Role: {{ membership.get_role_display }}
+                                    {% if membership.is_team_admin %}
+                                        <span class="badge bg-info ms-2">Admin</span>
+                                    {% endif %}
+                                </small>
+                            </div>
+                            <div>
+                                <a href="{% url 'teams:switch_team' membership.team.id %}" 
+                                   class="btn btn-primary btn-sm">Select Team</a>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center">
+                    <p class="text-muted mb-4">You are not a member of any teams yet.</p>
+                    {% if user.is_superuser %}
+                        <a href="{% url 'teams:create_team' %}" class="btn btn-primary">Create Your First Team</a>
+                    {% else %}
+                        <p>Please wait for a team invitation or contact an administrator.</p>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} 

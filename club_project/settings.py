@@ -12,6 +12,14 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 
 from pathlib import Path
 import os
+from dotenv import load_dotenv
+
+# Determine which .env file to load
+ENVIRONMENT = os.getenv('DJANGO_ENV', 'development')
+if ENVIRONMENT == 'production':
+    load_dotenv('.env.production')
+else:
+    load_dotenv('.env')
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -143,36 +151,19 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-# Logging configuration
+# Logging Configuration
 LOGGING = {
     'version': 1,
-    'disable_existing_loggers': False,
+    'disable_existing_loggers': True,
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
-        },
-        'file': {
-            'class': 'logging.FileHandler',
-            'filename': '/var/www/lpc/logs/django.log',
+            'level': 'CRITICAL',
         },
     },
-    'loggers': {
-        'django': {
-            'handlers': ['console', 'file'],
-            'level': 'INFO',
-        },
-        'storages': {
-            'handlers': ['console', 'file'],
-            'level': 'DEBUG',
-        },
-        'boto3': {
-            'handlers': ['console', 'file'],
-            'level': 'DEBUG',
-        },
-        'botocore': {
-            'handlers': ['console', 'file'],
-            'level': 'DEBUG',
-        },
+    'root': {
+        'handlers': ['console'],
+        'level': 'CRITICAL',
     },
 }
 
@@ -222,19 +213,23 @@ CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
 
 # Email settings
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.sendgrid.net'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'apikey'  # this is exactly the string 'apikey'
-EMAIL_HOST_PASSWORD = os.environ.get('SENDGRID_API_KEY')
+if DEBUG:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = 'smtp.sendgrid.net'
+    EMAIL_PORT = 587
+    EMAIL_USE_TLS = True
+    EMAIL_HOST_USER = 'apikey'  # this is exactly the string 'apikey'
+    EMAIL_HOST_PASSWORD = os.environ.get('SENDGRID_API_KEY')
+
 DEFAULT_FROM_EMAIL = 'Fubol Club <no-reply@fubol.club>'
 SERVER_EMAIL = 'no-reply@fubol.club'
 
 # Login URL
-LOGIN_URL = 'login'
-LOGIN_REDIRECT_URL = 'dashboard'
-LOGOUT_REDIRECT_URL = 'login'
+LOGIN_URL = 'teams:login'
+LOGIN_REDIRECT_URL = 'teams:dashboard'
+LOGOUT_REDIRECT_URL = 'teams:login'
 
 # Custom User Model
 AUTH_USER_MODEL = 'teams.User'
@@ -247,6 +242,11 @@ CSRF_COOKIE_SECURE = True
 SECURE_HSTS_SECONDS = 31536000  # 1 year
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
+
+# Session Settings
+SESSION_COOKIE_AGE = 86400  # 24 hours in seconds
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_SAVE_EVERY_REQUEST = True
 
 # Remove old AWS SES settings since we're not using them
 # AWS SES settings

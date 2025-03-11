@@ -6,13 +6,13 @@ from django.contrib import messages
 from django.core.mail import send_mail
 from django.urls import reverse, reverse_lazy
 from django.utils.crypto import get_random_string
-from django.http import HttpResponseForbidden
+from django.http import HttpResponseForbidden, JsonResponse
 from django.db import transaction
-from .models import Team, TeamMember, Season, Match, Profile
+from .models import Team, TeamMember, Season, Match, Profile, Payment, PlayerPayment
 from .forms import (
     UserRegistrationForm, TeamMemberInviteForm, TeamForm, 
     EmailAuthenticationForm, AddTeamMemberForm, UserProfileForm,
-    SeasonForm, MatchForm, AdminMemberProfileForm
+    SeasonForm, MatchForm, AdminMemberProfileForm, PaymentForm, PlayerPaymentFormSet
 )
 from django.db import models
 from django.contrib.auth.views import LogoutView
@@ -22,77 +22,156 @@ from django.template.loader import render_to_string
 
 User = get_user_model()
 
+def get_current_team(user):
+    """Get the current team for a user from their session or active memberships."""
+    # Get all active team memberships for the user
+    team_memberships = TeamMember.objects.filter(
+        user=user,
+        is_active=True
+    ).select_related('team')
+    
+    if not team_memberships.exists():
+        return None
+
+    # If there's only one team, return it
+    if team_memberships.count() == 1:
+        return team_memberships.first().team
+
+    # Try to get team from session
+    current_team_id = user.request.session.get('current_team') if hasattr(user, 'request') else None
+    
+    if current_team_id:
+        # Verify the team from session is in user's active teams
+        team_from_session = team_memberships.filter(team_id=current_team_id).first()
+        if team_from_session:
+            return team_from_session.team
+    
+    # If no team in session or invalid, return first active team
+    return team_memberships.first().team
+
+def get_current_season(team):
+    """Get the current season for a team."""
+    if not team:
+        return None
+        
+    # First try to get the active season
+    current_season = Season.objects.filter(
+        team=team,
+        is_active=True
+    ).first()
+    
+    # If no active season, try to find a current season based on dates
+    if not current_season:
+        today = timezone.now().date()
+        current_season = Season.objects.filter(
+            team=team,
+            start_date__lte=today,
+            end_date__gte=today
+        ).first()
+        
+        # If we found a current season by date, make it active
+        if current_season:
+            current_season.is_active = True
+            current_season.save()
+            
+    return current_season
+
+def is_user_team_admin(user, team):
+    """Check if a user is an admin for a team."""
+    return TeamMember.objects.filter(
+        user=user,
+        team=team,
+        is_active=True,
+        is_team_admin=True
+    ).exists()
+
 def is_admin(user):
     return user.is_superuser
 
 @login_required
 def dashboard(request):
-    team_memberships = TeamMember.objects.filter(user=request.user, is_active=True)
-    current_team = request.session.get('current_team')
+    if not request.user.is_authenticated:
+        return redirect('teams:login')
+
+    # Attach request to user for session access
+    request.user.request = request
+    current_team = get_current_team(request.user)
     
-    if not current_team and team_memberships.exists():
-        current_team = team_memberships.first().team.id
-        request.session['current_team'] = current_team
-    
-    team_members = []
-    current_membership = None
-    current_season = None
-    upcoming_matches = []
-    
-    if current_team:
-        team_members = TeamMember.objects.filter(
-            team_id=current_team
-        ).filter(
-            models.Q(is_active=True) | 
-            models.Q(is_active=False, invitation_token__isnull=False)
-        ).select_related('user', 'user__profile')
-        
-        current_membership = team_memberships.filter(team_id=current_team).first()
-        
-        # Get current season - first try to get the active season
-        current_season = Season.objects.filter(
-            team_id=current_team,
+    if not current_team:
+        messages.warning(request, "You are not a member of any team. Please join or create a team.")
+        return redirect('teams:team_list')
+
+    try:
+        # Get the user's team membership
+        team_member = TeamMember.objects.get(
+            team=current_team,
+            user=request.user,
             is_active=True
-        ).first()
-        
-        # If no active season, try to find a current season based on dates
-        if not current_season:
-            current_season = Season.objects.filter(
-                team_id=current_team,
-                start_date__lte=timezone.now().date(),
-                end_date__gte=timezone.now().date()
-            ).first()
-            # If we found a current season by date, make it active
-            if current_season:
-                current_season.is_active = True
-                current_season.save()
-        
-        if current_season:
-            upcoming_matches = Match.objects.filter(
-                season=current_season,
-                match_date__gte=timezone.now().date()
-            ).order_by('match_date', 'match_time')[:5]  # Show next 5 matches
-    
+        )
+    except TeamMember.DoesNotExist:
+        messages.error(request, "There was an error accessing your team membership.")
+        return redirect('teams:team_list')
+
+    current_season = get_current_season(current_team)
+    is_team_admin = is_user_team_admin(request.user, current_team)
+    today = timezone.now().date()
+
+    # Get pending payments for the team member
+    pending_payments = PlayerPayment.objects.filter(
+        player=team_member,
+        payment__season=current_season
+    ).select_related('payment') if current_season else []
+
+    # Get team memberships for the teams list
+    team_memberships = TeamMember.objects.filter(
+        user=request.user,
+        is_active=True
+    ).select_related('team')
+
+    # Get team members for the current team
+    team_members = TeamMember.objects.filter(
+        team=current_team
+    ).filter(
+        models.Q(is_active=True) | 
+        models.Q(is_active=False, invitation_token__isnull=False)
+    ).select_related('user', 'user__profile')
+
+    # Get upcoming matches if there's a current season
+    upcoming_matches = None
+    if current_season:
+        upcoming_matches = Match.objects.filter(
+            season=current_season,
+            match_date__gte=today
+        ).order_by('match_date', 'match_time')
+
     context = {
-        'team_memberships': team_memberships,
         'current_team': current_team,
-        'team_members': team_members,
-        'current_membership': current_membership,
-        'is_manager': current_membership and current_membership.role == TeamMember.Role.MANAGER,
-        'is_team_admin': current_membership and current_membership.is_team_admin,
         'current_season': current_season,
+        'is_team_admin': is_team_admin,
+        'pending_payments': pending_payments,
+        'today': today.isoformat(),
+        'team_memberships': team_memberships,
+        'team_members': team_members,
         'upcoming_matches': upcoming_matches,
     }
+
     return render(request, 'teams/dashboard.html', context)
 
 @login_required
 def switch_team(request, team_id):
     team_member = get_object_or_404(TeamMember, team_id=team_id, user=request.user, is_active=True)
     request.session['current_team'] = team_id
-    return redirect('dashboard')
+    return redirect('teams:dashboard')
 
 class CustomLogoutView(LogoutView):
-    next_page = reverse_lazy('login')
+    next_page = reverse_lazy('teams:login')
+    http_method_names = ['get', 'post']
+    template_name = 'teams/logout.html'
+    
+    def dispatch(self, request, *args, **kwargs):
+        # Clear any custom session data
+        request.session.flush()
+        return super().dispatch(request, *args, **kwargs)
 
 @login_required
 def team_members(request, team_id):
@@ -173,7 +252,7 @@ def invite_member(request, team_id):
                     
                     # Send invitation email
                     invite_url = request.build_absolute_uri(
-                        reverse('register') + f'?token={invitation_token}'
+                        reverse('teams:register') + f'?token={invitation_token}'
                     )
                     
                     # Print invitation details to console for development
@@ -210,11 +289,11 @@ def invite_member(request, team_id):
                     request.session[f'invite_{invitation_token}_is_official'] = is_official
                     
                     messages.success(request, f'Invitation sent to {email}')
-                    return redirect('team_members', team_id=team.id)
+                    return redirect('teams:team_members', team_id=team.id)
                     
             except Exception as e:
                 messages.error(request, f'Error sending invitation: {str(e)}')
-                return redirect('team_members', team_id=team.id)
+                return redirect('teams:team_members', team_id=team.id)
     else:
         form = TeamMemberInviteForm(team)
     
@@ -240,7 +319,7 @@ def toggle_team_admin(request, team_id, member_id):
         request,
         f'{target_member.user.get_full_name()} is {"now" if target_member.is_team_admin else "no longer"} a team admin.'
     )
-    return redirect('team_members', team_id=team.id)
+    return redirect('teams:team_members', team_id=team.id)
 
 @login_required
 def remove_member(request, team_id, member_id):
@@ -255,7 +334,7 @@ def remove_member(request, team_id, member_id):
     # Don't allow removing yourself
     if target_member.user == request.user:
         messages.error(request, "You cannot remove yourself from the team.")
-        return redirect('team_members', team_id=team.id)
+        return redirect('teams:team_members', team_id=team.id)
     
     # Clear member data and set as inactive
     target_member.is_active = False
@@ -265,7 +344,7 @@ def remove_member(request, team_id, member_id):
     target_member.save()
     
     messages.success(request, f'{target_member.user.get_full_name()} has been removed from the team.')
-    return redirect('team_members', team_id=team.id)
+    return redirect('teams:team_members', team_id=team.id)
 
 @login_required
 def remove_pending_invitation(request, team_id, member_id):
@@ -281,7 +360,7 @@ def remove_pending_invitation(request, team_id, member_id):
     pending_member.delete()
     
     messages.success(request, f'Invitation to {pending_member.email} has been cancelled.')
-    return redirect('team_members', team_id=team.id)
+    return redirect('teams:team_members', team_id=team.id)
 
 def register(request):
     token = request.GET.get('token')
@@ -339,15 +418,16 @@ def register(request):
                     # Log in the user
                     login(request, user)
                     messages.success(request, f'Registration successful! You are now a member of {team_member.team.name}.')
-                    return redirect('dashboard')
+                    return redirect('teams:dashboard')
 
             except Exception as e:
                 if settings.DEBUG:
-                    print(f"Registration error: {str(e)}")
-                messages.error(request, 'An error occurred during registration. Please try again.')
+                    messages.error(request, 'An error occurred during registration.')
+                else:
+                    messages.error(request, 'An error occurred during registration. Please try again.')
         else:
             if settings.DEBUG:
-                print("Form errors:", form.errors)
+                messages.error(request, 'Please correct the errors below.')
     else:
         # Pre-fill data if user exists
         user = User.objects.filter(email=team_member.email).first()
@@ -369,6 +449,7 @@ def register(request):
         'is_team_admin': team_member.is_team_admin,
         'is_official': is_official,
         'email': team_member.email,
+        'image_url': 'https://raw.githubusercontent.com/pabloveintimilla/club/main/teams/static/teams/images/felicidades.png'
     }
     return render(request, 'teams/register.html', context)
 
@@ -384,7 +465,7 @@ def create_team(request):
         if form.is_valid():
             team = form.save()
             messages.success(request, f'Team "{team.name}" has been created successfully!')
-            return redirect('admin_teams')
+            return redirect('teams:admin_teams')
     else:
         form = TeamForm()
     
@@ -396,7 +477,7 @@ def delete_team(request, team_id):
     if request.method == 'POST':
         team.delete()
         messages.success(request, f'Team "{team.name}" has been deleted successfully!')
-        return redirect('admin_teams')
+        return redirect('teams:admin_teams')
     return render(request, 'teams/delete_team.html', {'team': team})
 
 @login_required
@@ -418,7 +499,7 @@ def edit_team(request, team_id):
         if form.is_valid():
             form.save()
             messages.success(request, f'Team "{team.name}" has been updated successfully!')
-            return redirect('dashboard')
+            return redirect('teams:dashboard')
     else:
         form = TeamForm(instance=team)
     
@@ -455,7 +536,7 @@ def add_team_member(request, team_id):
                     )
                     
                     messages.success(request, f'{user.get_full_name()} has been added to the team.')
-                    return redirect('team_members', team_id=team.id)
+                    return redirect('teams:team_members', team_id=team.id)
             except Exception as e:
                 messages.error(request, f'Error creating user: {str(e)}')
     else:
@@ -469,11 +550,17 @@ def add_team_member(request, team_id):
 @login_required
 def edit_profile(request):
     if request.method == 'POST':
-        form = UserProfileForm(request.POST, instance=request.user)
+        form = UserProfileForm(request.POST, request.FILES, instance=request.user)
         if form.is_valid():
-            form.save()
+            user = form.save()
+            # Handle profile picture clearing
+            profile = getattr(user, 'profile', None)
+            if profile:
+                if request.POST.get('profile_picture-clear'):
+                    profile.profile_picture = 'profile_pics/castolo.png'  # Reset to default
+                    profile.save()
             messages.success(request, 'Your profile has been updated successfully!')
-            return redirect('dashboard')
+            return redirect('teams:dashboard')
     else:
         form = UserProfileForm(instance=request.user)
     
@@ -491,7 +578,7 @@ def view_profile(request, user_id):
     ).filter(
         teammember__user=user,
         teammember__is_active=True
-    )
+    ).distinct()
     
     if not common_teams.exists():
         return HttpResponseForbidden("You don't have permission to view this profile.")
@@ -534,7 +621,7 @@ def season_create(request, team_id):
             season.team = team
             season.save()
             messages.success(request, f'Season "{season.name}" has been created.')
-            return redirect('season_detail', team_id=team.id, season_id=season.id)
+            return redirect('teams:season_detail', team_id=team.id, season_id=season.id)
     else:
         form = SeasonForm()
     
@@ -558,7 +645,7 @@ def season_edit(request, team_id, season_id):
         if form.is_valid():
             form.save()
             messages.success(request, f'Season "{season.name}" has been updated.')
-            return redirect('season_detail', team_id=team.id, season_id=season.id)
+            return redirect('teams:season_detail', team_id=team.id, season_id=season.id)
     else:
         form = SeasonForm(instance=season)
     
@@ -608,7 +695,7 @@ def match_create(request, team_id, season_id):
             match.season = season
             match.save()
             messages.success(request, f'Match against {match.opponent} has been scheduled.')
-            return redirect('season_detail', team_id=team.id, season_id=season.id)
+            return redirect('teams:season_detail', team_id=team.id, season_id=season.id)
     else:
         form = MatchForm(season=season)
     
@@ -634,7 +721,7 @@ def match_edit(request, team_id, season_id, match_id):
         if form.is_valid():
             form.save()
             messages.success(request, f'Match against {match.opponent} has been updated.')
-            return redirect('season_detail', team_id=team.id, season_id=season.id)
+            return redirect('teams:season_detail', team_id=team.id, season_id=season.id)
     else:
         form = MatchForm(instance=match, season=season)
     
@@ -658,11 +745,17 @@ def edit_member(request, team_id, user_id):
         return HttpResponseForbidden("You don't have permission to edit member profiles.")
     
     if request.method == 'POST':
-        form = AdminMemberProfileForm(request.POST, instance=member_to_edit)
+        form = AdminMemberProfileForm(request.POST, request.FILES, instance=member_to_edit)
         if form.is_valid():
-            form.save()
+            user = form.save()
+            # Handle profile picture clearing
+            profile = getattr(user, 'profile', None)
+            if profile:
+                if request.POST.get('profile_picture-clear'):
+                    profile.profile_picture = 'profile_pics/castolo.png'  # Reset to default
+                    profile.save()
             messages.success(request, f"{member_to_edit.get_full_name()}'s profile has been updated successfully!")
-            return redirect('dashboard')
+            return redirect('teams:dashboard')
     else:
         form = AdminMemberProfileForm(instance=member_to_edit)
     
@@ -670,4 +763,170 @@ def edit_member(request, team_id, user_id):
         'form': form,
         'team': team,
         'member': member_to_edit
+    })
+
+@login_required
+def payment_list(request, team_id, season_id):
+    team = get_object_or_404(Team, id=team_id)
+    season = get_object_or_404(Season, id=season_id)
+    if not request.user.is_superuser and not TeamMember.objects.filter(team=team, user=request.user, is_team_admin=True).exists():
+        return HttpResponseForbidden("You don't have permission to manage payments.")
+    
+    payments = Payment.objects.filter(season=season)
+    return render(request, 'teams/payment_list.html', {
+        'team': team,
+        'season': season,
+        'payments': payments,
+    })
+
+@login_required
+def payment_create(request, team_id, season_id):
+    team = get_object_or_404(Team, id=team_id)
+    season = get_object_or_404(Season, id=season_id)
+    if not request.user.is_superuser and not TeamMember.objects.filter(team=team, user=request.user, is_team_admin=True).exists():
+        return HttpResponseForbidden("You don't have permission to create payments.")
+
+    if request.method == 'POST':
+        form = PaymentForm(request.POST)
+        if form.is_valid():
+            payment = form.save(commit=False)
+            payment.season = season
+            payment.save()
+            
+            # Create player payments for all official players
+            official_players = TeamMember.objects.filter(
+                team=team,
+                role=TeamMember.Role.PLAYER,
+                user__profile__is_official=True,
+                is_active=True
+            )
+            
+            for player in official_players:
+                PlayerPayment.objects.create(
+                    payment=payment,
+                    player=player,
+                    amount=0  # Default amount, to be edited by admin
+                )
+            
+            messages.success(request, 'Payment created successfully.')
+            return redirect('teams:payment_edit', team_id=team.id, season_id=season.id, payment_id=payment.id)
+    else:
+        form = PaymentForm()
+    
+    return render(request, 'teams/payment_form.html', {
+        'form': form,
+        'team': team,
+        'season': season,
+        'title': 'Create Payment'
+    })
+
+@login_required
+def payment_edit(request, team_id, season_id, payment_id):
+    team = get_object_or_404(Team, id=team_id)
+    season = get_object_or_404(Season, id=season_id)
+    payment = get_object_or_404(Payment, id=payment_id, season=season)
+    
+    if not request.user.is_superuser and not TeamMember.objects.filter(team=team, user=request.user, is_team_admin=True).exists():
+        return HttpResponseForbidden("You don't have permission to edit payments.")
+
+    if request.method == 'POST':
+        form = PaymentForm(request.POST, instance=payment)
+        formset = PlayerPaymentFormSet(request.POST, instance=payment)
+        if form.is_valid() and formset.is_valid():
+            with transaction.atomic():
+                form.save()
+                formset.save()  # Save the formset changes
+            messages.success(request, 'Payment updated successfully.')
+            return redirect('teams:payment_list', team_id=team.id, season_id=season.id)
+    else:
+        form = PaymentForm(instance=payment)
+        formset = PlayerPaymentFormSet(instance=payment)
+    
+    return render(request, 'teams/payment_form.html', {
+        'form': form,
+        'formset': formset,
+        'team': team,
+        'season': season,
+        'payment': payment,
+        'title': 'Edit Payment'
+    })
+
+@login_required
+def payment_delete(request, team_id, season_id, payment_id):
+    team = get_object_or_404(Team, id=team_id)
+    season = get_object_or_404(Season, id=season_id)
+    payment = get_object_or_404(Payment, id=payment_id, season=season)
+    
+    if not request.user.is_superuser and not TeamMember.objects.filter(team=team, user=request.user, is_team_admin=True).exists():
+        return HttpResponseForbidden("You don't have permission to delete payments.")
+
+    if request.method == 'POST':
+        payment.delete()
+        messages.success(request, 'Payment deleted successfully.')
+        return redirect('teams:payment_list', team_id=team.id, season_id=season.id)
+    
+    return render(request, 'teams/payment_delete.html', {
+        'team': team,
+        'season': season,
+        'payment': payment,
+    })
+
+@login_required
+def toggle_player_payment(request, team_id, season_id, payment_id, player_payment_id):
+    if request.method == 'POST':
+        team = get_object_or_404(Team, id=team_id)
+        player_payment = get_object_or_404(PlayerPayment, id=player_payment_id)
+        is_admin = request.headers.get('X-Admin-Action') == 'true'
+        
+        # Check permissions
+        if is_admin and not (request.user.is_superuser or TeamMember.objects.filter(team=team, user=request.user, is_team_admin=True).exists()):
+            return HttpResponseForbidden("You don't have permission to verify payments.")
+            
+        # Check if the user is the player or an admin
+        is_player = TeamMember.objects.filter(team=team, user=request.user, id=player_payment.player.id).exists()
+        if not (is_admin or is_player):
+            return HttpResponseForbidden("You don't have permission to manage this payment.")
+
+        # Handle admin actions
+        if is_admin:
+            if player_payment.is_paid and not player_payment.admin_verified:
+                # Admin verifying a payment
+                player_payment.mark_as_paid(is_admin=True)
+            elif not player_payment.is_paid:
+                # Admin marking as paid
+                player_payment.mark_as_paid(is_admin=True)
+            else:
+                # Admin unmarking a verified payment
+                player_payment.mark_as_unpaid(is_admin=True)
+        # Handle player actions
+        else:
+            if player_payment.admin_verified:
+                return HttpResponseForbidden("This payment has been verified by an admin and cannot be modified.")
+            
+            if player_payment.is_paid:
+                # Player canceling their payment notification
+                player_payment.mark_as_unpaid()
+            else:
+                # Player marking as paid (pending approval)
+                player_payment.mark_as_paid()
+        
+        return JsonResponse({
+            'status': 'success',
+            'is_paid': player_payment.is_paid,
+            'admin_verified': player_payment.admin_verified,
+            'paid_at': player_payment.paid_at.strftime('%Y-%m-%d %H:%M') if player_payment.paid_at else None
+        })
+    
+    return JsonResponse({'status': 'error', 'message': 'Invalid request method'})
+
+@login_required
+def team_list(request):
+    """View for listing and selecting teams."""
+    team_memberships = TeamMember.objects.filter(
+        user=request.user,
+        is_active=True
+    ).select_related('team')
+    
+    return render(request, 'teams/team_list.html', {
+        'team_memberships': team_memberships
     })

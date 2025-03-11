@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth import get_user_model
-from .models import Team, TeamMember, Position, Profile, Season, Match
+from .models import Team, TeamMember, Position, Profile, Season, Match, Payment, PlayerPayment
 
 class UserRegistrationForm(UserCreationForm):
     first_name = forms.CharField(max_length=30, required=True)
@@ -19,11 +19,10 @@ class UserRegistrationForm(UserCreationForm):
     )
     position = forms.ModelChoiceField(queryset=Position.objects.all(), required=True,
                                     help_text="Select your primary playing position")
-    profile_picture = forms.ImageField(required=False)
 
     class Meta:
         model = get_user_model()
-        fields = ('email', 'first_name', 'last_name', 'date_of_birth', 'player_number', 'position', 'profile_picture', 'password1', 'password2')
+        fields = ('email', 'first_name', 'last_name', 'date_of_birth', 'player_number', 'position', 'password1', 'password2')
 
     def __init__(self, *args, **kwargs):
         self.invited_email = kwargs.pop('email', None)
@@ -38,8 +37,6 @@ class UserRegistrationForm(UserCreationForm):
         for field in self.fields.values():
             if isinstance(field.widget, forms.DateInput):
                 field.widget.attrs.update({'class': 'form-control', 'type': 'date'})
-            elif isinstance(field.widget, forms.FileInput):
-                field.widget.attrs.update({'class': 'form-control'})
             else:
                 field.widget.attrs.update({'class': 'form-control'})
 
@@ -69,8 +66,6 @@ class UserRegistrationForm(UserCreationForm):
             profile = Profile.objects.get_or_create(user=user)[0]
             profile.player_number = self.cleaned_data['player_number']
             profile.position = self.cleaned_data['position']
-            if self.cleaned_data.get('profile_picture'):
-                profile.profile_picture = self.cleaned_data['profile_picture']
             profile.save()
         return user
 
@@ -170,10 +165,14 @@ class UserProfileForm(forms.ModelForm):
         required=True,
         help_text="Chilean ID number (RUT)"
     )
+    profile_picture = forms.ImageField(
+        required=False,
+        help_text="Upload a profile picture (optional)"
+    )
 
     class Meta:
         model = get_user_model()
-        fields = ('first_name', 'last_name', 'email', 'player_number', 'position', 'level', 'is_official', 'rut')
+        fields = ('first_name', 'last_name', 'email', 'player_number', 'position', 'level', 'is_official', 'rut', 'profile_picture')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -185,11 +184,16 @@ class UserProfileForm(forms.ModelForm):
                 self.fields['level'].initial = profile.level
                 self.fields['is_official'].initial = profile.is_official
                 self.fields['rut'].initial = profile.rut
+                if profile.profile_picture:
+                    self.fields['profile_picture'].initial = profile.profile_picture
             except Profile.DoesNotExist:
                 pass
 
         for field in self.fields.values():
-            field.widget.attrs['class'] = 'form-control'
+            if isinstance(field.widget, forms.FileInput):
+                field.widget.attrs['class'] = 'form-control'
+            else:
+                field.widget.attrs['class'] = 'form-control'
         # Special handling for checkbox
         self.fields['is_official'].widget.attrs['class'] = 'form-check-input'
 
@@ -203,6 +207,8 @@ class UserProfileForm(forms.ModelForm):
             profile.level = self.cleaned_data['level']
             profile.is_official = self.cleaned_data['is_official']
             profile.rut = self.cleaned_data['rut']
+            if self.cleaned_data.get('profile_picture'):
+                profile.profile_picture = self.cleaned_data['profile_picture']
             profile.save()
         return user
 
@@ -227,10 +233,14 @@ class AdminMemberProfileForm(forms.ModelForm):
         required=True,
         help_text="Chilean ID number (RUT)"
     )
+    profile_picture = forms.ImageField(
+        required=False,
+        help_text="Upload a profile picture (optional)"
+    )
 
     class Meta:
         model = get_user_model()
-        fields = ('first_name', 'last_name', 'email', 'player_number', 'position', 'level', 'is_official', 'rut')
+        fields = ('first_name', 'last_name', 'email', 'player_number', 'position', 'level', 'is_official', 'rut', 'profile_picture')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -242,11 +252,16 @@ class AdminMemberProfileForm(forms.ModelForm):
                 self.fields['level'].initial = profile.level
                 self.fields['is_official'].initial = profile.is_official
                 self.fields['rut'].initial = profile.rut
+                if profile.profile_picture:
+                    self.fields['profile_picture'].initial = profile.profile_picture
             except Profile.DoesNotExist:
                 pass
 
         for field in self.fields.values():
-            field.widget.attrs['class'] = 'form-control'
+            if isinstance(field.widget, forms.FileInput):
+                field.widget.attrs['class'] = 'form-control'
+            else:
+                field.widget.attrs['class'] = 'form-control'
         # Special handling for checkbox
         self.fields['is_official'].widget.attrs['class'] = 'form-check-input'
 
@@ -260,6 +275,8 @@ class AdminMemberProfileForm(forms.ModelForm):
             profile.level = self.cleaned_data['level']
             profile.is_official = self.cleaned_data['is_official']
             profile.rut = self.cleaned_data['rut']
+            if self.cleaned_data.get('profile_picture'):
+                profile.profile_picture = self.cleaned_data['profile_picture']
             profile.save()
         return user
 
@@ -353,3 +370,30 @@ class MatchForm(forms.ModelForm):
                 )
 
         return cleaned_data 
+
+class PaymentForm(forms.ModelForm):
+    class Meta:
+        model = Payment
+        fields = ['name', 'total_amount', 'due_date']
+        widgets = {
+            'due_date': forms.DateInput(attrs={'type': 'date'}),
+        }
+
+class PlayerPaymentForm(forms.ModelForm):
+    class Meta:
+        model = PlayerPayment
+        fields = ['amount', 'admin_verified']
+        labels = {
+            'admin_verified': 'Payment Verified',
+        }
+        help_texts = {
+            'admin_verified': 'Check this box to verify that the payment has been received and processed.'
+        }
+
+PlayerPaymentFormSet = forms.inlineformset_factory(
+    Payment, PlayerPayment,
+    form=PlayerPaymentForm,
+    fields=['amount', 'admin_verified'],
+    extra=0,
+    can_delete=True
+) 

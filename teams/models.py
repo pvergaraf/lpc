@@ -6,6 +6,7 @@ from PIL import Image
 import os
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -163,7 +164,6 @@ class Season(models.Model):
 
     @property
     def is_current(self):
-        from django.utils import timezone
         today = timezone.now().date()
         return self.start_date <= today <= self.end_date
 
@@ -213,3 +213,48 @@ class TeamMember(models.Model):
         if self.user:
             return f"{self.user.get_full_name()} - {self.team.name} ({self.get_role_display()})"
         return f"Pending Invitation ({self.email}) - {self.team.name}"
+
+class Payment(models.Model):
+    season = models.ForeignKey(Season, on_delete=models.CASCADE, related_name='payments')
+    name = models.CharField(max_length=200)
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    due_date = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['due_date']
+
+    def __str__(self):
+        return f"{self.name} - {self.season.name}"
+
+class PlayerPayment(models.Model):
+    payment = models.ForeignKey(Payment, on_delete=models.CASCADE, related_name='player_payments')
+    player = models.ForeignKey(TeamMember, on_delete=models.CASCADE, related_name='payments')
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    is_paid = models.BooleanField(default=False)
+    admin_verified = models.BooleanField(default=False)
+    paid_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['payment__due_date']
+        unique_together = ['payment', 'player']
+
+    def __str__(self):
+        return f"{self.player.user.get_full_name()} - {self.payment.name}"
+
+    def mark_as_paid(self, is_admin=False):
+        self.is_paid = True
+        if is_admin:
+            self.admin_verified = True
+        self.paid_at = timezone.now()
+        self.save()
+
+    def mark_as_unpaid(self, is_admin=False):
+        if is_admin:
+            self.admin_verified = False
+        self.is_paid = False
+        self.paid_at = None
+        self.save()

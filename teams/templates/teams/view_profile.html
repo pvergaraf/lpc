@@ -1,65 +1,67 @@
 {% extends 'teams/base.html' %}
+{% load static %}
 
-{% block title %}{{ profile_user.get_full_name }}'s Profile{% endblock %}
+{% block title %}View Profile{% endblock %}
 
 {% block content %}
-<style>
-.position-badge {
-    display: inline-block;
-    text-align: center;
-    min-width: 35px;
-    position: relative;
-    padding-bottom: 3px;
-}
-.position-code {
-    font-weight: bold;
-    font-size: 0.9em;
-    margin-bottom: 2px;
-}
-.position-line {
-    height: 3px;
-    width: 100%;
-    position: absolute;
-    bottom: 0;
-}
-</style>
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">{{ profile_user.get_full_name }}</h4>
+                </div>
+                <div class="card-body">
+                    <!-- Profile Picture -->
+                    <div class="text-center mb-4">
+                        {% if profile.profile_picture %}
+                            <img src="{{ profile.profile_picture.url }}" alt="Profile picture" class="img-thumbnail" style="max-width: 200px;">
+                        {% else %}
+                            <img src="{% static 'teams/images/default-profile.png' %}" alt="Default profile picture" class="img-thumbnail" style="max-width: 200px;">
+                        {% endif %}
+                    </div>
 
-<div class="card">
-    <div class="card-body text-center">
-        {% if profile.profile_picture %}
-            <img src="{{ profile.profile_picture.url }}" alt="Profile Picture" class="rounded-circle mb-3" style="width: 150px; height: 150px; object-fit: cover;">
-        {% else %}
-            <img src="{{ MEDIA_URL }}profile_pics/castolo.png" alt="Default Profile Picture" class="rounded-circle mb-3" style="width: 150px; height: 150px; object-fit: cover;">
-        {% endif %}
-        
-        <h3 class="card-title">{{ profile_user.get_full_name }}</h3>
-        <p class="text-muted">{{ profile_user.email }}</p>
-        
-        {% if profile.position %}
-            <div class="position-badge mb-2">
-                <div class="position-code">{{ profile.position.code }}</div>
-                <div class="position-line" style="background-color: {{ profile.position.color }};"></div>
+                    <!-- Player Info -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <p><strong>Email:</strong> {{ profile_user.email }}</p>
+                        </div>
+                    </div>
+
+                    {% if profile %}
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <p><strong>Position:</strong> {{ profile.position }}</p>
+                                <p><strong>Level:</strong> {{ profile.level }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Player Number:</strong> {{ profile.player_number }}</p>
+                                <p><strong>Official Player:</strong> {% if profile.is_official %}Yes{% else %}No{% endif %}</p>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    {% if profile.player_number %}
+                        <p class="h4">{{ profile.player_number }}</p>
+                    {% endif %}
+
+                    <div class="mt-4">
+                        <h5>Common Teams</h5>
+                        <div class="list-group">
+                            {% for team in common_teams %}
+                                <a href="{% url 'teams:team_members' team.id %}" class="list-group-item list-group-item-action">
+                                    {{ team.name }}
+                                </a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
             </div>
-        {% endif %}
-        
-        {% if profile.player_number %}
-            <p class="h4">#{{ profile.player_number }}</p>
-        {% endif %}
 
-        <div class="mt-4">
-            <h5>Common Teams</h5>
-            <div class="list-group">
-                {% for team in common_teams %}
-                <a href="{% url 'team_members' team.id %}" class="list-group-item list-group-item-action">
-                    {{ team.name }}
-                </a>
-                {% endfor %}
+            <div class="mt-3">
+                <a href="{% url 'teams:dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
             </div>
         </div>
     </div>
-</div>
-
-<div class="mt-3">
-    <a href="{% url 'dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
 </div>
 {% endblock %} 
