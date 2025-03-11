@@ -184,7 +184,7 @@ AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
 AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
 AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'us-east-1')
 AWS_S3_FILE_OVERWRITE = False
-AWS_DEFAULT_ACL = None
+AWS_DEFAULT_ACL = 'public-read'  # Make files publicly readable
 AWS_QUERYSTRING_AUTH = False
 AWS_S3_USE_SSL = True
 AWS_S3_OBJECT_PARAMETERS = {
@@ -199,14 +199,18 @@ STORAGES = {
     "default": {
         "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
         "OPTIONS": {
-            "location": "media"  # Store media files in /media/ prefix
-        }
+            "bucket_name": AWS_STORAGE_BUCKET_NAME,
+            "location": "media",
+            "default_acl": "public-read",
+        },
     },
     "staticfiles": {
         "BACKEND": "storages.backends.s3boto3.S3StaticStorage",
         "OPTIONS": {
-            "location": "static"  # Store static files in /static/ prefix
-        }
+            "bucket_name": AWS_STORAGE_BUCKET_NAME,
+            "location": "static",
+            "default_acl": "public-read",
+        },
     }
 }
 
