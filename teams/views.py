@@ -8,7 +8,7 @@ from django.urls import reverse, reverse_lazy
 from django.utils.crypto import get_random_string
 from django.http import HttpResponseForbidden
 from django.db import transaction
-from .models import Team, TeamMember, Season, Match
+from .models import Team, TeamMember, Season, Match, Profile
 from .forms import (
     UserRegistrationForm, TeamMemberInviteForm, TeamForm, 
     EmailAuthenticationForm, AddTeamMemberForm, UserProfileForm,
@@ -17,6 +17,8 @@ from .forms import (
 from django.db import models
 from django.contrib.auth.views import LogoutView
 from django.utils import timezone
+from django.conf import settings
+from django.template.loader import render_to_string
 
 User = get_user_model()
 
@@ -97,19 +99,26 @@ def team_members(request, team_id):
     team = get_object_or_404(Team, id=team_id)
     team_member = get_object_or_404(TeamMember, team=team, user=request.user, is_active=True)
     
-    # Get both active members and pending invitations
-    members = TeamMember.objects.filter(
-        team=team
-    ).filter(
-        models.Q(is_active=True) | 
-        models.Q(is_active=False, invitation_token__isnull=False)
-    ).select_related('user')
+    # Get active members
+    active_members = TeamMember.objects.filter(
+        team=team,
+        is_active=True
+    ).select_related('user', 'user__profile')
+    
+    # Get pending invitations
+    pending_invitations = TeamMember.objects.filter(
+        team=team,
+        is_active=False,
+        invitation_token__isnull=False,
+        invitation_accepted=False
+    )
     
     context = {
         'team': team,
-        'members': members,
-        'is_manager': team_member.role == TeamMember.Role.MANAGER,
-        'is_team_admin': team_member.is_team_admin,
+        'active_members': active_members,
+        'pending_invitations': pending_invitations,
+        'user': request.user,
+        'user_is_admin': team_member.is_team_admin or team_member.role == TeamMember.Role.MANAGER
     }
     return render(request, 'teams/team_members.html', context)
 
@@ -128,6 +137,7 @@ def invite_member(request, team_id):
             email = form.cleaned_data['email']
             role = form.cleaned_data['role']
             is_team_admin = form.cleaned_data['is_team_admin']
+            is_official = form.cleaned_data['is_official']
             invitation_token = get_random_string(64)
             
             try:
@@ -165,15 +175,39 @@ def invite_member(request, team_id):
                     invite_url = request.build_absolute_uri(
                         reverse('register') + f'?token={invitation_token}'
                     )
+                    
+                    # Print invitation details to console for development
+                    if settings.DEBUG:
+                        print("\n=== Invitation Details ===")
+                        print(f"Email: {email}")
+                        print(f"Role: {role}")
+                        print(f"Team Admin: {is_team_admin}")
+                        print(f"Official Player: {is_official}")
+                        print(f"Token: {invitation_token}")
+                        print(f"URL: {invite_url}")
+                        print("=======================\n")
+                    
+                    # Render the HTML email template
+                    html_message = render_to_string('teams/email/team_invitation.html', {
+                        'team': team,
+                        'role': team_member.get_role_display(),
+                        'is_team_admin': is_team_admin,
+                        'is_official': is_official,
+                        'invite_url': invite_url,
+                    })
+                    
+                    # Send the email with both plain text and HTML versions
                     send_mail(
-                        f'Invitation to join {team.name}',
-                        f'You have been invited to join {team.name} as a {role}. '
-                        f'{"You will have team admin privileges. " if is_team_admin else ""}'
-                        f'Click here to complete your registration: {invite_url}',
-                        'from@example.com',
-                        [email],
+                        subject=f'Invitation to join {team.name}',
+                        message=f'You have been invited to join {team.name} as a {team_member.get_role_display()}. Click here to accept: {invite_url}',
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[email],
+                        html_message=html_message,
                         fail_silently=False,
                     )
+                    
+                    # Store is_official in the session for use during registration
+                    request.session[f'invite_{invitation_token}_is_official'] = is_official
                     
                     messages.success(request, f'Invitation sent to {email}')
                     return redirect('team_members', team_id=team.id)
@@ -184,7 +218,10 @@ def invite_member(request, team_id):
     else:
         form = TeamMemberInviteForm(team)
     
-    return render(request, 'teams/invite_member.html', {'form': form, 'team': team})
+    return render(request, 'teams/invite_member.html', {
+        'form': form,
+        'team': team
+    })
 
 @login_required
 def toggle_team_admin(request, team_id, member_id):
@@ -259,28 +296,78 @@ def register(request):
         return render(request, 'teams/404.html', context, status=404)
     
     if request.method == 'POST':
-        form = UserRegistrationForm(request.POST, email=team_member.email)
+        form = UserRegistrationForm(request.POST, request.FILES, email=team_member.email)
         if form.is_valid():
-            user = form.save(commit=False)
-            user.email = team_member.email  # Ensure the email is set correctly
-            user.save()
-            
-            team_member.user = user
-            team_member.is_active = True
-            team_member.invitation_accepted = True
-            team_member.save()
-            
-            login(request, user)
-            messages.success(request, f'Registration successful! You are now a member of {team_member.team.name}.')
-            return redirect('dashboard')
+            try:
+                with transaction.atomic():
+                    # Try to get existing user or create new one
+                    user = User.objects.filter(email=team_member.email).first()
+                    if user:
+                        # Update existing user
+                        user.first_name = form.cleaned_data['first_name']
+                        user.last_name = form.cleaned_data['last_name']
+                        user.save()
+                    else:
+                        # Create new user
+                        user = form.save(commit=False)
+                        user.username = team_member.email
+                        user.email = team_member.email
+                        user.save()
+
+                    # Get the is_official status from session
+                    is_official = request.session.get(f'invite_{token}_is_official', False)
+                    
+                    # Create or update profile
+                    profile = Profile.objects.get_or_create(user=user)[0]
+                    profile.player_number = form.cleaned_data['player_number']
+                    profile.position = form.cleaned_data['position']
+                    profile.is_official = is_official
+                    profile.date_of_birth = form.cleaned_data['date_of_birth']
+                    if form.cleaned_data.get('profile_picture'):
+                        profile.profile_picture = form.cleaned_data['profile_picture']
+                    profile.save()
+
+                    # Update team member
+                    team_member.user = user
+                    team_member.is_active = True
+                    team_member.invitation_accepted = True
+                    team_member.save()
+
+                    # Clean up the session
+                    request.session.pop(f'invite_{token}_is_official', None)
+
+                    # Log in the user
+                    login(request, user)
+                    messages.success(request, f'Registration successful! You are now a member of {team_member.team.name}.')
+                    return redirect('dashboard')
+
+            except Exception as e:
+                if settings.DEBUG:
+                    print(f"Registration error: {str(e)}")
+                messages.error(request, 'An error occurred during registration. Please try again.')
+        else:
+            if settings.DEBUG:
+                print("Form errors:", form.errors)
     else:
-        form = UserRegistrationForm(email=team_member.email)
+        # Pre-fill data if user exists
+        user = User.objects.filter(email=team_member.email).first()
+        initial_data = {'email': team_member.email}
+        if user:
+            initial_data.update({
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+            })
+        form = UserRegistrationForm(initial=initial_data, email=team_member.email)
+    
+    # Get the is_official status for the template
+    is_official = request.session.get(f'invite_{token}_is_official', False)
     
     context = {
         'form': form,
         'team': team_member.team,
         'role': team_member.get_role_display(),
         'is_team_admin': team_member.is_team_admin,
+        'is_official': is_official,
         'email': team_member.email,
     }
     return render(request, 'teams/register.html', context)

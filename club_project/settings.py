@@ -30,11 +30,9 @@ ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
     '3.87.47.234',
+    'fubol.club',
+    'www.fubol.club',
     'ec2-3-87-47-234.compute-1.amazonaws.com',
-    'ec2-3-87-47-234.compute-1.amazonaws.com,ec2-3-87-47-234.compute-1.amazonaws.com',  # The problematic one
-    'ec2-3-87-47-234.compute-1.amazonaws.com,ec2-3-87-47-234.compute-1.amazonaws.com/',
-    'ec2-3-87-47-234.compute-1.amazonaws.com,ec2-3-87-47-234.compute-1.amazonaws.com:80',
-    'ec2-3-87-47-234.compute-1.amazonaws.com,ec2-3-87-47-234.compute-1.amazonaws.com:443',
 ]
 
 
@@ -249,3 +247,18 @@ LOGOUT_REDIRECT_URL = 'login'
 
 # Custom User Model
 AUTH_USER_MODEL = 'teams.User'
+
+# Security Settings
+SECURE_SSL_REDIRECT = not DEBUG
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SECURE_HSTS_SECONDS = 31536000  # 1 year
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+
+# Import local settings if they exist
+try:
+    from .local_settings import *
+except ImportError:
+    pass

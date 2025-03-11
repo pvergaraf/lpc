@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            padding: 20px 0;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .content {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #007bff;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .footer {
+            text-align: center;
+            padding-top: 20px;
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Team Invitation</h1>
+    </div>
+    
+    <div class="content">
+        <p>Hello!</p>
+        
+        <p>You have been invited to join <strong>{{ team.name }}</strong> as a <strong>{{ role }}</strong>.</p>
+        
+        {% if is_team_admin %}
+        <p>You will have team administrator privileges.</p>
+        {% endif %}
+        
+        {% if is_official %}
+        <p>You will be registered as an <strong>official player</strong>.</p>
+        {% endif %}
+        
+        <p>To accept this invitation and complete your registration, please click the button below:</p>
+        
+        <div style="text-align: center;">
+            <a href="{{ invite_url }}" class="button">Accept Invitation</a>
+        </div>
+        
+        <p>If the button doesn't work, you can copy and paste this link into your browser:</p>
+        <p style="word-break: break-all;">{{ invite_url }}</p>
+        
+        <p>This invitation link will expire once used.</p>
+    </div>
+    
+    <div class="footer">
+        <p>If you received this email by mistake, please ignore it.</p>
+    </div>
+</body>
+</html> 

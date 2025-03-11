@@ -10,7 +10,7 @@ class UserRegistrationForm(UserCreationForm):
         widget=forms.DateInput(attrs={'type': 'date'}),
         required=True
     )
-    email = forms.EmailField(disabled=True, required=False)
+    email = forms.EmailField(required=True)
     player_number = forms.IntegerField(
         min_value=1,
         max_value=99,
@@ -26,11 +26,13 @@ class UserRegistrationForm(UserCreationForm):
         fields = ('email', 'first_name', 'last_name', 'date_of_birth', 'player_number', 'position', 'profile_picture', 'password1', 'password2')
 
     def __init__(self, *args, **kwargs):
-        email = kwargs.pop('email', None)
+        self.invited_email = kwargs.pop('email', None)
         super().__init__(*args, **kwargs)
-        if email:
-            self.fields['email'].initial = email
+        if self.invited_email:
+            self.fields['email'].initial = self.invited_email
             self.fields['email'].widget.attrs['readonly'] = True
+            # Remove unique validator for email field
+            self.fields['email'].validators = []
         
         # Add Bootstrap classes
         for field in self.fields.values():
@@ -42,17 +44,33 @@ class UserRegistrationForm(UserCreationForm):
                 field.widget.attrs.update({'class': 'form-control'})
 
     def clean_email(self):
-        return self.initial.get('email')
+        email = self.cleaned_data.get('email')
+        if self.invited_email:
+            return self.invited_email
+        return email
+
+    def clean(self):
+        cleaned_data = super().clean()
+        # If this is an invited registration, bypass the unique email validation
+        if self.invited_email:
+            # Remove any email-related errors
+            if 'email' in self._errors:
+                del self._errors['email']
+            cleaned_data['email'] = self.invited_email
+        return cleaned_data
 
     def save(self, commit=True):
         user = super().save(commit=False)
-        user.username = user.email
+        user.username = self.cleaned_data.get('email')  # Set username to email
+        user.email = self.cleaned_data.get('email')  # Ensure email is set
         if commit:
             user.save()
             # Create or update profile
             profile = Profile.objects.get_or_create(user=user)[0]
             profile.player_number = self.cleaned_data['player_number']
             profile.position = self.cleaned_data['position']
+            if self.cleaned_data.get('profile_picture'):
+                profile.profile_picture = self.cleaned_data['profile_picture']
             profile.save()
         return user
 
@@ -70,6 +88,12 @@ class TeamMemberInviteForm(forms.Form):
         initial=False,
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         help_text="Give this member admin privileges for the team"
+    )
+    is_official = forms.BooleanField(
+        required=False,
+        initial=False,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        help_text="Mark this player as officially registered"
     )
 
     def __init__(self, team, *args, **kwargs):

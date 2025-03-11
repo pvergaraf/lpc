@@ -24,129 +24,100 @@
 }
 </style>
 
-<div class="card">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="card-title mb-0">{{ team.name }} - Team Members</h5>
-        {% if is_manager or is_team_admin %}
-        <div class="btn-group">
-            <a href="{% url 'add_team_member' team.id %}" class="btn btn-success btn-sm">
-                Add Member
-            </a>
-            <a href="{% url 'invite_member' team.id %}" class="btn btn-primary btn-sm">
-                Invite Member
-            </a>
-        </div>
-        {% endif %}
+<div class="container mt-4">
+    <h2>{{ team.name }} - Team Members</h2>
+    
+    {% if user_is_admin %}
+    <div class="mb-4">
+        <a href="{% url 'invite_member' team.id %}" class="btn btn-primary">
+            <i class="fas fa-user-plus"></i> Invite Member
+        </a>
     </div>
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Position</th>
-                        <th>Email</th>
-                        <th>#</th>
-                        <th>Role</th>
-                        <th>Status</th>
-                        {% if is_manager or is_team_admin %}
-                        <th>Admin</th>
-                        <th>Actions</th>
-                        {% endif %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for member in members %}
-                    <tr>
-                        <td>
-                            {% if member.user %}
-                                <a href="{% url 'view_profile' member.user.id %}">{{ member.user.get_full_name }}</a>
-                            {% else %}
-                                <em>Pending Invitation</em>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if member.user and member.user.profile and member.user.profile.position %}
-                                <div class="position-badge">
-                                    <div class="position-code">{{ member.user.profile.position.code }}</div>
-                                    <div class="position-line" style="background-color: {{ member.user.profile.position.color }};"></div>
-                                </div>
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if member.user %}
-                                {{ member.user.email }}
-                            {% else %}
-                                {{ member.email }}
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if member.user and member.user.profile %}
-                                #{{ member.user.profile.player_number }}
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-                        <td>
-                            <span class="badge {% if member.role == 'MANAGER' %}bg-primary{% else %}bg-secondary{% endif %}">
-                                {{ member.get_role_display }}
-                            </span>
-                        </td>
-                        <td>
-                            {% if member.is_active %}
-                                <span class="badge bg-success">Active</span>
-                            {% else %}
-                                <span class="badge bg-warning">Pending</span>
-                            {% endif %}
-                        </td>
-                        {% if is_manager or is_team_admin %}
-                        <td>
-                            {% if member.is_active %}
-                                {% if member.is_team_admin %}
-                                <span class="badge bg-info">Team Admin</span>
-                                {% endif %}
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if member.user and member.user != user and member.is_active %}
-                            <div class="btn-group">
-                                <form method="post" action="{% url 'toggle_team_admin' team.id member.id %}" class="d-inline">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-sm btn-outline-info">
-                                        {% if member.is_team_admin %}Remove Admin{% else %}Make Admin{% endif %}
-                                    </button>
-                                </form>
-                                <form method="post" action="{% url 'remove_member' team.id member.id %}" class="d-inline ms-1">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" 
-                                            onclick="return confirm('Are you sure you want to remove this member?')">
-                                        Remove
-                                    </button>
-                                </form>
-                            </div>
-                            {% elif not member.is_active %}
-                            <form method="post" action="{% url 'remove_pending_invitation' team.id member.id %}" class="d-inline">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-sm btn-outline-danger" 
-                                        onclick="return confirm('Are you sure you want to cancel this invitation?')">
+    {% endif %}
+
+    {% if pending_invitations %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h4>Pending Invitations</h4>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Admin</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for member in pending_invitations %}
+                        <tr>
+                            <td>{{ member.email }}</td>
+                            <td>{{ member.get_role_display }}</td>
+                            <td>{% if member.is_team_admin %}Yes{% else %}No{% endif %}</td>
+                            <td>
+                                {% if user_is_admin %}
+                                <a href="{% url 'remove_pending_invitation' team.id member.id %}" 
+                                   class="btn btn-danger btn-sm"
+                                   onclick="return confirm('Are you sure you want to cancel this invitation?')">
                                     Cancel Invitation
-                                </button>
-                            </form>
-                            {% endif %}
-                        </td>
-                        {% endif %}
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="8" class="text-center">No members yet</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                                </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-header">
+            <h4>Active Members</h4>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Admin</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for member in active_members %}
+                        <tr>
+                            <td>{{ member.user.get_full_name }}</td>
+                            <td>{{ member.user.email }}</td>
+                            <td>{{ member.get_role_display }}</td>
+                            <td>{% if member.is_team_admin %}Yes{% else %}No{% endif %}</td>
+                            <td>
+                                {% if user_is_admin and member.user != user %}
+                                <div class="btn-group">
+                                    <a href="{% url 'toggle_team_admin' team.id member.id %}" 
+                                       class="btn btn-warning btn-sm">
+                                        {% if member.is_team_admin %}Remove Admin{% else %}Make Admin{% endif %}
+                                    </a>
+                                    <a href="{% url 'remove_member' team.id member.id %}" 
+                                       class="btn btn-danger btn-sm"
+                                       onclick="return confirm('Are you sure you want to remove this member?')">
+                                        Remove
+                                    </a>
+                                </div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>
