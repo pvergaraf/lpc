@@ -199,19 +199,15 @@ STORAGES = {
     "default": {
         "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
         "OPTIONS": {
-            "bucket_name": AWS_STORAGE_BUCKET_NAME,
-            "location": "media",
-            "default_acl": "public-read",
-        },
+            "location": "media"  # Store media files in /media/ prefix
+        }
     },
     "staticfiles": {
         "BACKEND": "storages.backends.s3boto3.S3StaticStorage",
         "OPTIONS": {
-            "bucket_name": AWS_STORAGE_BUCKET_NAME,
-            "location": "static",
-            "default_acl": "public-read",
-        },
-    },
+            "location": "static"  # Store static files in /static/ prefix
+        }
+    }
 }
 
 # URLs for static and media files

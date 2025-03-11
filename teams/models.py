@@ -90,7 +90,7 @@ class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     profile_picture = models.ImageField(
         upload_to='profile_pics/',
-        default='profile_pics/castolo.png',  # Set castolo.png as default image
+        default='profile_pics/castolo.png',
         blank=True
     )
     player_number = models.IntegerField(null=True, blank=True)
@@ -104,18 +104,22 @@ class Profile(models.Model):
     rut = models.CharField(max_length=12, blank=True, null=True, help_text="Chilean ID number (RUT)")
 
     def save(self, *args, **kwargs):
-        # Remove old profile picture if it exists and a new one is being uploaded
-        if self.pk and self.profile_picture.name != 'profile_pics/castolo.png':  # Don't delete default image
-            try:
-                old_profile = Profile.objects.get(pk=self.pk)
-                if old_profile.profile_picture and self.profile_picture != old_profile.profile_picture:
-                    old_profile.profile_picture.delete(save=False)
-            except Profile.DoesNotExist:
-                pass
+        # Check if this is a new instance
+        is_new = self.pk is None
+        
+        if not is_new:
+            # Get the old instance from the database
+            old_instance = Profile.objects.get(pk=self.pk)
+            if (old_instance.profile_picture and 
+                old_instance.profile_picture != self.profile_picture and 
+                old_instance.profile_picture.name != 'profile_pics/castolo.png'):
+                # Delete the old picture only if it's not the default
+                old_instance.profile_picture.delete(save=False)
+        
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.user.get_full_name()}'s Profile"
+        return f"{self.user.email}'s profile"
 
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
