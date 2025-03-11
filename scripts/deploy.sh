@@ -3,6 +3,11 @@
 # Navigate to the project directory
 cd /var/www/lpc
 
+# Discard any local changes
+echo "Discarding local changes..."
+git reset --hard HEAD
+git clean -fd
+
 # Pull the latest changes
 echo "Pulling latest changes..."
 git pull
