@@ -19,8 +19,16 @@ def main():
     print("\nDjango Settings:")
     print("-" * 50)
     print(f"DEBUG: {settings.DEBUG}")
-    print(f"STATICFILES_STORAGE: {settings.STATICFILES_STORAGE}")
-    print(f"DEFAULT_FILE_STORAGE: {settings.DEFAULT_FILE_STORAGE}")
+    
+    # Handle both old and new storage settings
+    if hasattr(settings, 'STORAGES'):
+        print("Using Django 4.2+ STORAGES setting:")
+        print(f"STORAGES: {settings.STORAGES}")
+    else:
+        print("Using legacy storage settings:")
+        print(f"STATICFILES_STORAGE: {getattr(settings, 'STATICFILES_STORAGE', 'Not set')}")
+        print(f"DEFAULT_FILE_STORAGE: {getattr(settings, 'DEFAULT_FILE_STORAGE', 'Not set')}")
+    
     print(f"STATIC_URL: {settings.STATIC_URL}")
     print(f"AWS_S3_CUSTOM_DOMAIN: {getattr(settings, 'AWS_S3_CUSTOM_DOMAIN', 'Not set')}")
     print(f"AWS_STORAGE_BUCKET_NAME: {getattr(settings, 'AWS_STORAGE_BUCKET_NAME', 'Not set')}")
@@ -32,7 +40,6 @@ def main():
     print(f"staticfiles_storage class: {staticfiles_storage.__class__.__name__}")
     print(f"default_storage class: {default_storage.__class__.__name__}")
 
-    # Test if we can list files in the static storage
     print("\nTesting Static Storage:")
     print("-" * 50)
     try:
@@ -43,6 +50,7 @@ def main():
                 print(f"- {obj.key} ({obj.size} bytes)")
         else:
             print("Static storage is not using S3")
+            print(f"Storage backend type: {type(staticfiles_storage)}")
     except Exception as e:
         print(f"Error accessing static storage: {str(e)}")
 
