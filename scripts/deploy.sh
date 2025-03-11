@@ -32,9 +32,26 @@ sudo chmod 660 /var/www/lpc/django.log
 sudo chmod +x /var/www/lpc/scripts/*
 sudo chmod +x /var/www/lpc/venv/bin/*
 
+echo "Verifying AWS settings..."
+# Check if AWS settings are properly configured
+if ! sudo grep -q "AWS_ACCESS_KEY_ID" /var/www/lpc/.env.production; then
+    echo "Error: AWS_ACCESS_KEY_ID not found in .env.production"
+    exit 1
+fi
+
 echo "Collecting static files..."
 # Load environment variables and run collectstatic as www-data
-sudo -u www-data bash -c 'source /var/www/lpc/venv/bin/activate && source /var/www/lpc/.env.production && python /var/www/lpc/manage.py collectstatic --no-input --clear'
+sudo -u www-data bash -c '
+    set -a
+    source /var/www/lpc/.env.production
+    set +a
+    source /var/www/lpc/venv/bin/activate
+    echo "AWS Environment Check:"
+    echo "AWS_STORAGE_BUCKET_NAME: $AWS_STORAGE_BUCKET_NAME"
+    echo "AWS_S3_REGION_NAME: $AWS_S3_REGION_NAME"
+    echo "AWS_ACCESS_KEY_ID is set: $(if [ -n "$AWS_ACCESS_KEY_ID" ]; then echo "yes"; else echo "no"; fi)"
+    python /var/www/lpc/manage.py collectstatic --no-input --clear
+'
 
 echo "Restarting application..."
 sudo systemctl restart lpc
