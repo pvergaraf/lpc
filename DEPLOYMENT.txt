@@ -1,0 +1,83 @@
+DEPLOYMENT GUIDE
+===============
+
+This guide outlines the steps needed to deploy the LPC application to a production server.
+
+INITIAL SERVER SETUP
+------------------
+
+1. Update the system:
+   sudo apt update
+   sudo apt upgrade
+
+2. Install required packages:
+   sudo apt install python3-pip python3-venv nginx postgresql postgresql-contrib
+
+3. Clone the repository:
+   cd /var/www
+   sudo git clone https://github.com/yourusername/lpc.git
+
+ENVIRONMENT SETUP
+---------------
+
+1. Create and activate virtual environment:
+   cd /var/www/lpc
+   sudo python3 -m venv venv
+   source venv/bin/activate
+
+2. Install dependencies:
+   pip install -r requirements.txt
+
+3. Create production environment file:
+   sudo nano /var/www/lpc/.env.production
+
+   Add required environment variables:
+   AWS_ACCESS_KEY_ID=your_key
+   AWS_SECRET_ACCESS_KEY=your_secret
+   AWS_STORAGE_BUCKET_NAME=your_bucket
+   AWS_S3_REGION_NAME=your_region
+   DJANGO_SETTINGS_MODULE=club_project.settings
+   DEBUG=False
+
+4. Set proper permissions:
+   sudo chmod 600 /var/www/lpc/.env.production
+   sudo chown www-data:www-data /var/www/lpc/.env.production
+
+DEPLOYMENT
+---------
+
+To deploy updates to the application:
+
+1. SSH into the server
+2. Run the deployment script:
+   sudo /var/www/lpc/scripts/deploy.sh
+
+The deploy script will:
+- Pull the latest changes
+- Install any new dependencies
+- Collect static files
+- Set proper permissions
+- Restart the application
+
+MAINTENANCE SCRIPTS
+-----------------
+
+Additional maintenance scripts are available in the scripts directory:
+
+- test_s3_with_env.sh: Test S3 connectivity
+- collect_static.sh: Manually collect static files
+
+Run them as the www-data user:
+sudo -u www-data /var/www/lpc/scripts/test_s3_with_env.sh
+sudo -u www-data /var/www/lpc/scripts/collect_static.sh
+
+TROUBLESHOOTING
+-------------
+
+Check application logs:
+sudo tail -f /var/www/lpc/gunicorn-error.log
+sudo tail -f /var/www/lpc/django.log
+
+Check service status:
+sudo systemctl status lpc
+sudo systemctl status nginx 
