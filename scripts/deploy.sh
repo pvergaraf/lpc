@@ -32,24 +32,25 @@ sudo chmod 660 /var/www/lpc/django.log
 sudo chmod +x /var/www/lpc/scripts/*
 sudo chmod +x /var/www/lpc/venv/bin/*
 
-echo "Verifying AWS settings..."
-# Check if AWS settings are properly configured
-if ! sudo grep -q "AWS_ACCESS_KEY_ID" /var/www/lpc/.env.production; then
-    echo "Error: AWS_ACCESS_KEY_ID not found in .env.production"
-    exit 1
-fi
-
 echo "Collecting static files..."
-# Load environment variables and run collectstatic as www-data
+# Load environment variables and run collectstatic as www-data, properly handling special characters
 sudo -u www-data bash -c '
-    set -a
-    source /var/www/lpc/.env.production
-    set +a
+    while IFS="=" read -r key value; do
+        # Skip comments and empty lines
+        [[ $key =~ ^#.*$ ]] && continue
+        [[ -z $key ]] && continue
+        # Remove any leading/trailing whitespace
+        key=$(echo $key | xargs)
+        value=$(echo $value | xargs)
+        # Export the variable
+        export "$key=$value"
+    done < /var/www/lpc/.env.production
     source /var/www/lpc/venv/bin/activate
     echo "AWS Environment Check:"
     echo "AWS_STORAGE_BUCKET_NAME: $AWS_STORAGE_BUCKET_NAME"
     echo "AWS_S3_REGION_NAME: $AWS_S3_REGION_NAME"
     echo "AWS_ACCESS_KEY_ID is set: $(if [ -n "$AWS_ACCESS_KEY_ID" ]; then echo "yes"; else echo "no"; fi)"
+    echo "AWS_SECRET_ACCESS_KEY is set: $(if [ -n "$AWS_SECRET_ACCESS_KEY" ]; then echo "yes"; else echo "no"; fi)"
     python /var/www/lpc/manage.py collectstatic --no-input --clear
 '
 
