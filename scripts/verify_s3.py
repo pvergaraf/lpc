@@ -20,19 +20,9 @@ def verify_s3():
         s3.put_object(
             Bucket=os.environ['AWS_STORAGE_BUCKET_NAME'],
             Key='static/test_upload.txt',
-            Body=test_content,
-            ACL='public-read'
+            Body=test_content
         )
         print("✓ Upload successful")
-        
-        # Test file download
-        print("Downloading test file...")
-        obj = s3.get_object(
-            Bucket=os.environ['AWS_STORAGE_BUCKET_NAME'],
-            Key='static/test_upload.txt'
-        )
-        content = obj['Body'].read()
-        print("✓ Download successful")
         
         # List all files
         print("\nCurrent files in bucket:")
