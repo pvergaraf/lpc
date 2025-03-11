@@ -68,13 +68,12 @@ def upload_castolo():
         
         print(f"Found local file. Uploading to S3 at {s3_path}...")
         
-        # Upload to S3
+        # Upload to S3 without ACL
         with open(local_path, 'rb') as f:
             s3.upload_fileobj(
                 f,
                 aws_settings['AWS_STORAGE_BUCKET_NAME'],
-                s3_path,
-                ExtraArgs={'ACL': 'public-read'}
+                s3_path
             )
             print(f"Successfully uploaded castolo profile picture to s3://{aws_settings['AWS_STORAGE_BUCKET_NAME']}/{s3_path}")
             
