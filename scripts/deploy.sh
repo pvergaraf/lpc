@@ -8,8 +8,8 @@ set -e
 
 echo "Starting deployment..."
 
-# Navigate to project directory
-cd /var/www/lpc
+echo "Activating virtual environment..."
+source /var/www/lpc/venv/bin/activate
 
 echo "Discarding local changes..."
 git checkout -- .
@@ -18,7 +18,8 @@ echo "Pulling latest changes..."
 git pull origin main
 
 echo "Installing dependencies..."
-sudo -u www-data /var/www/lpc/venv/bin/pip install -r requirements.txt
+# Activate virtual environment and install dependencies
+source venv/bin/activate && pip install -r requirements.txt
 
 echo "Setting correct permissions..."
 # Set ownership
@@ -36,7 +37,7 @@ sudo chmod +x /var/www/lpc/venv/bin/*
 
 echo "Collecting static files..."
 # Load environment variables and run collectstatic
-sudo -u www-data bash -c 'set -a && source /var/www/lpc/.env.production && set +a && /var/www/lpc/venv/bin/python manage.py collectstatic --no-input --clear'
+source .env.production && python manage.py collectstatic --no-input --clear
 
 echo "Restarting application..."
 sudo systemctl restart lpc
