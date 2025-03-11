@@ -183,6 +183,18 @@ AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
 AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
 AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'us-east-1')
+
+# Print debug info to help diagnose the issue
+print("AWS Settings Debug:")
+print(f"Bucket Name: {AWS_STORAGE_BUCKET_NAME}")
+print(f"Region: {AWS_S3_REGION_NAME}")
+print(f"Access Key: {'Set' if AWS_ACCESS_KEY_ID else 'Not Set'}")
+print(f"Secret Key: {'Set' if AWS_SECRET_ACCESS_KEY else 'Not Set'}")
+
+# Ensure these values are set before continuing
+if not all([AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_STORAGE_BUCKET_NAME]):
+    raise Exception("Required AWS settings are not configured!")
+
 AWS_S3_FILE_OVERWRITE = False
 AWS_DEFAULT_ACL = None
 AWS_QUERYSTRING_AUTH = False
@@ -199,12 +211,14 @@ STORAGES = {
     "default": {
         "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
         "OPTIONS": {
+            "bucket_name": AWS_STORAGE_BUCKET_NAME,
             "location": "media"
         },
     },
     "staticfiles": {
         "BACKEND": "storages.backends.s3boto3.S3StaticStorage",
         "OPTIONS": {
+            "bucket_name": AWS_STORAGE_BUCKET_NAME,
             "location": "static"
         },
     },
