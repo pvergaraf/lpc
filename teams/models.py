@@ -88,7 +88,11 @@ class Position(models.Model):
 
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    profile_picture = models.ImageField(upload_to='profile_pics/', null=True, blank=True)
+    profile_picture = models.ImageField(
+        upload_to='profile_pics/',
+        default='profile_pics/castolo.png',  # Set castolo.png as default image
+        blank=True
+    )
     player_number = models.IntegerField(null=True, blank=True)
     position = models.ForeignKey(Position, on_delete=models.SET_NULL, null=True, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
@@ -101,7 +105,7 @@ class Profile(models.Model):
 
     def save(self, *args, **kwargs):
         # Remove old profile picture if it exists and a new one is being uploaded
-        if self.pk:  # If this is an update
+        if self.pk and self.profile_picture.name != 'profile_pics/castolo.png':  # Don't delete default image
             try:
                 old_profile = Profile.objects.get(pk=self.pk)
                 if old_profile.profile_picture and self.profile_picture != old_profile.profile_picture:
