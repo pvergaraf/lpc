@@ -1,0 +1,16 @@
+[Unit]
+Description=gunicorn daemon for Fubol Club
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/lpc
+ExecStart=/var/www/lpc/venv/bin/gunicorn \
+    --access-logfile - \
+    --workers 3 \
+    --bind unix:/var/www/lpc/club_project.sock \
+    club_project.wsgi:application
+
+[Install]
+WantedBy=multi-user.target 

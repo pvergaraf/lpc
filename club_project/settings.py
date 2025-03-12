@@ -160,6 +160,25 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 CLOUDWATCH_LOG_GROUP = 'fubol-club'
 CLOUDWATCH_LOG_STREAM = 'django-logs'
 
+# AWS S3 Configuration
+AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
+AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME', 'lpc-static-files-2024')
+AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'us-east-1')
+AWS_S3_FILE_OVERWRITE = False
+AWS_QUERYSTRING_AUTH = False
+AWS_S3_USE_SSL = True
+AWS_S3_OBJECT_PARAMETERS = {
+    'CacheControl': 'max-age=86400',
+}
+
+# Create boto3 session for CloudWatch logging
+BOTO3_SESSION = boto3.Session(
+    aws_access_key_id=AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+    region_name=AWS_S3_REGION_NAME,
+)
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -191,11 +210,7 @@ LOGGING = {
             'use_queues': True,
             'send_interval': 10,
             'create_log_group': True,
-            'boto3_session': boto3.Session(
-                aws_access_key_id=AWS_ACCESS_KEY_ID,
-                aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-                region_name=AWS_S3_REGION_NAME,
-            ),
+            'boto3_session': BOTO3_SESSION,
         },
         'fallback': {
             'class': 'logging.FileHandler',
@@ -220,18 +235,6 @@ LOGGING = {
             'propagate': False,
         },
     },
-}
-
-# AWS S3 Configuration
-AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
-AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
-AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME', 'lpc-static-files-2024')
-AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'us-east-1')
-AWS_S3_FILE_OVERWRITE = False
-AWS_QUERYSTRING_AUTH = False
-AWS_S3_USE_SSL = True
-AWS_S3_OBJECT_PARAMETERS = {
-    'CacheControl': 'max-age=86400',
 }
 
 # S3 Static Files Configuration
