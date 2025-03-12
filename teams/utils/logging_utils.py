@@ -3,6 +3,7 @@ import json
 from datetime import datetime, date
 from typing import Any, Dict, Optional
 from functools import wraps
+import os
 
 from django.http import HttpRequest
 
@@ -50,7 +51,7 @@ def get_file_info(file) -> Dict[str, Any]:
     return {
         "file_name": getattr(file, 'name', 'Unknown'),
         "file_size": f"{file.size / (1024 * 1024):.2f}MB" if hasattr(file, 'size') else 'Unknown',
-        "file_type": getattr(file, 'content_type', 'Unknown'),
+        "file_type": os.path.splitext(file.name)[1].lower() if hasattr(file, 'name') else 'Unknown',
     }
 
 def format_context(context: Dict) -> Dict:

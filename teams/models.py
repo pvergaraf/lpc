@@ -635,8 +635,8 @@ class PlayerPayment(models.Model):
         self.save()
 
     def mark_as_unpaid(self, is_admin=False):
-        if is_admin:
-            self.admin_verified = False
+        """Mark a payment as unpaid."""
         self.is_paid = False
+        self.admin_verified = False if is_admin else self.admin_verified
         self.paid_at = None
         self.save()

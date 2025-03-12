@@ -24,6 +24,7 @@ from .utils.logging_utils import log_error, log_upload_error
 import os
 import traceback
 import secrets
+import json
 
 User = get_user_model()
 
@@ -1564,8 +1565,7 @@ def edit_member(request, team_id, user_id):
                                 "user_email": request.user.email,
                                 "member_email": member_to_edit.email,
                                 "file_name": file.name,
-                                "file_size": file.size,
-                                "file_type": file.content_type
+                                "file_size": file.size
                             }
                         )
                     elif request.POST.get('profile_picture-clear'):
@@ -2034,3 +2034,4 @@ def send_invitation_email(email, team, invitation_url, role='Player', is_team_ad
             }
         )
         raise
+

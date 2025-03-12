@@ -47,8 +47,6 @@ urlpatterns = [
     path('team/<int:team_id>/edit/', views.edit_team, name='edit_team'),
     path('team/<int:team_id>/member/<int:member_id>/toggle-admin/', views.toggle_team_admin, name='toggle_team_admin'),
     path('team/<int:team_id>/member/<int:member_id>/remove/', views.remove_member, name='remove_member'),
-    path('profile/edit/', views.edit_profile, name='edit_profile'),
-    path('profile/<int:user_id>/', views.view_profile, name='view_profile'),
     path('team/<int:team_id>/remove-invitation/<int:member_id>/', views.remove_pending_invitation, name='remove_pending_invitation'),
     path('team/<int:team_id>/seasons/', views.season_list, name='season_list'),
     path('team/<int:team_id>/seasons/create/', views.season_create, name='season_create'),
@@ -65,8 +63,11 @@ urlpatterns = [
     path('team/<int:team_id>/season/<int:season_id>/payments/<int:payment_id>/edit/', views.payment_edit, name='payment_edit'),
     path('team/<int:team_id>/season/<int:season_id>/payments/<int:payment_id>/delete/', views.payment_delete, name='payment_delete'),
     path('team/<int:team_id>/season/<int:season_id>/payments/<int:payment_id>/refresh/', views.refresh_players, name='refresh_players'),
-    path('team/<int:team_id>/season/<int:season_id>/payments/<int:payment_id>/player/<int:player_payment_id>/', views.toggle_player_payment, name='toggle_player_payment'),
+    path('team/<int:team_id>/season/<int:season_id>/payments/<int:payment_id>/player/<int:player_payment_id>/toggle/', views.toggle_player_payment, name='toggle_player_payment'),
     path('update-condition/', views.update_condition, name='update_condition'),
+    # Profile URLs
+    path('profile/edit/', views.edit_profile, name='edit_profile'),
+    path('profile/<int:user_id>/', views.view_profile, name='view_profile'),
 ]
 
 if settings.DEBUG:
