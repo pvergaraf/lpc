@@ -189,7 +189,7 @@
                                             {% for match in upcoming_matches %}
                                                 <tr>
                                                     <td>{{ match.match_date|date:"M d, Y" }}</td>
-                                                    <td>{{ match.match_time|time:"g:i A" }} ({{ match.match_time|time:"g:i A"|arrival_time:40 }})</td>
+                                                    <td>{{ match.match_time|time:"g:i A" }} ({{ match.match_time|time:"g:i A"|arrival_time:45 }})</td>
                                                     <td>{{ match.opponent }}</td>
                                                     <td>{{ match.field_number }}</td>
                                                     {% if is_team_admin %}
