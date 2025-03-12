@@ -101,7 +101,7 @@
                     {% endif %}
                     <div>{{ request.user.email }}</div>
                     {% if request.user.profile and request.user.profile.level %}
-                        <div>Level: {{ request.user.profile.level }}</div>
+                        <div>Level: {{ request.user.profile.level }} {% if request.user.profile.date_of_birth %}• {{ request.user.profile.date_of_birth|calculate_age }}{% endif %}</div>
                     {% endif %}
                 </div>
                 <a href="{% url 'teams:edit_profile' %}" class="text-decoration-underline text-dark mt-3 d-block text-start">Edit Profile</a>

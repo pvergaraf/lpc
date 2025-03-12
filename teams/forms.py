@@ -184,10 +184,15 @@ class UserProfileForm(forms.ModelForm):
         required=True,
         help_text="Select your country"
     )
+    date_of_birth = forms.DateField(
+        widget=forms.DateInput(attrs={'type': 'date'}),
+        required=True,
+        help_text="Your date of birth"
+    )
 
     class Meta:
         model = get_user_model()
-        fields = ('first_name', 'last_name', 'email', 'player_number', 'position', 'level', 'is_official', 'rut', 'profile_picture', 'country')
+        fields = ('first_name', 'last_name', 'email', 'player_number', 'position', 'level', 'is_official', 'rut', 'profile_picture', 'country', 'date_of_birth')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -200,6 +205,7 @@ class UserProfileForm(forms.ModelForm):
                 self.fields['is_official'].initial = profile.is_official
                 self.fields['rut'].initial = profile.rut
                 self.fields['country'].initial = profile.country
+                self.fields['date_of_birth'].initial = profile.date_of_birth
                 if profile.profile_picture:
                     self.fields['profile_picture'].initial = profile.profile_picture
             except Profile.DoesNotExist:
@@ -224,6 +230,7 @@ class UserProfileForm(forms.ModelForm):
             profile.is_official = self.cleaned_data['is_official']
             profile.rut = self.cleaned_data['rut']
             profile.country = self.cleaned_data['country']
+            profile.date_of_birth = self.cleaned_data['date_of_birth']
             if self.cleaned_data.get('profile_picture'):
                 profile.profile_picture = self.cleaned_data['profile_picture']
             profile.save()
@@ -259,10 +266,15 @@ class AdminMemberProfileForm(forms.ModelForm):
         required=True,
         help_text="Select your country"
     )
+    date_of_birth = forms.DateField(
+        widget=forms.DateInput(attrs={'type': 'date'}),
+        required=True,
+        help_text="Player's date of birth"
+    )
 
     class Meta:
         model = get_user_model()
-        fields = ('first_name', 'last_name', 'email', 'player_number', 'position', 'level', 'is_official', 'rut', 'profile_picture', 'country')
+        fields = ('first_name', 'last_name', 'email', 'player_number', 'position', 'level', 'is_official', 'rut', 'profile_picture', 'country', 'date_of_birth')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -275,6 +287,7 @@ class AdminMemberProfileForm(forms.ModelForm):
                 self.fields['is_official'].initial = profile.is_official
                 self.fields['rut'].initial = profile.rut
                 self.fields['country'].initial = profile.country
+                self.fields['date_of_birth'].initial = profile.date_of_birth
                 if profile.profile_picture:
                     self.fields['profile_picture'].initial = profile.profile_picture
             except Profile.DoesNotExist:
@@ -299,6 +312,7 @@ class AdminMemberProfileForm(forms.ModelForm):
             profile.is_official = self.cleaned_data['is_official']
             profile.rut = self.cleaned_data['rut']
             profile.country = self.cleaned_data['country']
+            profile.date_of_birth = self.cleaned_data['date_of_birth']
             if self.cleaned_data.get('profile_picture'):
                 profile.profile_picture = self.cleaned_data['profile_picture']
             profile.save()

@@ -1,5 +1,5 @@
 from django import template
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 register = template.Library()
 
@@ -34,4 +34,12 @@ def arrival_time(time_str, minutes_before):
         # Format back to string
         return arrival_time.strftime('%I:%M %p')
     except:
-        return time_str 
+        return time_str
+
+@register.filter
+def calculate_age(birth_date):
+    if not birth_date:
+        return ''
+    today = date.today()
+    age = today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
+    return f"{age} years old" 
