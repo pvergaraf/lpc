@@ -2,6 +2,30 @@
 
 A Django web application for managing soccer teams and matches.
 
+## Features
+
+- Team management
+- Player profiles with FIFA-style cards
+- Season and match scheduling
+- Email notifications
+- AWS S3 for static and media files
+- SendGrid for email delivery (in production)
+- Player condition tracking system:
+  - Top condition (↑)
+  - Good condition (↗)
+  - Normal condition (→)
+  - Bad condition (↘)
+  - Awful condition (↓)
+  - Injured (+)
+- Position badges with color coding:
+  - Goalkeeper: Gold
+  - Defense: Lime Green
+  - Midfield: Royal Blue
+  - Attack: Orange Red
+- AWS CloudWatch integration for monitoring
+- Real-time performance metrics
+- Mobile-responsive design
+
 ## Environment Configuration
 
 The project uses different environment files for development and production settings:
@@ -65,14 +89,40 @@ python manage.py runserver
 
 In production servers, set `DJANGO_ENV=production` in your server configuration (e.g., systemd service file, Docker container, etc.).
 
-## Features
+## Tech Stack
 
-- Team management
-- Player profiles
-- Season and match scheduling
-- Email notifications
-- AWS S3 for static and media files
-- SendGrid for email delivery (in production)
+- Python 3.x
+- Django 5.0.2
+- PostgreSQL
+- AWS (S3, RDS, EC2, CloudWatch)
+- Bootstrap 5
+- Nginx
+- Gunicorn
+
+## Monitoring
+
+The application uses AWS CloudWatch for comprehensive monitoring:
+
+- Custom metrics for business logic
+- Real-time performance monitoring
+- Error tracking and alerting
+- Resource utilization monitoring
+- Custom dashboards for:
+  - Player conditions
+  - Team activity
+  - Match scheduling
+  - Payment tracking
+
+## Security Features
+
+- SSL/HTTPS encryption
+- Secure headers configuration
+- AWS security groups
+- Database SSL connection
+- Environment variable protection
+- Regular security audits
+- HSTS enabled
+- CSRF protection
 
 ## Development Setup
 
@@ -132,14 +182,6 @@ In production servers, set `DJANGO_ENV=production` in your server configuration 
 - Regularly update dependencies
 - Use strong passwords for database and admin accounts
 
-## Tech Stack
-
-- Python 3.x
-- Django 4.x
-- PostgreSQL
-- AWS (S3, RDS, EC2)
-- Bootstrap 5
-
 ## Local Development Setup
 
 1. Clone the repository
@@ -147,56 +189,3 @@ In production servers, set `DJANGO_ENV=production` in your server configuration 
 git clone <repository-url>
 cd club
 ```
-
-2. Create and activate virtual environment
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-3. Install dependencies
-```bash
-pip install -r requirements.txt
-```
-
-4. Set up environment variables
-```bash
-cp .env.example .env
-# Edit .env with your configuration
-```
-
-5. Run migrations
-```bash
-python manage.py migrate
-```
-
-6. Create superuser
-```bash
-python manage.py createsuperuser
-```
-
-7. Run development server
-```bash
-python manage.py runserver
-```
-
-## AWS Deployment
-
-The application is configured to run on AWS with:
-- EC2 for application hosting
-- RDS for PostgreSQL database
-- S3 for static and media files
-
-Detailed deployment instructions are in `docs/deployment.md`
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details. 
