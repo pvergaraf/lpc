@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 import watchtower
 import logging
 from pythonjsonlogger import jsonlogger
+import boto3
 
 # Determine which .env file to load
 ENVIRONMENT = os.getenv('DJANGO_ENV', 'development')
@@ -171,6 +172,14 @@ AWS_S3_OBJECT_PARAMETERS = {
     'CacheControl': 'max-age=86400',
 }
 
+# Create CloudWatch client
+cloudwatch_client = boto3.client(
+    'logs',
+    aws_access_key_id=AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+    region_name=AWS_S3_REGION_NAME
+)
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -202,9 +211,7 @@ LOGGING = {
             'use_queues': True,
             'send_interval': 10,
             'create_log_group': True,
-            'aws_access_key_id': AWS_ACCESS_KEY_ID,
-            'aws_secret_access_key': AWS_SECRET_ACCESS_KEY,
-            'region': AWS_S3_REGION_NAME,
+            'boto3_client': cloudwatch_client,
         },
         'fallback': {
             'class': 'logging.FileHandler',
