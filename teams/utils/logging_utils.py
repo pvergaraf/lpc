@@ -92,6 +92,21 @@ def log_error(
     # Get request ID or create one
     request_id = getattr(request, '_logging_id', None) if request else None
     
+    # Get user information
+    user_info = {}
+    if request and hasattr(request, 'user'):
+        user = request.user
+        if user.is_authenticated:
+            user_info = {
+                'user_id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'is_staff': user.is_staff,
+                'is_superuser': user.is_superuser
+            }
+        else:
+            user_info = {'user': 'anonymous'}
+
     # Format the log message with colors based on error_type
     if error_type == "RegistrationDebug":
         color = COLORS['CYAN']
@@ -111,6 +126,11 @@ def log_error(
         formatted_message = f"{color}{prefix} [{request_id}] {error_message}"
     else:
         formatted_message = f"{color}{prefix} {error_message}"
+
+    # Add user info to context
+    if extra_context is None:
+        extra_context = {}
+    extra_context['user'] = user_info
 
     # Add context if available, but filter and format it first
     if extra_context:
