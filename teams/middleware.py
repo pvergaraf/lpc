@@ -14,7 +14,7 @@ class RequestLoggingMiddleware:
         extra = {
             'request_id': request.id,
             'ip': self.get_client_ip(request),
-            'user': str(request.user) if request.user.is_authenticated else 'anonymous',
+            'user': str(request.user) if hasattr(request, 'user') and request.user.is_authenticated else 'anonymous',
             'path': request.path,
             'method': request.method,
         }
