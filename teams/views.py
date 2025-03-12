@@ -116,11 +116,13 @@ def dashboard(request):
     is_team_admin = is_user_team_admin(request.user, current_team)
     today = timezone.now().date()
 
-    # Get pending payments for the team member
+    # Get pending payments for the current user
     pending_payments = PlayerPayment.objects.filter(
-        player=team_member,
-        payment__season=current_season
-    ).select_related('payment') if current_season else []
+        player__user=request.user,
+        player__team=current_team,
+        payment__season=current_season,
+        amount__gt=0  # Only show payments with amount > 0
+    ).select_related('payment')
 
     # Get team memberships for the teams list
     team_memberships = TeamMember.objects.filter(
@@ -930,3 +932,41 @@ def team_list(request):
     return render(request, 'teams/team_list.html', {
         'team_memberships': team_memberships
     })
+
+@login_required
+def refresh_players(request, team_id, season_id, payment_id):
+    team = get_object_or_404(Team, id=team_id)
+    season = get_object_or_404(Season, id=season_id)
+    payment = get_object_or_404(Payment, id=payment_id, season=season)
+    
+    if not request.user.is_superuser and not TeamMember.objects.filter(team=team, user=request.user, is_team_admin=True).exists():
+        return HttpResponseForbidden("You don't have permission to refresh payments.")
+
+    # Get all current official players
+    official_players = TeamMember.objects.filter(
+        team=team,
+        role=TeamMember.Role.PLAYER,
+        user__profile__is_official=True,
+        is_active=True
+    )
+    
+    # Get existing player payments
+    existing_player_payments = {pp.player_id: pp for pp in payment.player_payments.all()}
+    
+    # Create new player payments for players who don't have one
+    new_players = 0
+    for player in official_players:
+        if player.id not in existing_player_payments:
+            PlayerPayment.objects.create(
+                payment=payment,
+                player=player,
+                amount=0  # Default amount
+            )
+            new_players += 1
+    
+    if new_players > 0:
+        messages.success(request, f'Added {new_players} new player{"s" if new_players != 1 else ""} to the payment.')
+    else:
+        messages.info(request, 'No new players to add.')
+    
+    return redirect('teams:payment_edit', team_id=team.id, season_id=season.id, payment_id=payment.id)

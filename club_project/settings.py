@@ -13,6 +13,10 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+import watchtower
+import logging
+from pythonjsonlogger import jsonlogger
+import boto3
 
 # Determine which .env file to load
 ENVIRONMENT = os.getenv('DJANGO_ENV', 'development')
@@ -60,6 +64,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'teams.middleware.RequestLoggingMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -152,18 +157,68 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Logging Configuration
+CLOUDWATCH_LOG_GROUP = 'fubol-club'
+CLOUDWATCH_LOG_STREAM = 'django-logs'
+
 LOGGING = {
     'version': 1,
-    'disable_existing_loggers': True,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'json': {
+            'format': '%(asctime)s %(levelname)s %(user)s %(ip)s %(message)s',
+            'class': 'pythonjsonlogger.jsonlogger.JsonFormatter',
+        },
+    },
+    'filters': {
+        'require_debug_false': {
+            '()': 'django.utils.log.RequireDebugFalse',
+        },
+    },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
-            'level': 'CRITICAL',
+            'formatter': 'verbose',
+        },
+        'watchtower': {
+            'class': 'watchtower.CloudWatchLogHandler',
+            'log_group': CLOUDWATCH_LOG_GROUP,
+            'stream_name': CLOUDWATCH_LOG_STREAM,
+            'formatter': 'json',
+            'use_queues': True,
+            'send_interval': 10,
+            'create_log_group': True,
+            'boto3_session': boto3.Session(
+                aws_access_key_id=AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+                region_name=AWS_S3_REGION_NAME,
+            ),
+        },
+        'fallback': {
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(BASE_DIR, 'logs', 'django.log'),
+            'formatter': 'verbose',
         },
     },
-    'root': {
-        'handlers': ['console'],
-        'level': 'CRITICAL',
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'watchtower', 'fallback'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'teams': {
+            'handlers': ['console', 'watchtower', 'fallback'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'watchtower': {
+            'level': 'INFO',
+            'handlers': ['console', 'fallback'],
+            'propagate': False,
+        },
     },
 }
 

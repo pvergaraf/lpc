@@ -9,3 +9,5 @@ boto3
 psycopg2-binary
 gunicorn
 python-dotenv==1.0.1
+watchtower==3.0.1
+python-json-logger==2.0.7
