@@ -136,6 +136,7 @@ class Profile(models.Model):
         default=1
     )
     is_official = models.BooleanField(default=False, help_text="Indicates if the player is officially registered")
+    active_player = models.BooleanField(default=True, help_text="Indicates if the player is currently active")
     rut = models.CharField(max_length=12, blank=True, null=True, help_text="Chilean ID number (RUT)")
     country = models.CharField(
         max_length=2,

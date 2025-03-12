@@ -144,6 +144,12 @@ class TeamMemberInviteForm(forms.Form):
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         help_text="Mark this player as officially registered"
     )
+    active_player = forms.BooleanField(
+        required=False,
+        initial=True,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        help_text="Mark if the player is currently active"
+    )
 
     def __init__(self, team, *args, **kwargs):
         self.team = team
@@ -220,10 +226,6 @@ class UserProfileForm(forms.ModelForm):
         required=True,
         help_text="Player level (1-99)"
     )
-    is_official = forms.BooleanField(
-        required=False,
-        help_text="Check if the player is officially registered"
-    )
     rut = forms.CharField(
         max_length=12,
         required=True,
@@ -251,7 +253,7 @@ class UserProfileForm(forms.ModelForm):
 
     class Meta:
         model = get_user_model()
-        fields = ('first_name', 'last_name', 'email', 'player_number', 'position', 'level', 'is_official', 'rut', 'profile_picture', 'country', 'date_of_birth', 'description')
+        fields = ('first_name', 'last_name', 'email', 'player_number', 'position', 'level', 'rut', 'profile_picture', 'country', 'date_of_birth', 'description')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -261,7 +263,6 @@ class UserProfileForm(forms.ModelForm):
                 self.fields['player_number'].initial = profile.player_number
                 self.fields['position'].initial = profile.position
                 self.fields['level'].initial = profile.level
-                self.fields['is_official'].initial = profile.is_official
                 self.fields['rut'].initial = profile.rut
                 self.fields['country'].initial = profile.country
                 self.fields['date_of_birth'].initial = profile.date_of_birth
@@ -276,8 +277,6 @@ class UserProfileForm(forms.ModelForm):
                 field.widget.attrs['class'] = 'form-control'
             else:
                 field.widget.attrs['class'] = 'form-control'
-        # Special handling for checkbox
-        self.fields['is_official'].widget.attrs['class'] = 'form-check-input'
 
     def save(self, commit=True):
         user = super().save(commit=False)
@@ -287,7 +286,6 @@ class UserProfileForm(forms.ModelForm):
             profile.player_number = self.cleaned_data['player_number']
             profile.position = self.cleaned_data['position']
             profile.level = self.cleaned_data['level']
-            profile.is_official = self.cleaned_data['is_official']
             profile.rut = self.cleaned_data['rut']
             profile.country = self.cleaned_data['country']
             profile.date_of_birth = self.cleaned_data['date_of_birth']
@@ -312,6 +310,11 @@ class AdminMemberProfileForm(forms.ModelForm):
     is_official = forms.BooleanField(
         required=False,
         help_text="Check if the player is officially registered"
+    )
+    active_player = forms.BooleanField(
+        required=False,
+        initial=True,
+        help_text="Check if the player is currently active"
     )
     rut = forms.CharField(
         max_length=12,
@@ -340,7 +343,7 @@ class AdminMemberProfileForm(forms.ModelForm):
 
     class Meta:
         model = get_user_model()
-        fields = ('first_name', 'last_name', 'email', 'player_number', 'position', 'level', 'is_official', 'rut', 'profile_picture', 'country', 'date_of_birth', 'description')
+        fields = ('first_name', 'last_name', 'email', 'player_number', 'position', 'level', 'is_official', 'active_player', 'rut', 'profile_picture', 'country', 'date_of_birth', 'description')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -351,6 +354,7 @@ class AdminMemberProfileForm(forms.ModelForm):
                 self.fields['position'].initial = profile.position
                 self.fields['level'].initial = profile.level
                 self.fields['is_official'].initial = profile.is_official
+                self.fields['active_player'].initial = profile.active_player
                 self.fields['rut'].initial = profile.rut
                 self.fields['country'].initial = profile.country
                 self.fields['date_of_birth'].initial = profile.date_of_birth
@@ -365,8 +369,9 @@ class AdminMemberProfileForm(forms.ModelForm):
                 field.widget.attrs['class'] = 'form-control'
             else:
                 field.widget.attrs['class'] = 'form-control'
-        # Special handling for checkbox
+        # Special handling for checkboxes
         self.fields['is_official'].widget.attrs['class'] = 'form-check-input'
+        self.fields['active_player'].widget.attrs['class'] = 'form-check-input'
 
     def save(self, commit=True):
         user = super().save(commit=False)
@@ -377,6 +382,7 @@ class AdminMemberProfileForm(forms.ModelForm):
             profile.position = self.cleaned_data['position']
             profile.level = self.cleaned_data['level']
             profile.is_official = self.cleaned_data['is_official']
+            profile.active_player = self.cleaned_data['active_player']
             profile.rut = self.cleaned_data['rut']
             profile.country = self.cleaned_data['country']
             profile.date_of_birth = self.cleaned_data['date_of_birth']

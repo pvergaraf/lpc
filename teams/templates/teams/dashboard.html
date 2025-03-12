@@ -569,6 +569,13 @@
                                                     {% if member.is_team_admin %}
                                                         <span class="badge bg-info">Admin</span>
                                                     {% endif %}
+                                                    {% if member.user.profile.active_player %}
+                                                        {% if member.user.profile.is_official %}
+                                                            <span class="badge bg-success">Active</span>
+                                                        {% else %}
+                                                            <span class="badge bg-warning text-dark">Galleta</span>
+                                                        {% endif %}
+                                                    {% endif %}
                                                 </td>
                                                 {% if is_team_admin %}
                                                     <td>
