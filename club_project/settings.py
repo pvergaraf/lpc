@@ -16,7 +16,6 @@ from dotenv import load_dotenv
 import watchtower
 import logging
 from pythonjsonlogger import jsonlogger
-import boto3
 
 # Determine which .env file to load
 ENVIRONMENT = os.getenv('DJANGO_ENV', 'development')
@@ -172,13 +171,6 @@ AWS_S3_OBJECT_PARAMETERS = {
     'CacheControl': 'max-age=86400',
 }
 
-# Create boto3 session for CloudWatch logging
-BOTO3_SESSION = boto3.Session(
-    aws_access_key_id=AWS_ACCESS_KEY_ID,
-    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-    region_name=AWS_S3_REGION_NAME,
-)
-
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -210,7 +202,9 @@ LOGGING = {
             'use_queues': True,
             'send_interval': 10,
             'create_log_group': True,
-            'boto3_session': BOTO3_SESSION,
+            'aws_access_key_id': AWS_ACCESS_KEY_ID,
+            'aws_secret_access_key': AWS_SECRET_ACCESS_KEY,
+            'region': AWS_S3_REGION_NAME,
         },
         'fallback': {
             'class': 'logging.FileHandler',
@@ -305,12 +299,6 @@ SECURE_HSTS_PRELOAD = True
 SESSION_COOKIE_AGE = 86400  # 24 hours in seconds
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 SESSION_SAVE_EVERY_REQUEST = True
-
-# Remove old AWS SES settings since we're not using them
-# AWS SES settings
-# AWS_SES_REGION_NAME = 'us-east-1'
-# AWS_SES_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
-# AWS_SES_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
 
 # Import local settings if they exist
 try:
