@@ -278,7 +278,7 @@ def invite_member(request, team_id):
             invitation_url = request.build_absolute_uri(
                 reverse('teams:register') + f'?token={token}'
             )
-            send_invitation_email(email, team, invitation_url)
+            send_invitation_email(email, team, invitation_url, role, is_team_admin, is_official)
             
             messages.success(request, f'Invitation sent to {email}')
             return redirect('teams:team_members', team_id=team.id)
@@ -763,7 +763,6 @@ def edit_profile(request):
                 profile.player_number = form.cleaned_data['player_number']
                 profile.position = form.cleaned_data['position']
                 profile.level = form.cleaned_data['level']
-                profile.is_official = form.cleaned_data['is_official']
                 profile.rut = form.cleaned_data['rut']
                 profile.country = form.cleaned_data['country']
                 profile.date_of_birth = form.cleaned_data['date_of_birth']
@@ -1011,16 +1010,60 @@ def edit_member(request, team_id, user_id):
     if request.method == 'POST':
         form = AdminMemberProfileForm(request.POST, request.FILES, instance=member_to_edit)
         if form.is_valid():
-            user = form.save()
-            # Handle profile picture clearing
-            profile = getattr(user, 'profile', None)
-            if profile:
-                if request.POST.get('profile_picture-clear'):
-                    profile.profile_picture = 'profile_pics/castolo.png'  # Reset to default
-                profile.active_player = form.cleaned_data['active_player']
-                profile.save()
-            messages.success(request, f"{member_to_edit.get_full_name()}'s profile has been updated successfully!")
-            return redirect('teams:dashboard')
+            try:
+                with transaction.atomic():
+                    user = form.save(commit=False)
+                    user.save()
+                    
+                    # Get or create profile
+                    profile = Profile.objects.get_or_create(user=user)[0]
+                    
+                    # Handle profile picture
+                    if form.cleaned_data.get('profile_picture'):
+                        # Validate file size
+                        file = form.cleaned_data['profile_picture']
+                        if file.size > 2 * 1024 * 1024:  # 2MB limit
+                            messages.error(request, 'Profile picture must be less than 2MB')
+                            return render(request, 'teams/edit_member.html', {'form': form, 'team': team, 'member': member_to_edit})
+                        
+                        # Validate file type
+                        allowed_extensions = ['.jpg', '.jpeg', '.png']
+                        file_extension = os.path.splitext(file.name)[1].lower()
+                        if file_extension not in allowed_extensions:
+                            messages.error(request, 'Profile picture must be JPEG or PNG')
+                            return render(request, 'teams/edit_member.html', {'form': form, 'team': team, 'member': member_to_edit})
+                        
+                        profile.profile_picture = file
+                    elif request.POST.get('profile_picture-clear'):
+                        profile.profile_picture = 'profile_pics/castolo.png'  # Reset to default
+                    
+                    # Save all profile fields
+                    profile.player_number = form.cleaned_data['player_number']
+                    profile.position = form.cleaned_data['position']
+                    profile.level = form.cleaned_data['level']
+                    profile.is_official = form.cleaned_data['is_official']
+                    profile.active_player = form.cleaned_data['active_player']
+                    profile.rut = form.cleaned_data['rut']
+                    profile.country = form.cleaned_data['country']
+                    profile.date_of_birth = form.cleaned_data['date_of_birth']
+                    profile.description = form.cleaned_data['description']
+                    profile.save()
+                    
+                    messages.success(request, f"{member_to_edit.get_full_name()}'s profile has been updated successfully!")
+                    return redirect('teams:dashboard')
+            except Exception as e:
+                log_error(
+                    request=request,
+                    error_message=f"Failed to update member profile: {str(e)}",
+                    error_type="ProfileUpdateError",
+                    extra_context={
+                        "team_id": team_id,
+                        "user_id": user_id,
+                        "error": str(e)
+                    }
+                )
+                messages.error(request, 'An error occurred while updating the profile.')
+                return render(request, 'teams/edit_member.html', {'form': form, 'team': team, 'member': member_to_edit})
     else:
         form = AdminMemberProfileForm(instance=member_to_edit)
     
@@ -1271,3 +1314,38 @@ def update_condition(request):
     
     # Redirect back to the dashboard
     return redirect('teams:dashboard')
+
+def send_invitation_email(email, team, invitation_url, role='Player', is_team_admin=False, is_official=False):
+    """Send an invitation email to a prospective team member."""
+    subject = f'Invitation to join {team.name}'
+    context = {
+        'team': team,
+        'invite_url': invitation_url,
+        'role': role,
+        'is_team_admin': is_team_admin,
+        'is_official': is_official
+    }
+    html_message = render_to_string('teams/email/team_invitation.html', context)
+    plain_message = f'You have been invited to join {team.name}. Click here to accept: {invitation_url}'
+    
+    try:
+        send_mail(
+            subject=subject,
+            message=plain_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
+            html_message=html_message,
+            fail_silently=False,
+        )
+    except Exception as e:
+        log_error(
+            None,
+            error_message=f"Failed to send invitation email: {str(e)}",
+            error_type="EmailError",
+            extra_context={
+                "email": email,
+                "team": team.name,
+                "error": str(e)
+            }
+        )
+        raise
