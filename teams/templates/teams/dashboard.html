@@ -30,6 +30,104 @@
     color: #333;
     margin-bottom: 20px;
     text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.condition-arrow {
+    font-size: 1.5rem;
+    display: inline-block;
+    background-color: #000000;
+    color: inherit;
+    width: 30px;
+    height: 30px;
+    line-height: 30px;
+    text-align: center;
+    margin-left: 0;
+}
+
+.condition-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+}
+
+.condition-option-arrow {
+    display: inline-block;
+    background-color: #000000;
+    width: 24px;
+    height: 24px;
+    line-height: 24px;
+    text-align: center;
+    margin-left: 10px;
+}
+
+.condition-top {
+    color: #00ff00;
+}
+
+.condition-good {
+    color: #90ee90;
+}
+
+.condition-normal {
+    color: #ffd700;
+}
+
+.condition-bad {
+    color: #ffa500;
+}
+
+.condition-awful {
+    color: #ff0000;
+}
+
+.condition-injured {
+    color: #ff0000;
+}
+
+.condition-prompt {
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.condition-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+@media (min-width: 768px) {
+    .condition-form {
+        flex-direction: row;
+        align-items: center;
+    }
+}
+
+.condition-form select {
+    flex: 1;
+    padding: 8px;
+    border-radius: 5px;
+    border: 1px solid #ddd;
+    min-width: 200px;
+}
+
+.condition-form button {
+    padding: 8px 15px;
+    border-radius: 5px;
+    background: #007bff;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+.condition-form button:hover {
+    background: #0056b3;
 }
 
 .fifa-card-image {
@@ -71,6 +169,7 @@
 
 .fifa-card-details {
     margin-top: 10px;
+    margin-bottom: 10px;
     color: #333;
 }
 
@@ -78,19 +177,57 @@
     width: 100%;
     margin-top: 15px;
 }
+
+.modal-content {
+    background: transparent;
+    border: none;
+}
+
+.modal-header {
+    padding: 0.5rem 1rem;
+    background-color: white;
+    border-top-left-radius: 15px;
+    border-top-right-radius: 15px;
+    border: none;
+}
+
+.modal-body {
+    padding: 0.5rem 1rem 1rem 1rem;
+    background-color: white;
+    border-bottom-left-radius: 15px;
+    border-bottom-right-radius: 15px;
+}
+
+.btn-close {
+    margin: 0;
+    padding: 0.5rem;
+}
 </style>
 
 <div class="container mt-4">
     {% csrf_token %}
+    
     <div class="row">
-        <!-- Profile Card -->
-        <div class="col-md-3">
+        <!-- Profile Card - First on mobile -->
+        <div class="col-md-3 order-1">
             <div class="fifa-card mb-4">
                 {% if request.user.profile and request.user.profile.player_number %}
                     <div class="fifa-card-number">{{ request.user.profile.player_number }}</div>
                 {% endif %}
                 {% if request.user.profile and request.user.profile.position %}
-                    <div class="fifa-card-position">{{ request.user.profile.position.code }}</div>
+                    <div class="fifa-card-position">
+                        {{ request.user.profile.position.code }}
+                        {% with condition=request.user.profile.condition %}
+                            <span class="condition-arrow condition-{{ condition|lower }}">
+                                {% if condition == 'TOP' %}↑{% endif %}
+                                {% if condition == 'GOOD' %}↗{% endif %}
+                                {% if condition == 'NORMAL' %}→{% endif %}
+                                {% if condition == 'BAD' %}↘{% endif %}
+                                {% if condition == 'AWFUL' %}↓{% endif %}
+                                {% if condition == 'INJURED' %}+{% endif %}
+                            </span>
+                        {% endwith %}
+                    </div>
                 {% endif %}
                 {% if request.user.profile and request.user.profile.country %}
                     <div class="fifa-card-country">
@@ -164,8 +301,36 @@
         </div>
 
         <!-- Main Content -->
-        <div class="col-md-9">
+        <div class="col-md-9 order-2">
             {% if current_team %}
+                <!-- Condition Prompt -->
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0 d-flex align-items-center">
+                            <i class="fas fa-heartbeat text-primary me-2"></i>
+                            What's your condition this week?
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" action="{% url 'teams:update_condition' %}" class="condition-form">
+                            {% csrf_token %}
+                            <select name="condition" id="condition" onchange="this.form.submit()" class="form-select">
+                                {% for value, label in request.user.profile.CONDITION_CHOICES %}
+                                    <option value="{{ value }}" {% if request.user.profile.condition == value %}selected{% endif %}>
+                                        {{ label }}
+                                        {% if value == 'TOP' %}↑{% endif %}
+                                        {% if value == 'GOOD' %}↗{% endif %}
+                                        {% if value == 'NORMAL' %}→{% endif %}
+                                        {% if value == 'BAD' %}↘{% endif %}
+                                        {% if value == 'AWFUL' %}↓{% endif %}
+                                        {% if value == 'INJURED' %}+{% endif %}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </form>
+                    </div>
+                </div>
+
                 <!-- Current Season -->
                 <div class="card mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">
@@ -338,7 +503,7 @@
                             <table class="table">
                                 <thead>
                                     <tr>
-                                        <th>Player #</th>
+                                        <th>#</th>
                                         <th>Position</th>
                                         <th>Name</th>
                                         <th>Country</th>
@@ -361,9 +526,21 @@
                                                 </td>
                                                 <td>
                                                     {% if member.user and member.user.profile and member.user.profile.position %}
-                                                        <div class="position-badge" style="display: inline-block; padding: 6px 12px; background-color: #000000; color: white; font-weight: bold; position: relative; margin: 2px; width: 60px; text-align: center;">
-                                                            {{ member.user.profile.position.code }}
-                                                            <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 4px; background-color: {{ member.user.profile.position.color }};"></div>
+                                                        <div class="d-flex align-items-center gap-2">
+                                                            <div class="position-badge" style="display: inline-block; padding: 6px 12px; background-color: #000000; color: white; font-weight: bold; position: relative; margin: 2px; width: 70px; text-align: center;">
+                                                                {{ member.user.profile.position.code }}
+                                                                <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 4px; background-color: {{ member.user.profile.position.color }};"></div>
+                                                            </div>
+                                                            {% if member.user.profile and member.user.profile.condition %}
+                                                                <span class="condition-arrow condition-{{ member.user.profile.condition|lower }}">
+                                                                    {% if member.user.profile.condition == 'TOP' %}↑{% endif %}
+                                                                    {% if member.user.profile.condition == 'GOOD' %}↗{% endif %}
+                                                                    {% if member.user.profile.condition == 'NORMAL' %}→{% endif %}
+                                                                    {% if member.user.profile.condition == 'BAD' %}↘{% endif %}
+                                                                    {% if member.user.profile.condition == 'AWFUL' %}↓{% endif %}
+                                                                    {% if member.user.profile.condition == 'INJURED' %}+{% endif %}
+                                                                </span>
+                                                            {% endif %}
                                                         </div>
                                                     {% else %}
                                                         -
@@ -371,7 +548,7 @@
                                                 </td>
                                                 <td>
                                                     {% if member.user %}
-                                                        <a href="{% url 'teams:view_profile' member.user.id %}">
+                                                        <a href="#" class="show-fifa-card" data-bs-toggle="modal" data-bs-target="#playerModal{{ member.user.id }}">
                                                             {{ member.user.get_full_name }}
                                                         </a>
                                                     {% else %}
@@ -418,6 +595,75 @@
                                     {% endfor %}
                                 </tbody>
                             </table>
+
+                            <!-- FIFA Card Modals -->
+                            {% for member in team_members %}
+                                {% if member.is_active %}
+                                    <div class="modal fade" id="playerModal{{ member.user.id }}" tabindex="-1" aria-hidden="true">
+                                        <div class="modal-dialog modal-dialog-centered">
+                                            <div class="modal-content">
+                                                <div class="modal-header border-0">
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <div class="fifa-card">
+                                                        {% if member.user.profile and member.user.profile.player_number %}
+                                                            <div class="fifa-card-number">{{ member.user.profile.player_number }}</div>
+                                                        {% endif %}
+                                                        {% if member.user.profile and member.user.profile.position %}
+                                                            <div class="fifa-card-position">
+                                                                {{ member.user.profile.position.code }}
+                                                                {% with condition=member.user.profile.condition %}
+                                                                    <span class="condition-arrow condition-{{ condition|lower }}">
+                                                                        {% if condition == 'TOP' %}↑{% endif %}
+                                                                        {% if condition == 'GOOD' %}↗{% endif %}
+                                                                        {% if condition == 'NORMAL' %}→{% endif %}
+                                                                        {% if condition == 'BAD' %}↘{% endif %}
+                                                                        {% if condition == 'AWFUL' %}↓{% endif %}
+                                                                        {% if condition == 'INJURED' %}+{% endif %}
+                                                                    </span>
+                                                                {% endwith %}
+                                                            </div>
+                                                        {% endif %}
+                                                        {% if member.user.profile and member.user.profile.country %}
+                                                            <div class="fifa-card-country">
+                                                                {{ member.user.profile.country|country_flag }}
+                                                                {% if current_team.team_photo %}
+                                                                    <img src="{{ current_team.team_photo.url }}" alt="{{ current_team.name }}" class="fifa-card-team-logo">
+                                                                {% else %}
+                                                                    <img src="{{ MEDIA_URL }}team_photos/default.png" alt="Default team photo" class="fifa-card-team-logo">
+                                                                {% endif %}
+                                                            </div>
+                                                        {% endif %}
+                                                        {% if member.user.profile and member.user.profile.profile_picture %}
+                                                            <img src="{{ member.user.profile.profile_picture.url }}" alt="Profile Picture" class="fifa-card-image">
+                                                        {% else %}
+                                                            <img src="{% static 'teams/images/default-profile.png' %}" alt="Default Profile Picture" class="fifa-card-image">
+                                                        {% endif %}
+                                                        <div class="fifa-card-name">
+                                                            {% with name_parts=member.user.get_full_name.split %} 
+                                                                {{ name_parts.0.0 }}. {{ name_parts|last }}
+                                                            {% endwith %}
+                                                        </div>
+                                                        <div class="fifa-card-details">
+                                                            {% if member.user.profile and member.user.profile.rut %}
+                                                                <div>RUT: {{ member.user.profile.rut }}</div>
+                                                            {% endif %}
+                                                            <div>{{ member.user.email }}</div>
+                                                            {% if member.user.profile and member.user.profile.level %}
+                                                                <div>Level: {{ member.user.profile.level }} {% if member.user.profile.date_of_birth %}• {{ member.user.profile.date_of_birth|calculate_age }}{% endif %}</div>
+                                                            {% endif %}
+                                                            {% if member.user.profile and member.user.profile.description %}
+                                                                <div class="mt-1 text-muted fst-italic">"{{ member.user.profile.description }}"</div>
+                                                            {% endif %}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
                         </div>
                     </div>
                 </div>

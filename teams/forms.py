@@ -2,6 +2,7 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm, PasswordResetForm
 from django.contrib.auth import get_user_model
 from .models import Team, TeamMember, Position, Profile, Season, Match, Payment, PlayerPayment
+from .utils.logging_utils import log_error
 
 class UserRegistrationForm(UserCreationForm):
     first_name = forms.CharField(max_length=30, required=True)
@@ -19,6 +20,18 @@ class UserRegistrationForm(UserCreationForm):
     )
     position = forms.ModelChoiceField(queryset=Position.objects.all(), required=True,
                                     help_text="Select your primary playing position")
+    level = forms.IntegerField(
+        min_value=1,
+        max_value=99,
+        required=True,
+        initial=1,
+        help_text="Player level (1-99)"
+    )
+    rut = forms.CharField(
+        max_length=12,
+        required=True,
+        help_text="Chilean ID number (RUT)"
+    )
     country = forms.ChoiceField(
         choices=Profile.COUNTRIES,
         required=True,
@@ -27,13 +40,13 @@ class UserRegistrationForm(UserCreationForm):
     )
     description = forms.CharField(
         max_length=20,
-        required=False,
+        required=True,
         help_text="A short description (max 20 characters)"
     )
 
     class Meta:
         model = get_user_model()
-        fields = ('email', 'first_name', 'last_name', 'date_of_birth', 'player_number', 'position', 'country', 'description', 'password1', 'password2')
+        fields = ('email', 'first_name', 'last_name', 'date_of_birth', 'player_number', 'position', 'level', 'rut', 'country', 'description', 'password1', 'password2')
 
     def __init__(self, *args, **kwargs):
         self.invited_email = kwargs.pop('email', None)
@@ -68,19 +81,44 @@ class UserRegistrationForm(UserCreationForm):
         return cleaned_data
 
     def save(self, commit=True):
-        user = super().save(commit=False)
-        user.username = self.cleaned_data.get('email')  # Set username to email
-        user.email = self.cleaned_data.get('email')  # Ensure email is set
-        if commit:
-            user.save()
-            # Create or update profile
-            profile = Profile.objects.get_or_create(user=user)[0]
-            profile.player_number = self.cleaned_data['player_number']
-            profile.position = self.cleaned_data['position']
-            profile.country = self.cleaned_data['country']
-            profile.description = self.cleaned_data['description']
-            profile.save()
-        return user
+        try:
+            user = super().save(commit=False)
+            user.username = self.cleaned_data.get('email')  # Set username to email
+            user.email = self.cleaned_data.get('email')  # Ensure email is set
+            user.date_of_birth = self.cleaned_data.get('date_of_birth')  # Set date of birth
+            
+            log_error(
+                None,  # No request object in form
+                error_message="Form save debug info",
+                error_type="RegistrationDebug",
+                extra_context={
+                    "form_data": self.cleaned_data,
+                    "commit": commit,
+                    "user_data": {
+                        "username": user.username,
+                        "email": user.email,
+                        "date_of_birth": user.date_of_birth,
+                        "first_name": user.first_name,
+                        "last_name": user.last_name
+                    }
+                }
+            )
+            
+            if commit:
+                user.save()
+            return user
+            
+        except Exception as e:
+            log_error(
+                None,  # No request object in form
+                error_message=f"Form save error: {str(e)}",
+                error_type="RegistrationError",
+                extra_context={
+                    "form_data": self.cleaned_data,
+                    "error": str(e)
+                }
+            )
+            raise
 
 class EmailAuthenticationForm(AuthenticationForm):
     username = forms.EmailField(widget=forms.EmailInput(attrs={'autofocus': True}))

@@ -3,12 +3,25 @@ import traceback
 from django.template import TemplateDoesNotExist
 from django.conf import settings
 from ..utils.logging_utils import log_error
+import uuid
 
 class ErrorLoggingMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
+        # Generate a unique ID for this request
+        request._logging_id = str(uuid.uuid4())[:8]
+        
+        # If this is a registration request, log it
+        if 'register' in request.path:
+            log_error(
+                request=request,
+                error_message=f"Started {request.method} request to {request.path}",
+                error_type="RegistrationDebug",
+                extra_context={"method": request.method, "path": request.path}
+            )
+
         try:
             response = self.get_response(request)
             return response
@@ -58,3 +71,22 @@ class ErrorLoggingMiddleware:
             
             # Re-raise the exception to let Django handle it
             raise 
+
+        # Log completion of registration requests
+        if 'register' in request.path:
+            log_error(
+                request=request,
+                error_message=f"Completed {request.method} request to {request.path} with status {response.status_code}",
+                error_type="RegistrationDebug"
+            )
+
+        return response
+
+    def process_exception(self, request, exception):
+        log_error(
+            request=request,
+            error_message=str(exception),
+            error_type="Error",
+            extra_context={"exception_type": exception.__class__.__name__}
+        )
+        return None 

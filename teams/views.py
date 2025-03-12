@@ -22,6 +22,7 @@ from django.template.loader import render_to_string
 from django.db.models import Case, When, Value, IntegerField
 from .utils.logging_utils import log_error, log_upload_error
 import os
+import traceback
 
 User = get_user_model()
 
@@ -429,9 +430,7 @@ def register(request):
             request=request,
             error_message="Invalid or expired invitation token",
             error_type="RegistrationError",
-            extra_context={
-                "token": token
-            }
+            extra_context={"token": token}
         )
         context = {
             'title': 'Invalid Invitation',
@@ -441,8 +440,43 @@ def register(request):
         return render(request, 'teams/404.html', context, status=404)
     
     if request.method == 'POST':
+        # Remove sensitive data from logs
+        safe_post_data = request.POST.copy()
+        if 'password1' in safe_post_data:
+            safe_post_data['password1'] = '***'
+        if 'password2' in safe_post_data:
+            safe_post_data['password2'] = '***'
+            
+        log_error(
+            request=request,
+            error_message="Registration POST request received",
+            error_type="RegistrationDebug",
+            extra_context={
+                "post_data": dict(safe_post_data),
+                "files": bool(request.FILES),
+                "team_member_data": {
+                    "email": team_member.email,
+                    "team": team_member.team.name,
+                    "role": team_member.role
+                }
+            }
+        )
+        
         form = UserRegistrationForm(request.POST, request.FILES, email=team_member.email)
         if form.is_valid():
+            # Remove sensitive data from cleaned_data logs
+            safe_cleaned_data = form.cleaned_data.copy()
+            if 'password1' in safe_cleaned_data:
+                safe_cleaned_data['password1'] = '***'
+            if 'password2' in safe_cleaned_data:
+                safe_cleaned_data['password2'] = '***'
+                
+            log_error(
+                request=request,
+                error_message="Form validation successful",
+                error_type="RegistrationDebug",
+                extra_context={"cleaned_data": safe_cleaned_data}
+            )
             try:
                 with transaction.atomic():
                     # Try to get existing user or create new one
@@ -451,32 +485,148 @@ def register(request):
                         # Update existing user
                         user.first_name = form.cleaned_data['first_name']
                         user.last_name = form.cleaned_data['last_name']
+                        user.date_of_birth = form.cleaned_data['date_of_birth']
                         user.save()
+                        log_error(
+                            request=request,
+                            error_message="Updated existing user",
+                            error_type="RegistrationDebug",
+                            extra_context={
+                                "user_id": user.id,
+                                "email": user.email
+                            }
+                        )
                     else:
                         # Create new user
-                        user = form.save(commit=False)
-                        user.username = team_member.email
-                        user.email = team_member.email
-                        user.save()
+                        user = form.save()
+                        log_error(
+                            request=request,
+                            error_message="Created new user",
+                            error_type="RegistrationDebug",
+                            extra_context={
+                                "user_id": user.id,
+                                "email": user.email
+                            }
+                        )
 
                     # Get the is_official status from session
                     is_official = request.session.get(f'invite_{token}_is_official', False)
                     
+                    # Check if profile exists
+                    profile_exists = hasattr(user, 'profile')
+                    log_error(
+                        request=request,
+                        error_message="Profile check",
+                        error_type="RegistrationDebug",
+                        extra_context={
+                            "profile_exists": profile_exists,
+                            "user_id": user.id
+                        }
+                    )
+                    
                     # Create or update profile
                     profile = Profile.objects.get_or_create(user=user)[0]
-                    profile.player_number = form.cleaned_data['player_number']
-                    profile.position = form.cleaned_data['position']
-                    profile.is_official = is_official
-                    profile.date_of_birth = form.cleaned_data['date_of_birth']
-                    if form.cleaned_data.get('profile_picture'):
-                        profile.profile_picture = form.cleaned_data['profile_picture']
+                    
+                    # Log profile state before update
+                    log_error(
+                        request=request,
+                        error_message="Profile state before update",
+                        error_type="RegistrationDebug",
+                        extra_context={
+                            "profile_id": profile.id,
+                            "initial_state": {
+                                "player_number": profile.player_number,
+                                "position": str(profile.position) if profile.position else None,
+                                "is_official": profile.is_official,
+                                "level": profile.level,
+                                "rut": profile.rut,
+                                "country": profile.country,
+                                "description": profile.description
+                            }
+                        }
+                    )
+                    
+                    # Save all profile fields
+                    profile_fields = {
+                        'player_number': form.cleaned_data['player_number'],
+                        'position': form.cleaned_data['position'],
+                        'is_official': is_official,
+                        'date_of_birth': form.cleaned_data['date_of_birth'],
+                        'level': form.cleaned_data['level'],
+                        'rut': form.cleaned_data['rut'],
+                        'country': form.cleaned_data['country'],
+                        'description': form.cleaned_data['description']
+                    }
+                    
+                    # Log profile data before save
+                    log_error(
+                        request=request,
+                        error_message="Profile data before save",
+                        error_type="RegistrationDebug",
+                        extra_context={"profile_data": profile_fields}
+                    )
+                    
+                    # Update all fields at once
+                    for field, value in profile_fields.items():
+                        setattr(profile, field, value)
+                        # Log each field update
+                        log_error(
+                            request=request,
+                            error_message=f"Setting profile field: {field}",
+                            error_type="RegistrationDebug",
+                            extra_context={
+                                "field": field,
+                                "value": str(value),
+                                "profile_id": profile.id
+                            }
+                        )
+                    
+                    # Save the profile
                     profile.save()
+                    
+                    # Force refresh from database
+                    profile.refresh_from_db()
+                    
+                    # Verify profile was saved correctly
+                    saved_profile = Profile.objects.get(user=user)
+                    log_error(
+                        request=request,
+                        error_message="Profile data after save",
+                        error_type="RegistrationDebug",
+                        extra_context={
+                            "saved_profile_data": {
+                                "player_number": saved_profile.player_number,
+                                "position": str(saved_profile.position),
+                                "is_official": saved_profile.is_official,
+                                "date_of_birth": str(saved_profile.date_of_birth),
+                                "level": saved_profile.level,
+                                "rut": saved_profile.rut,
+                                "country": saved_profile.country,
+                                "description": saved_profile.description
+                            }
+                        }
+                    )
 
                     # Update team member
                     team_member.user = user
                     team_member.is_active = True
                     team_member.invitation_accepted = True
                     team_member.save()
+                    
+                    log_error(
+                        request=request,
+                        error_message="Team member updated",
+                        error_type="RegistrationDebug",
+                        extra_context={
+                            "team_member_data": {
+                                "id": team_member.id,
+                                "user_id": team_member.user_id,
+                                "team": team_member.team.name,
+                                "is_active": team_member.is_active,
+                                "invitation_accepted": team_member.invitation_accepted
+                            }
+                        }
+                    )
 
                     # Clean up the session
                     request.session.pop(f'invite_{token}_is_official', None)
@@ -495,11 +645,23 @@ def register(request):
                         "team_id": team_member.team.id,
                         "email": team_member.email,
                         "role": team_member.role,
-                        "is_team_admin": team_member.is_team_admin
+                        "is_team_admin": team_member.is_team_admin,
+                        "form_data": form.cleaned_data,
+                        "error": str(e),
+                        "error_type": type(e).__name__
                     }
                 )
                 messages.error(request, 'An error occurred during registration. Please try again.')
         else:
+            log_error(
+                request=request,
+                error_message="Form validation failed",
+                error_type="RegistrationError",
+                extra_context={
+                    "form_errors": form.errors,
+                    "non_field_errors": form.non_field_errors()
+                }
+            )
             if settings.DEBUG:
                 messages.error(request, 'Please correct the errors below.')
     else:
@@ -516,16 +678,11 @@ def register(request):
     # Get the is_official status for the template
     is_official = request.session.get(f'invite_{token}_is_official', False)
     
-    context = {
+    return render(request, 'teams/register.html', {
         'form': form,
-        'team': team_member.team,
-        'role': team_member.get_role_display(),
-        'is_team_admin': team_member.is_team_admin,
         'is_official': is_official,
-        'email': team_member.email,
-        'image_url': 'https://raw.githubusercontent.com/pabloveintimilla/club/main/teams/static/teams/images/felicidades.png'
-    }
-    return render(request, 'teams/register.html', context)
+        'team': team_member.team
+    })
 
 @user_passes_test(is_admin)
 def admin_teams(request):
@@ -630,10 +787,8 @@ def edit_profile(request):
                 user = form.save(commit=False)
                 profile = Profile.objects.get_or_create(user=user)[0]
                 
-                # Handle profile picture deletion
-                if request.POST.get('profile_picture-clear'):
-                    profile.profile_picture = 'profile_pics/castolo.png'
-                elif form.cleaned_data.get('profile_picture'):
+                # Handle profile picture upload
+                if form.cleaned_data.get('profile_picture'):
                     # Validate file size
                     file = form.cleaned_data['profile_picture']
                     if file.size > 2 * 1024 * 1024:  # 2MB limit
@@ -1170,3 +1325,16 @@ def refresh_players(request, team_id, season_id, payment_id):
         messages.info(request, 'No new players to add.')
     
     return redirect('teams:payment_edit', team_id=team.id, season_id=season.id, payment_id=payment.id)
+
+@login_required
+def update_condition(request):
+    if request.method == 'POST':
+        condition = request.POST.get('condition')
+        if condition and hasattr(request.user, 'profile'):
+            profile = request.user.profile
+            if condition in dict(Profile.CONDITION_CHOICES):
+                profile.condition = condition
+                profile.save()
+    
+    # Redirect back to the dashboard
+    return redirect('teams:dashboard')

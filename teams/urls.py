@@ -66,6 +66,7 @@ urlpatterns = [
     path('team/<int:team_id>/season/<int:season_id>/payments/<int:payment_id>/delete/', views.payment_delete, name='payment_delete'),
     path('team/<int:team_id>/season/<int:season_id>/payments/<int:payment_id>/refresh/', views.refresh_players, name='refresh_players'),
     path('team/<int:team_id>/season/<int:season_id>/payments/<int:payment_id>/player/<int:player_payment_id>/', views.toggle_player_payment, name='toggle_player_payment'),
+    path('update-condition/', views.update_condition, name='update_condition'),
 ]
 
 if settings.DEBUG:

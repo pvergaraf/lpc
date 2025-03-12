@@ -22,6 +22,66 @@
     width: 100%;
     height: 4px;
 }
+.fifa-card {
+    background: linear-gradient(135deg, #FFD700 0%, #FDB931 100%);
+    border-radius: 15px;
+    padding: 20px;
+    position: relative;
+    max-width: 300px;
+    margin: 0 auto;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+.fifa-card-number {
+    font-size: 3.5rem;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 10px;
+    text-align: left;
+}
+.fifa-card-position {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 20px;
+    text-align: left;
+}
+.fifa-card-image {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    object-fit: cover;
+    position: absolute;
+    right: 20px;
+    top: 20px;
+}
+.fifa-card-name {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #333;
+    margin-top: 20px;
+    text-transform: uppercase;
+    border-top: 2px solid rgba(0,0,0,0.1);
+    padding-top: 10px;
+}
+.fifa-card-country {
+    font-size: 2rem;
+    position: absolute;
+    top: 80px;
+    left: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.fifa-card-team-logo {
+    width: 32px;
+    height: 32px;
+    object-fit: cover;
+    border-radius: 50%;
+}
+.fifa-card-details {
+    margin-top: 10px;
+    color: #333;
+}
 </style>
 
 <div class="container mt-4">
@@ -130,7 +190,7 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <a href="{% url 'teams:view_profile' member.user.id %}">
+                                <a href="#" class="show-fifa-card" data-bs-toggle="modal" data-bs-target="#playerModal{{ member.user.id }}">
                                     {{ member.user.get_full_name }}
                                 </a>
                             </td>
@@ -170,6 +230,59 @@
                             </td>
                             {% endif %}
                         </tr>
+                        
+                        <!-- FIFA Card Modal for each player -->
+                        <div class="modal fade" id="playerModal{{ member.user.id }}" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content">
+                                    <div class="modal-header border-0">
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="fifa-card">
+                                            {% if member.user.profile and member.user.profile.player_number %}
+                                                <div class="fifa-card-number">{{ member.user.profile.player_number }}</div>
+                                            {% endif %}
+                                            {% if member.user.profile and member.user.profile.position %}
+                                                <div class="fifa-card-position">{{ member.user.profile.position.code }}</div>
+                                            {% endif %}
+                                            {% if member.user.profile and member.user.profile.country %}
+                                                <div class="fifa-card-country">
+                                                    {{ member.user.profile.country|country_flag }}
+                                                    {% if team.team_photo %}
+                                                        <img src="{{ team.team_photo.url }}" alt="{{ team.name }}" class="fifa-card-team-logo">
+                                                    {% else %}
+                                                        <img src="{{ MEDIA_URL }}team_photos/default.png" alt="Default team photo" class="fifa-card-team-logo">
+                                                    {% endif %}
+                                                </div>
+                                            {% endif %}
+                                            {% if member.user.profile and member.user.profile.profile_picture %}
+                                                <img src="{{ member.user.profile.profile_picture.url }}" alt="Profile Picture" class="fifa-card-image">
+                                            {% else %}
+                                                <img src="{% static 'teams/images/default-profile.png' %}" alt="Default Profile Picture" class="fifa-card-image">
+                                            {% endif %}
+                                            <div class="fifa-card-name">
+                                                {% with name_parts=member.user.get_full_name.split %} 
+                                                    {{ name_parts.0.0 }}. {{ name_parts|last }}
+                                                {% endwith %}
+                                            </div>
+                                            <div class="fifa-card-details">
+                                                {% if member.user.profile and member.user.profile.rut %}
+                                                    <div>RUT: {{ member.user.profile.rut }}</div>
+                                                {% endif %}
+                                                <div>{{ member.user.email }}</div>
+                                                {% if member.user.profile and member.user.profile.level %}
+                                                    <div>Level: {{ member.user.profile.level }} {% if member.user.profile.date_of_birth %}• {{ member.user.profile.date_of_birth|calculate_age }}{% endif %}</div>
+                                                {% endif %}
+                                                {% if member.user.profile and member.user.profile.description %}
+                                                    <div class="mt-1 text-muted fst-italic">"{{ member.user.profile.description }}"</div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         {% endfor %}
                     </tbody>
                 </table>

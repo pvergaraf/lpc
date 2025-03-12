@@ -182,60 +182,25 @@ cloudwatch_client = boto3.client(
 
 LOGGING = {
     'version': 1,
-    'disable_existing_loggers': False,
+    'disable_existing_loggers': True,
     'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-            'style': '{',
-        },
-        'json': {
-            'format': '%(asctime)s %(levelname)s %(user)s %(ip)s %(message)s',
-            'class': 'pythonjsonlogger.jsonlogger.JsonFormatter',
-        },
-    },
-    'filters': {
-        'require_debug_false': {
-            '()': 'django.utils.log.RequireDebugFalse',
-        },
+        'minimal': {
+            'format': '%(message)s'
+        }
     },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
-        },
-        'watchtower': {
-            'class': 'watchtower.CloudWatchLogHandler',
-            'log_group': CLOUDWATCH_LOG_GROUP,
-            'stream_name': CLOUDWATCH_LOG_STREAM,
-            'formatter': 'json',
-            'use_queues': True,
-            'send_interval': 10,
-            'create_log_group': True,
-            'boto3_client': cloudwatch_client,
-        },
-        'fallback': {
-            'class': 'logging.FileHandler',
-            'filename': os.path.join(BASE_DIR, 'logs', 'django.log'),
-            'formatter': 'verbose',
-        },
+            'formatter': 'minimal',
+        }
     },
     'loggers': {
         'django': {
-            'handlers': ['console', 'watchtower', 'fallback'],
-            'level': 'INFO',
-            'propagate': True,
-        },
-        'teams': {
-            'handlers': ['console', 'watchtower', 'fallback'],
-            'level': 'INFO',
-            'propagate': True,
-        },
-        'watchtower': {
-            'level': 'INFO',
-            'handlers': ['console', 'fallback'],
+            'handlers': ['console'],
+            'level': 'ERROR',
             'propagate': False,
-        },
-    },
+        }
+    }
 }
 
 # S3 Static Files Configuration

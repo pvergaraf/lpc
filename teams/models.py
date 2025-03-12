@@ -4,9 +4,11 @@ from django.utils.translation import gettext_lazy as _
 from django.core.validators import MinValueValidator, MaxValueValidator
 from PIL import Image
 import os
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
+from .utils.logging_utils import log_error
+import traceback
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -110,6 +112,15 @@ class Profile(models.Model):
         ('US', 'United States'),
     ]
 
+    CONDITION_CHOICES = [
+        ('TOP', 'Top Condition'),
+        ('GOOD', 'Good Condition'),
+        ('NORMAL', 'Normal Condition'),
+        ('BAD', 'Bad Condition'),
+        ('AWFUL', 'Awful Condition'),
+        ('INJURED', 'Injured'),
+    ]
+
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     profile_picture = models.ImageField(
         upload_to='profile_pics/',
@@ -132,33 +143,325 @@ class Profile(models.Model):
         default='CL',
         help_text="Player's country"
     )
+    condition = models.CharField(
+        max_length=10,
+        choices=CONDITION_CHOICES,
+        default='NORMAL',
+        help_text="Player's current condition"
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._original_state = self._get_current_state()
+        self._modified_fields = set()
+
+    def _get_current_state(self):
+        return {
+            'player_number': self.player_number,
+            'position_id': self.position_id if self.position else None,
+            'is_official': self.is_official,
+            'level': self.level,
+            'rut': self.rut,
+            'country': self.country,
+            'description': self.description,
+        }
 
     def save(self, *args, **kwargs):
         # Check if this is a new instance
         is_new = self.pk is None
         
+        # Track which fields have been modified
+        if not is_new:
+            current_state = self._get_current_state()
+            self._modified_fields = {
+                field for field, value in current_state.items()
+                if value != self._original_state.get(field)
+            }
+        
+        # Log save attempt
+        log_error(
+            None,
+            error_message="Profile save attempt",
+            error_type="ProfileDebug",
+            extra_context={
+                "profile_id": self.pk,
+                "is_new": is_new,
+                "user_id": self.user.id if self.user else None,
+                "modified_fields": list(getattr(self, '_modified_fields', set())),
+                "current_state": {
+                    "player_number": self.player_number,
+                    "position": str(self.position) if self.position else None,
+                    "is_official": self.is_official,
+                    "level": self.level,
+                    "rut": self.rut,
+                    "country": self.country,
+                    "description": self.description
+                }
+            }
+        )
+        
         if not is_new:
             # Get the old instance from the database
-            old_instance = Profile.objects.get(pk=self.pk)
-            if (old_instance.profile_picture and 
-                old_instance.profile_picture != self.profile_picture and 
-                old_instance.profile_picture.name != 'profile_pics/castolo.png'):
-                # Delete the old picture only if it's not the default
-                old_instance.profile_picture.delete(save=False)
+            try:
+                old_instance = Profile.objects.get(pk=self.pk)
+                if (old_instance.profile_picture and 
+                    old_instance.profile_picture != self.profile_picture and 
+                    old_instance.profile_picture.name != 'profile_pics/castolo.png'):
+                    # Delete the old picture only if it's not the default
+                    old_instance.profile_picture.delete(save=False)
+                
+                # Log changes
+                log_error(
+                    None,
+                    error_message="Profile changes detected",
+                    error_type="ProfileDebug",
+                    extra_context={
+                        "profile_id": self.pk,
+                        "old_state": {
+                            "player_number": old_instance.player_number,
+                            "position": str(old_instance.position) if old_instance.position else None,
+                            "is_official": old_instance.is_official,
+                            "level": old_instance.level,
+                            "rut": old_instance.rut,
+                            "country": old_instance.country,
+                            "description": old_instance.description
+                        }
+                    }
+                )
+            except Profile.DoesNotExist:
+                pass
         
+        # Call the actual save method
         super().save(*args, **kwargs)
+        
+        # Update original state after save
+        self._original_state = self._get_current_state()
+        
+        # Log after save
+        log_error(
+            None,
+            error_message="Profile saved",
+            error_type="ProfileDebug",
+            extra_context={
+                "profile_id": self.pk,
+                "saved_state": {
+                    "player_number": self.player_number,
+                    "position": str(self.position) if self.position else None,
+                    "is_official": self.is_official,
+                    "level": self.level,
+                    "rut": self.rut,
+                    "country": self.country,
+                    "description": self.description
+                }
+            }
+        )
 
     def __str__(self):
         return f"{self.user.email}'s profile"
 
-@receiver(post_save, sender=User)
-def create_user_profile(sender, instance, created, **kwargs):
-    if created:
-        Profile.objects.create(user=instance)
+@receiver(pre_save, sender=Profile)
+def log_profile_changes(sender, instance, **kwargs):
+    try:
+        if instance.pk:
+            old_instance = Profile.objects.get(pk=instance.pk)
+            changes = {}
+            for field in ['player_number', 'position', 'is_official', 'level', 'rut', 'country', 'description']:
+                old_value = getattr(old_instance, field)
+                new_value = getattr(instance, field)
+                if old_value != new_value:
+                    changes[field] = {
+                        'old': str(old_value),
+                        'new': str(new_value)
+                    }
+            if changes:
+                log_error(
+                    None,
+                    error_message="Profile field changes",
+                    error_type="ProfileDebug",
+                    extra_context={
+                        "profile_id": instance.pk,
+                        "changes": changes
+                    }
+                )
+    except Profile.DoesNotExist:
+        pass
 
 @receiver(post_save, sender=User)
-def save_user_profile(sender, instance, **kwargs):
-    instance.profile.save()
+def create_user_profile(sender, instance, created, raw=False, **kwargs):
+    if raw:  # Skip during fixtures/migrations
+        return
+        
+    log_error(
+        None,
+        error_message="create_user_profile signal triggered",
+        error_type="SignalDebug",
+        extra_context={
+            "user_id": instance.id,
+            "created": created,
+            "has_profile": hasattr(instance, 'profile'),
+            "signal_order": "1st signal",
+            "signal_handler": "create_user_profile",
+            "sender": str(sender)
+        }
+    )
+    
+    if created:
+        try:
+            # Force refresh the instance from database
+            instance.refresh_from_db()
+            
+            profile = Profile.objects.create(user=instance)
+            log_error(
+                None,
+                error_message="Profile created from first signal",
+                error_type="SignalDebug",
+                extra_context={
+                    "profile_id": profile.pk,
+                    "user_id": instance.id,
+                    "profile_state": {
+                        "player_number": profile.player_number,
+                        "position": str(profile.position) if profile.position else None,
+                        "is_official": profile.is_official,
+                        "level": profile.level,
+                        "rut": profile.rut,
+                        "country": profile.country,
+                        "description": profile.description
+                    }
+                }
+            )
+        except Exception as e:
+            log_error(
+                None,
+                error_message=f"Error creating profile from first signal: {str(e)}",
+                error_type="SignalError",
+                extra_context={
+                    "user_id": instance.id,
+                    "error": str(e),
+                    "traceback": traceback.format_exc()
+                }
+            )
+
+@receiver(post_save, sender=User)
+def save_user_profile(sender, instance, created, raw=False, **kwargs):
+    if raw:  # Skip during fixtures/migrations
+        return
+        
+    log_error(
+        None,
+        error_message="save_user_profile signal triggered",
+        error_type="SignalDebug",
+        extra_context={
+            "user_id": instance.id,
+            "created": created,
+            "has_profile": hasattr(instance, 'profile'),
+            "signal_order": "2nd signal",
+            "signal_handler": "save_user_profile",
+            "sender": str(sender)
+        }
+    )
+    
+    try:
+        # Force refresh the instance from database
+        instance.refresh_from_db()
+        
+        if not hasattr(instance, 'profile'):
+            log_error(
+                None,
+                error_message="No profile found in second signal",
+                error_type="SignalDebug",
+                extra_context={
+                    "user_id": instance.id,
+                    "will_create": True
+                }
+            )
+            profile = Profile.objects.create(user=instance)
+            log_error(
+                None,
+                error_message="Profile created in second signal",
+                error_type="SignalDebug",
+                extra_context={
+                    "profile_id": profile.pk,
+                    "user_id": instance.id
+                }
+            )
+        else:
+            # Only save if profile exists and has been modified
+            profile = instance.profile
+            # Force refresh the profile from database
+            profile.refresh_from_db()
+            
+            if hasattr(profile, '_modified_fields'):
+                log_error(
+                    None,
+                    error_message="Profile save from second signal",
+                    error_type="SignalDebug",
+                    extra_context={
+                        "profile_id": profile.pk,
+                        "user_id": instance.id,
+                        "modified_fields": getattr(profile, '_modified_fields', []),
+                        "current_state": {
+                            "player_number": profile.player_number,
+                            "position": str(profile.position) if profile.position else None,
+                            "is_official": profile.is_official,
+                            "level": profile.level,
+                            "rut": profile.rut,
+                            "country": profile.country,
+                            "description": profile.description
+                        }
+                    }
+                )
+                profile.save()
+            else:
+                log_error(
+                    None,
+                    error_message="Profile not modified, skipping save in second signal",
+                    error_type="SignalDebug",
+                    extra_context={
+                        "profile_id": profile.pk,
+                        "user_id": instance.id,
+                        "current_state": {
+                            "player_number": profile.player_number,
+                            "position": str(profile.position) if profile.position else None,
+                            "is_official": profile.is_official,
+                            "level": profile.level,
+                            "rut": profile.rut,
+                            "country": profile.country,
+                            "description": profile.description
+                        }
+                    }
+                )
+    except Exception as e:
+        log_error(
+            None,
+            error_message=f"Error in second signal: {str(e)}",
+            error_type="SignalError",
+            extra_context={
+                "user_id": instance.id,
+                "error": str(e),
+                "traceback": traceback.format_exc()
+            }
+        )
+
+# Add signal connection verification
+def verify_signal_connections():
+    log_error(
+        None,
+        error_message="Verifying signal connections",
+        error_type="SignalDebug",
+        extra_context={
+            "create_user_profile_connected": any(
+                r[1] == create_user_profile 
+                for r in post_save.receivers
+            ),
+            "save_user_profile_connected": any(
+                r[1] == save_user_profile 
+                for r in post_save.receivers
+            )
+        }
+    )
+
+# Call verification on module load
+verify_signal_connections()
 
 class Team(models.Model):
     name = models.CharField(max_length=100)
