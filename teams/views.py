@@ -20,6 +20,8 @@ from django.utils import timezone
 from django.conf import settings
 from django.template.loader import render_to_string
 from django.db.models import Case, When, Value, IntegerField
+from .utils.logging_utils import log_error, log_upload_error
+import os
 
 User = get_user_model()
 
@@ -241,8 +243,17 @@ def invite_member(request, team_id):
     team = get_object_or_404(Team, id=team_id)
     team_member = get_object_or_404(TeamMember, team=team, user=request.user, is_active=True)
     
-    # Check if user is team admin or manager
     if not (team_member.is_team_admin or team_member.role == TeamMember.Role.MANAGER):
+        log_error(
+            request=request,
+            error_message="Unauthorized attempt to invite team member",
+            error_type="PermissionError",
+            extra_context={
+                "team_id": team_id,
+                "user_role": team_member.role,
+                "is_admin": team_member.is_team_admin
+            }
+        )
         return HttpResponseForbidden("You don't have permission to invite members.")
     
     if request.method == 'POST':
@@ -327,6 +338,18 @@ def invite_member(request, team_id):
                     return redirect('teams:team_members', team_id=team.id)
                     
             except Exception as e:
+                log_error(
+                    request=request,
+                    error_message=f"Failed to send invitation: {str(e)}",
+                    error_type="InvitationError",
+                    extra_context={
+                        "team_id": team_id,
+                        "invited_email": email,
+                        "role": role,
+                        "is_team_admin": is_team_admin,
+                        "is_official": is_official
+                    }
+                )
                 messages.error(request, f'Error sending invitation: {str(e)}')
                 return redirect('teams:team_members', team_id=team.id)
     else:
@@ -402,6 +425,14 @@ def register(request):
     try:
         team_member = TeamMember.objects.get(invitation_token=token, is_active=False)
     except TeamMember.DoesNotExist:
+        log_error(
+            request=request,
+            error_message="Invalid or expired invitation token",
+            error_type="RegistrationError",
+            extra_context={
+                "token": token
+            }
+        )
         context = {
             'title': 'Invalid Invitation',
             'message': 'This invitation link is no longer active or has already been used.',
@@ -456,10 +487,18 @@ def register(request):
                     return redirect('teams:dashboard')
 
             except Exception as e:
-                if settings.DEBUG:
-                    messages.error(request, 'An error occurred during registration.')
-                else:
-                    messages.error(request, 'An error occurred during registration. Please try again.')
+                log_error(
+                    request=request,
+                    error_message=f"Registration failed: {str(e)}",
+                    error_type="RegistrationError",
+                    extra_context={
+                        "team_id": team_member.team.id,
+                        "email": team_member.email,
+                        "role": team_member.role,
+                        "is_team_admin": team_member.is_team_admin
+                    }
+                )
+                messages.error(request, 'An error occurred during registration. Please try again.')
         else:
             if settings.DEBUG:
                 messages.error(request, 'Please correct the errors below.')
@@ -587,15 +626,86 @@ def edit_profile(request):
     if request.method == 'POST':
         form = UserProfileForm(request.POST, request.FILES, instance=request.user)
         if form.is_valid():
-            user = form.save()
-            # Handle profile picture clearing
-            profile = getattr(user, 'profile', None)
-            if profile:
+            try:
+                user = form.save(commit=False)
+                profile = Profile.objects.get_or_create(user=user)[0]
+                
+                # Handle profile picture deletion
                 if request.POST.get('profile_picture-clear'):
-                    profile.profile_picture = 'profile_pics/castolo.png'  # Reset to default
-                    profile.save()
-            messages.success(request, 'Your profile has been updated successfully!')
-            return redirect('teams:dashboard')
+                    profile.profile_picture = 'profile_pics/castolo.png'
+                elif form.cleaned_data.get('profile_picture'):
+                    # Validate file size
+                    file = form.cleaned_data['profile_picture']
+                    if file.size > 2 * 1024 * 1024:  # 2MB limit
+                        log_upload_error(
+                            request=request,
+                            file=file,
+                            error_message="File size exceeds maximum limit of 2MB",
+                            upload_type="profile_picture",
+                            attempted_location="profile_pics/",
+                            validation_errors={
+                                "size_limit": "2MB",
+                                "actual_size": f"{file.size / (1024 * 1024):.2f}MB"
+                            }
+                        )
+                        messages.error(request, 'Profile picture must be less than 2MB')
+                        return render(request, 'teams/edit_profile.html', {'form': form})
+                    
+                    # Validate file type using file extension
+                    allowed_extensions = ['.jpg', '.jpeg', '.png']
+                    file_extension = os.path.splitext(file.name)[1].lower()
+                    if file_extension not in allowed_extensions:
+                        log_upload_error(
+                            request=request,
+                            file=file,
+                            error_message="Invalid file type",
+                            upload_type="profile_picture",
+                            attempted_location="profile_pics/",
+                            validation_errors={
+                                "allowed_extensions": allowed_extensions,
+                                "actual_extension": file_extension
+                            }
+                        )
+                        messages.error(request, 'Profile picture must be JPEG or PNG')
+                        return render(request, 'teams/edit_profile.html', {'form': form})
+                    
+                    profile.profile_picture = file
+                
+                # Save user and profile
+                user.save()
+                profile.player_number = form.cleaned_data['player_number']
+                profile.position = form.cleaned_data['position']
+                profile.level = form.cleaned_data['level']
+                profile.is_official = form.cleaned_data['is_official']
+                profile.rut = form.cleaned_data['rut']
+                profile.country = form.cleaned_data['country']
+                profile.date_of_birth = form.cleaned_data['date_of_birth']
+                profile.description = form.cleaned_data['description']
+                profile.save()
+                
+                messages.success(request, 'Profile updated successfully')
+                return redirect('teams:dashboard')
+            except Exception as e:
+                log_upload_error(
+                    request=request,
+                    file=form.cleaned_data.get('profile_picture'),
+                    error_message=str(e),
+                    upload_type="profile_picture",
+                    attempted_location="profile_pics/",
+                    validation_errors={"unexpected_error": str(e)}
+                )
+                messages.error(request, 'An error occurred while updating your profile')
+                return render(request, 'teams/edit_profile.html', {'form': form})
+        else:
+            if 'profile_picture' in form.errors:
+                log_upload_error(
+                    request=request,
+                    file=request.FILES.get('profile_picture'),
+                    error_message=form.errors['profile_picture'],
+                    upload_type="profile_picture",
+                    attempted_location="profile_pics/",
+                    validation_errors={"form_errors": form.errors['profile_picture']}
+                )
     else:
         form = UserProfileForm(instance=request.user)
     
@@ -721,16 +831,48 @@ def match_create(request, team_id, season_id):
     team_member = get_object_or_404(TeamMember, team=team, user=request.user, is_active=True)
     
     if not (team_member.is_team_admin or team_member.role == TeamMember.Role.MANAGER):
+        log_error(
+            request=request,
+            error_message="Unauthorized attempt to create match",
+            error_type="PermissionError",
+            extra_context={
+                "team_id": team_id,
+                "season_id": season_id,
+                "user_role": team_member.role,
+                "is_admin": team_member.is_team_admin
+            }
+        )
         return HttpResponseForbidden("You don't have permission to create matches.")
     
     if request.method == 'POST':
         form = MatchForm(request.POST, season=season)
         if form.is_valid():
-            match = form.save(commit=False)
-            match.season = season
-            match.save()
-            messages.success(request, f'Match against {match.opponent} has been scheduled.')
-            return redirect('teams:season_detail', team_id=team.id, season_id=season.id)
+            try:
+                match = form.save(commit=False)
+                match.season = season
+                match.save()
+                messages.success(request, f'Match against {match.opponent} has been scheduled.')
+                return redirect('teams:season_detail', team_id=team.id, season_id=season.id)
+            except Exception as e:
+                log_error(
+                    request=request,
+                    error_message=f"Failed to create match: {str(e)}",
+                    error_type="MatchCreationError",
+                    extra_context={
+                        "team_id": team_id,
+                        "season_id": season_id,
+                        "opponent": form.cleaned_data.get('opponent'),
+                        "match_date": form.cleaned_data.get('match_date'),
+                        "match_time": form.cleaned_data.get('match_time')
+                    }
+                )
+                messages.error(request, 'An error occurred while scheduling the match.')
+                return render(request, 'teams/match_form.html', {
+                    'form': form,
+                    'team': team,
+                    'season': season,
+                    'title': 'Schedule Match'
+                })
     else:
         form = MatchForm(season=season)
     
@@ -818,33 +960,58 @@ def payment_list(request, team_id, season_id):
 def payment_create(request, team_id, season_id):
     team = get_object_or_404(Team, id=team_id)
     season = get_object_or_404(Season, id=season_id)
+    
     if not request.user.is_superuser and not TeamMember.objects.filter(team=team, user=request.user, is_team_admin=True).exists():
+        log_error(
+            request=request,
+            error_message="Unauthorized attempt to create payment",
+            error_type="PermissionError",
+            extra_context={
+                "team_id": team_id,
+                "season_id": season_id
+            }
+        )
         return HttpResponseForbidden("You don't have permission to create payments.")
 
     if request.method == 'POST':
         form = PaymentForm(request.POST)
         if form.is_valid():
-            payment = form.save(commit=False)
-            payment.season = season
-            payment.save()
-            
-            # Create player payments for all official players
-            official_players = TeamMember.objects.filter(
-                team=team,
-                role=TeamMember.Role.PLAYER,
-                user__profile__is_official=True,
-                is_active=True
-            )
-            
-            for player in official_players:
-                PlayerPayment.objects.create(
-                    payment=payment,
-                    player=player,
-                    amount=0  # Default amount, to be edited by admin
+            try:
+                with transaction.atomic():
+                    payment = form.save(commit=False)
+                    payment.season = season
+                    payment.save()
+                    
+                    # Create player payments
+                    official_players = TeamMember.objects.filter(
+                        team=team,
+                        role=TeamMember.Role.PLAYER,
+                        user__profile__is_official=True,
+                        is_active=True
+                    )
+                    
+                    for player in official_players:
+                        PlayerPayment.objects.create(
+                            payment=payment,
+                            player=player,
+                            amount=0
+                        )
+                    
+                    messages.success(request, 'Payment created successfully.')
+                    return redirect('teams:payment_edit', team_id=team.id, season_id=season.id, payment_id=payment.id)
+            except Exception as e:
+                log_error(
+                    request=request,
+                    error_message=f"Failed to create payment: {str(e)}",
+                    error_type="PaymentCreationError",
+                    extra_context={
+                        "team_id": team_id,
+                        "season_id": season_id,
+                        "form_data": form.cleaned_data
+                    }
                 )
-            
-            messages.success(request, 'Payment created successfully.')
-            return redirect('teams:payment_edit', team_id=team.id, season_id=season.id, payment_id=payment.id)
+                messages.error(request, 'An error occurred while creating the payment.')
+                return render(request, 'teams/payment_form.html', {'form': form, 'team': team, 'season': season})
     else:
         form = PaymentForm()
     

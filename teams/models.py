@@ -116,6 +116,7 @@ class Profile(models.Model):
         default='profile_pics/castolo.png',
         blank=True
     )
+    description = models.CharField(max_length=20, blank=True, help_text="A short description (max 20 characters)")
     player_number = models.IntegerField(null=True, blank=True)
     position = models.ForeignKey(Position, on_delete=models.SET_NULL, null=True, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)

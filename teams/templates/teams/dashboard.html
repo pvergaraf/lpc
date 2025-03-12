@@ -120,6 +120,9 @@
                     {% if request.user.profile and request.user.profile.level %}
                         <div>Level: {{ request.user.profile.level }} {% if request.user.profile.date_of_birth %}• {{ request.user.profile.date_of_birth|calculate_age }}{% endif %}</div>
                     {% endif %}
+                    {% if request.user.profile and request.user.profile.description %}
+                        <div class="mt-1 text-muted fst-italic">"{{ request.user.profile.description }}"</div>
+                    {% endif %}
                 </div>
                 <a href="{% url 'teams:edit_profile' %}" class="text-decoration-underline text-dark mt-3 d-block text-start">Edit Profile</a>
             </div>
@@ -358,7 +361,7 @@
                                                 </td>
                                                 <td>
                                                     {% if member.user and member.user.profile and member.user.profile.position %}
-                                                        <div class="position-badge" style="display: inline-block; padding: 6px 12px; background-color: #000000; color: white; font-weight: bold; position: relative; margin: 2px;">
+                                                        <div class="position-badge" style="display: inline-block; padding: 6px 12px; background-color: #000000; color: white; font-weight: bold; position: relative; margin: 2px; width: 60px; text-align: center;">
                                                             {{ member.user.profile.position.code }}
                                                             <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 4px; background-color: {{ member.user.profile.position.color }};"></div>
                                                         </div>

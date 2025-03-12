@@ -28,6 +28,9 @@
                             {% if profile.country %}
                             <p><strong>Country:</strong> {{ profile.get_country_display }}</p>
                             {% endif %}
+                            {% if profile.description %}
+                            <p><strong>Description:</strong> {{ profile.description }}</p>
+                            {% endif %}
                         </div>
                     </div>
 
