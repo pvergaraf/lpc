@@ -57,6 +57,16 @@
     position: absolute;
     top: 80px;
     left: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.fifa-card-team-logo {
+    width: 32px;
+    height: 32px;
+    object-fit: cover;
+    border-radius: 50%;
 }
 
 .fifa-card-details {
@@ -83,7 +93,14 @@
                     <div class="fifa-card-position">{{ request.user.profile.position.code }}</div>
                 {% endif %}
                 {% if request.user.profile and request.user.profile.country %}
-                    <div class="fifa-card-country">{{ request.user.profile.country|country_flag }}</div>
+                    <div class="fifa-card-country">
+                        {{ request.user.profile.country|country_flag }}
+                        {% if current_team and current_team.team_photo %}
+                            <img src="{{ current_team.team_photo.url }}" alt="{{ current_team.name }}" class="fifa-card-team-logo">
+                        {% else %}
+                            <img src="{{ MEDIA_URL }}team_photos/default.png" alt="Default team photo" class="fifa-card-team-logo">
+                        {% endif %}
+                    </div>
                 {% endif %}
                 {% if request.user.profile and request.user.profile.profile_picture %}
                     <img src="{{ request.user.profile.profile_picture.url }}" alt="Profile Picture" class="fifa-card-image">
@@ -117,7 +134,18 @@
                         <div class="list-group">
                             {% for membership in team_memberships %}
                                 <a href="{% url 'teams:switch_team' membership.team.id %}" 
-                                   class="list-group-item list-group-item-action {% if membership.team.id == current_team %}active{% endif %}">
+                                   class="list-group-item list-group-item-action {% if membership.team.id == current_team %}active{% endif %} d-flex align-items-center">
+                                    {% if membership.team.team_photo %}
+                                        <img src="{{ membership.team.team_photo.url }}" 
+                                             alt="{{ membership.team.name }}" 
+                                             class="rounded-circle me-2"
+                                             style="width: 40px; height: 40px; object-fit: cover;">
+                                    {% else %}
+                                        <img src="{{ MEDIA_URL }}team_photos/default.png" 
+                                             alt="Default team photo" 
+                                             class="rounded-circle me-2"
+                                             style="width: 40px; height: 40px; object-fit: cover;">
+                                    {% endif %}
                                     {{ membership.team.name }}
                                 </a>
                             {% endfor %}

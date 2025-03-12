@@ -162,8 +162,57 @@ def save_user_profile(sender, instance, **kwargs):
 class Team(models.Model):
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
+    team_photo = models.ImageField(
+        upload_to='team_photos/',
+        default='team_photos/default.png',
+        blank=True,
+        help_text="Upload a square team photo"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        
+        if not is_new and self.team_photo:
+            try:
+                old_instance = Team.objects.get(pk=self.pk)
+                if (old_instance.team_photo and 
+                    old_instance.team_photo != self.team_photo and 
+                    old_instance.team_photo.name != 'team_photos/default.png'):
+                    # Delete the old picture only if it's not the default
+                    old_instance.team_photo.delete(save=False)
+            except Team.DoesNotExist:
+                pass
+
+        super().save(*args, **kwargs)
+
+        # Process the team photo if it exists and has changed
+        if self.team_photo and (is_new or self.team_photo.name != 'team_photos/default.png'):
+            img = Image.open(self.team_photo.path)
+            
+            # Convert to RGB if necessary
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            
+            # Get the minimum dimension to make it square
+            min_dim = min(img.width, img.height)
+            
+            # Calculate cropping box
+            left = (img.width - min_dim) // 2
+            top = (img.height - min_dim) // 2
+            right = left + min_dim
+            bottom = top + min_dim
+            
+            # Crop to square
+            img = img.crop((left, top, right, bottom))
+            
+            # Resize if larger than 300x300
+            if min_dim > 300:
+                img = img.resize((300, 300), Image.Resampling.LANCZOS)
+            
+            # Save the processed image
+            img.save(self.team_photo.path, quality=90, optimize=True)
 
     def __str__(self):
         return self.name

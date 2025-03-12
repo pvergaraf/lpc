@@ -133,9 +133,19 @@ class TeamMemberInviteForm(forms.Form):
         return email
 
 class TeamForm(forms.ModelForm):
+    team_photo = forms.ImageField(
+        required=False,
+        help_text="Upload a square team photo (will be cropped if not square)",
+        widget=forms.FileInput(attrs={'class': 'form-control'})
+    )
+
     class Meta:
         model = Team
-        fields = ('name', 'description')
+        fields = ('name', 'description', 'team_photo')
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
 
 class AddTeamMemberForm(UserCreationForm):
     first_name = forms.CharField(max_length=30, required=True)
