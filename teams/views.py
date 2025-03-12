@@ -19,6 +19,7 @@ from django.contrib.auth.views import LogoutView
 from django.utils import timezone
 from django.conf import settings
 from django.template.loader import render_to_string
+from django.db.models import Case, When, Value, IntegerField
 
 User = get_user_model()
 
@@ -136,7 +137,23 @@ def dashboard(request):
     ).filter(
         models.Q(is_active=True) | 
         models.Q(is_active=False, invitation_token__isnull=False)
-    ).select_related('user', 'user__profile')
+    ).select_related(
+        'user', 
+        'user__profile', 
+        'user__profile__position'
+    ).annotate(
+        position_order=Case(
+            When(user__profile__position__type='GK', then=Value(1)),
+            When(user__profile__position__type='DEF', then=Value(2)),
+            When(user__profile__position__type='MID', then=Value(3)),
+            When(user__profile__position__type='ATT', then=Value(4)),
+            default=Value(5),
+            output_field=IntegerField(),
+        )
+    ).order_by(
+        'position_order',
+        'user__profile__player_number'
+    )
 
     # Get upcoming matches if there's a current season
     upcoming_matches = None
@@ -184,7 +201,23 @@ def team_members(request, team_id):
     active_members = TeamMember.objects.filter(
         team=team,
         is_active=True
-    ).select_related('user', 'user__profile')
+    ).select_related(
+        'user', 
+        'user__profile',
+        'user__profile__position'
+    ).annotate(
+        position_order=Case(
+            When(user__profile__position__type='GK', then=Value(1)),
+            When(user__profile__position__type='DEF', then=Value(2)),
+            When(user__profile__position__type='MID', then=Value(3)),
+            When(user__profile__position__type='ATT', then=Value(4)),
+            default=Value(5),
+            output_field=IntegerField(),
+        )
+    ).order_by(
+        'position_order',
+        'user__profile__player_number'
+    )
     
     # Get pending invitations
     pending_invitations = TeamMember.objects.filter(

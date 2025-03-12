@@ -1,3 +1,3 @@
 """
-Template tags package for teams app.
+Template tags for the teams app.
 """ 

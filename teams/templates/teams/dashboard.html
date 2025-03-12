@@ -1,44 +1,110 @@
 {% extends "teams/base.html" %}
 {% load static %}
-{% load currency_filters %}
+{% load teams_tags %}
 
 {% block title %}fubol.club{% endblock %}
 
 {% block content %}
+<style>
+.fifa-card {
+    background: linear-gradient(135deg, #FFD700 0%, #FDB931 100%);
+    border-radius: 15px;
+    padding: 20px;
+    position: relative;
+    max-width: 300px;
+    margin: 0 auto;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.fifa-card-number {
+    font-size: 3.5rem;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 10px;
+    text-align: left;
+}
+
+.fifa-card-position {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.fifa-card-image {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    object-fit: cover;
+    position: absolute;
+    right: 20px;
+    top: 20px;
+}
+
+.fifa-card-name {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #333;
+    margin-top: 20px;
+    text-transform: uppercase;
+    border-top: 2px solid rgba(0,0,0,0.1);
+    padding-top: 10px;
+}
+
+.fifa-card-country {
+    font-size: 2rem;
+    position: absolute;
+    top: 80px;
+    left: 20px;
+}
+
+.fifa-card-details {
+    margin-top: 10px;
+    color: #333;
+}
+
+.fifa-card-edit {
+    width: 100%;
+    margin-top: 15px;
+}
+</style>
+
 <div class="container mt-4">
     {% csrf_token %}
     <div class="row">
         <!-- Profile Card -->
         <div class="col-md-3">
-            <div class="card mb-4">
-                <div class="card-body text-center">
-                    {% if request.user.profile and request.user.profile.profile_picture %}
-                        <img src="{{ request.user.profile.profile_picture.url }}" alt="Profile Picture" class="rounded-circle mb-3" style="width: 150px; height: 150px; object-fit: cover;">
-                    {% else %}
-                        <img src="{% static 'teams/images/default-profile.png' %}" alt="Default Profile Picture" class="rounded-circle mb-3" style="width: 150px; height: 150px; object-fit: cover;">
-                    {% endif %}
-                    <h5 class="card-title">{{ request.user.get_full_name }}</h5>
-                    <p class="card-text">{{ request.user.email }}</p>
-                    {% if request.user.profile and request.user.profile.player_number %}
-                        <p class="card-text">Player #{{ request.user.profile.player_number }}</p>
-                    {% endif %}
-                    {% if request.user.profile and request.user.profile.position %}
-                        <div class="position-badge" style="display: inline-block; padding: 6px 12px; background-color: #000000; color: white; font-weight: bold; position: relative; margin: 2px;">
-                            {{ request.user.profile.position.code }}
-                            <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 4px; background-color: {{ request.user.profile.position.color }};"></div>
-                        </div>
-                    {% endif %}
-                    {% if request.user.profile and request.user.profile.level %}
-                        <p class="card-text mt-2">Level: {{ request.user.profile.level }}</p>
-                    {% endif %}
-                    {% if request.user.profile and request.user.profile.rut %}
-                        <p class="card-text">RUT: {{ request.user.profile.rut }}</p>
-                    {% endif %}
-                    {% if request.user.profile and request.user.profile.is_official %}
-                        <span class="badge bg-success mb-2">Official Player</span>
-                    {% endif %}
-                    <a href="{% url 'teams:edit_profile' %}" class="btn btn-primary">Edit Profile</a>
+            <div class="fifa-card mb-4">
+                {% if request.user.profile and request.user.profile.player_number %}
+                    <div class="fifa-card-number">{{ request.user.profile.player_number }}</div>
+                {% endif %}
+                {% if request.user.profile and request.user.profile.position %}
+                    <div class="fifa-card-position">{{ request.user.profile.position.code }}</div>
+                {% endif %}
+                {% if request.user.profile and request.user.profile.country %}
+                    <div class="fifa-card-country">{{ request.user.profile.country|country_flag }}</div>
+                {% endif %}
+                {% if request.user.profile and request.user.profile.profile_picture %}
+                    <img src="{{ request.user.profile.profile_picture.url }}" alt="Profile Picture" class="fifa-card-image">
+                {% else %}
+                    <img src="{% static 'teams/images/default-profile.png' %}" alt="Default Profile Picture" class="fifa-card-image">
+                {% endif %}
+                <div class="fifa-card-name">
+                    {% with name_parts=request.user.get_full_name.split %} 
+                        {{ name_parts.0.0 }}. {{ name_parts|last }}
+                    {% endwith %}
                 </div>
+                <div class="fifa-card-details">
+                    {% if request.user.profile and request.user.profile.rut %}
+                        <div>RUT: {{ request.user.profile.rut }}</div>
+                    {% endif %}
+                    <div>{{ request.user.email }}</div>
+                    {% if request.user.profile and request.user.profile.level %}
+                        <div>Level: {{ request.user.profile.level }}</div>
+                    {% endif %}
+                </div>
+                <a href="{% url 'teams:edit_profile' %}" class="text-decoration-underline text-dark mt-3 d-block text-start">Edit Profile</a>
             </div>
             
             <!-- Teams List -->
@@ -170,10 +236,12 @@
                                                 <td>{{ payment.payment.name }}</td>
                                                 <td>${{ payment.amount|currency_no_decimals }}</td>
                                                 <td>
-                                                    {{ payment.payment.due_date|date:"M d, Y" }}
-                                                    {% if payment.payment.due_date|date:"Y-m-d" < today %}
-                                                        <span class="badge bg-danger ms-2">Overdue</span>
-                                                    {% endif %}
+                                                    <div class="d-flex align-items-center">
+                                                        {% if payment.payment.due_date|date:"Y-m-d" < today %}
+                                                            <span class="badge bg-danger me-2">Overdue</span>
+                                                        {% endif %}
+                                                        {{ payment.payment.due_date|date:"M d, Y" }}
+                                                    </div>
                                                 </td>
                                                 <td>
                                                     {% if payment.admin_verified %}
@@ -186,19 +254,21 @@
                                                 </td>
                                                 <td>
                                                     {% if not payment.admin_verified %}
-                                                        {% if not payment.is_paid %}
-                                                            <a href="https://slach.cl/lpcfc/{{ payment.amount|stringformat:'d' }}" 
-                                                               target="_blank" 
-                                                               class="btn btn-sm btn-primary me-2">
-                                                                Pay Now
-                                                            </a>
-                                                        {% endif %}
-                                                        <button type="button" 
-                                                                class="btn btn-sm {% if payment.is_paid %}btn-outline-success{% else %}btn-success{% endif %} toggle-payment-btn"
-                                                                data-payment-id="{{ payment.id }}"
-                                                                data-is-admin="{% if is_team_admin %}true{% else %}false{% endif %}">
-                                                            {% if payment.is_paid %}Mark as Unpaid{% else %}Mark as Paid{% endif %}
-                                                        </button>
+                                                        <div class="d-flex flex-column flex-sm-row gap-2">
+                                                            {% if not payment.is_paid %}
+                                                                <a href="https://slach.cl/lpcfc/{{ payment.amount|stringformat:'d' }}" 
+                                                                   target="_blank" 
+                                                                   class="btn btn-sm btn-primary">
+                                                                    Pay Now
+                                                                </a>
+                                                            {% endif %}
+                                                            <button type="button" 
+                                                                    class="btn btn-sm {% if payment.is_paid %}btn-outline-success{% else %}btn-success{% endif %} toggle-payment-btn"
+                                                                    data-payment-id="{{ payment.id }}"
+                                                                    data-is-admin="{% if is_team_admin %}true{% else %}false{% endif %}">
+                                                                {% if payment.is_paid %}Mark as Unpaid{% else %}Mark as Paid{% endif %}
+                                                            </button>
+                                                        </div>
                                                     {% endif %}
                                                 </td>
                                             </tr>
@@ -237,13 +307,10 @@
                             <table class="table">
                                 <thead>
                                     <tr>
-                                        <th>Name</th>
-                                        <th>Email</th>
                                         <th>Player #</th>
                                         <th>Position</th>
-                                        <th>Level</th>
-                                        <th>RUT</th>
-                                        <th>Status</th>
+                                        <th>Name</th>
+                                        <th>Country</th>
                                         <th>Role</th>
                                         {% if is_team_admin %}
                                             <th>Actions</th>
@@ -252,77 +319,53 @@
                                 </thead>
                                 <tbody>
                                     {% for member in team_members %}
-                                        <tr>
-                                            <td>
-                                                {% if member.user %}
-                                                    <a href="{% url 'teams:view_profile' member.user.id %}">
-                                                        {{ member.user.get_full_name }}
-                                                    </a>
-                                                {% else %}
-                                                    Pending Invitation
-                                                {% endif %}
-                                            </td>
-                                            <td>
-                                                {% if member.user %}
-                                                    {{ member.user.email }}
-                                                {% else %}
-                                                    {{ member.email }}
-                                                {% endif %}
-                                            </td>
-                                            <td>
-                                                {% if member.user and member.user.profile and member.user.profile.player_number %}
-                                                    {{ member.user.profile.player_number }}
-                                                {% else %}
-                                                    -
-                                                {% endif %}
-                                            </td>
-                                            <td>
-                                                {% if member.user and member.user.profile and member.user.profile.position %}
-                                                    <div class="position-badge" style="display: inline-block; padding: 6px 12px; background-color: #000000; color: white; font-weight: bold; position: relative; margin: 2px;">
-                                                        {{ member.user.profile.position.code }}
-                                                        <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 4px; background-color: {{ member.user.profile.position.color }};"></div>
-                                                    </div>
-                                                {% else %}
-                                                    -
-                                                {% endif %}
-                                            </td>
-                                            <td>
-                                                {% if member.user and member.user.profile and member.user.profile.level %}
-                                                    {{ member.user.profile.level }}
-                                                {% else %}
-                                                    -
-                                                {% endif %}
-                                            </td>
-                                            <td>
-                                                {% if member.user and member.user.profile and member.user.profile.rut %}
-                                                    {{ member.user.profile.rut }}
-                                                {% else %}
-                                                    -
-                                                {% endif %}
-                                            </td>
-                                            <td>
-                                                {% if member.is_active %}
-                                                    <span class="badge bg-success">Active</span>
-                                                    {% if member.user.profile.is_official %}
-                                                        <span class="badge bg-info">Official</span>
-                                                    {% endif %}
-                                                {% else %}
-                                                    <span class="badge bg-warning text-dark">Pending</span>
-                                                {% endif %}
-                                            </td>
-                                            <td>
-                                                <span class="badge {% if member.role == 'MANAGER' %}bg-primary{% else %}bg-secondary{% endif %}">
-                                                    {{ member.get_role_display }}
-                                                </span>
-                                                {% if member.is_team_admin %}
-                                                    <span class="badge bg-info">Admin</span>
-                                                {% endif %}
-                                            </td>
-                                            {% if is_team_admin %}
+                                        {% if member.is_active %}
+                                            <tr>
                                                 <td>
-                                                    <div class="btn-group">
-                                                        {% if member.is_active %}
-                                                            <a href="{% url 'teams:edit_member' team_id=current_team.id user_id=member.user.id %}" class="btn btn-sm btn-outline-primary">Edit Profile</a>
+                                                    {% if member.user and member.user.profile and member.user.profile.player_number %}
+                                                        {{ member.user.profile.player_number }}
+                                                    {% else %}
+                                                        -
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if member.user and member.user.profile and member.user.profile.position %}
+                                                        <div class="position-badge" style="display: inline-block; padding: 6px 12px; background-color: #000000; color: white; font-weight: bold; position: relative; margin: 2px;">
+                                                            {{ member.user.profile.position.code }}
+                                                            <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 4px; background-color: {{ member.user.profile.position.color }};"></div>
+                                                        </div>
+                                                    {% else %}
+                                                        -
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if member.user %}
+                                                        <a href="{% url 'teams:view_profile' member.user.id %}">
+                                                            {{ member.user.get_full_name }}
+                                                        </a>
+                                                    {% else %}
+                                                        Pending Invitation
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if member.user and member.user.profile and member.user.profile.country %}
+                                                        {{ member.user.profile.country|country_flag }}
+                                                    {% else %}
+                                                        -
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    <span class="badge {% if member.role == 'MANAGER' %}bg-primary{% else %}bg-secondary{% endif %}">
+                                                        {{ member.get_role_display }}
+                                                    </span>
+                                                    {% if member.is_team_admin %}
+                                                        <span class="badge bg-info">Admin</span>
+                                                    {% endif %}
+                                                </td>
+                                                {% if is_team_admin %}
+                                                    <td>
+                                                        <div class="btn-group">
+                                                            <a href="{% url 'teams:edit_member' team_id=current_team.id user_id=member.user.id %}" class="btn btn-sm btn-outline-primary">Edit</a>
                                                             <form method="post" action="{% url 'teams:toggle_team_admin' team_id=current_team.id member_id=member.id %}" class="d-inline ms-1">
                                                                 {% csrf_token %}
                                                                 <button type="submit" class="btn btn-sm btn-outline-info">
@@ -336,19 +379,11 @@
                                                                     Remove
                                                                 </button>
                                                             </form>
-                                                        {% else %}
-                                                            <form method="post" action="{% url 'teams:remove_pending_invitation' team_id=current_team.id member_id=member.id %}" class="d-inline">
-                                                                {% csrf_token %}
-                                                                <button type="submit" class="btn btn-sm btn-outline-danger"
-                                                                        onclick="return confirm('Are you sure you want to cancel this invitation?')">
-                                                                    Cancel Invitation
-                                                                </button>
-                                                            </form>
-                                                        {% endif %}
-                                                    </div>
-                                                </td>
-                                            {% endif %}
-                                        </tr>
+                                                        </div>
+                                                    </td>
+                                                {% endif %}
+                                            </tr>
+                                        {% endif %}
                                     {% endfor %}
                                 </tbody>
                             </table>

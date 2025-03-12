@@ -21,6 +21,11 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'teams:dashboard' %}">Dashboard</a>
                     </li>
+                    {% if current_team %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'teams:team_members' current_team.id %}">Team Members</a>
+                    </li>
+                    {% endif %}
                     {% if is_team_admin and current_season %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown">

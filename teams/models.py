@@ -12,7 +12,7 @@ class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
         if not email:
             raise ValueError('The Email field must be set')
-        email = self.normalize_email(email)
+        email = self.normalize_email(email.lower())  # Force lowercase
         user = self.model(email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
@@ -88,6 +88,28 @@ class Position(models.Model):
         }.get(self.type, '#808080')  # Gray as default
 
 class Profile(models.Model):
+    COUNTRIES = [
+        ('CL', 'Chile'),  # Chile first
+        ('AR', 'Argentina'),
+        ('BO', 'Bolivia'),
+        ('BR', 'Brazil'),
+        ('CO', 'Colombia'),
+        ('EC', 'Ecuador'),
+        ('PE', 'Peru'),
+        ('PY', 'Paraguay'),
+        ('UY', 'Uruguay'),
+        ('VE', 'Venezuela'),
+        ('DE', 'Germany'),
+        ('ES', 'Spain'),
+        ('FR', 'France'),
+        ('GB', 'United Kingdom'),
+        ('IT', 'Italy'),
+        ('MX', 'Mexico'),
+        ('NL', 'Netherlands'),
+        ('PT', 'Portugal'),
+        ('US', 'United States'),
+    ]
+
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     profile_picture = models.ImageField(
         upload_to='profile_pics/',
@@ -103,6 +125,12 @@ class Profile(models.Model):
     )
     is_official = models.BooleanField(default=False, help_text="Indicates if the player is officially registered")
     rut = models.CharField(max_length=12, blank=True, null=True, help_text="Chilean ID number (RUT)")
+    country = models.CharField(
+        max_length=2,
+        choices=COUNTRIES,
+        default='CL',
+        help_text="Player's country"
+    )
 
     def save(self, *args, **kwargs):
         # Check if this is a new instance

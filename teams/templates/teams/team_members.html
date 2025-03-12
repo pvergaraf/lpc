@@ -1,4 +1,6 @@
 {% extends 'teams/base.html' %}
+{% load static %}
+{% load teams_tags %}
 
 {% block title %}{{ team.name }} - Members{% endblock %}
 
@@ -6,21 +8,19 @@
 <style>
 .position-badge {
     display: inline-block;
-    text-align: center;
-    min-width: 35px;
-    position: relative;
-    padding-bottom: 3px;
-}
-.position-code {
+    padding: 6px 12px;
+    background-color: #000000;
+    color: white;
     font-weight: bold;
-    font-size: 0.9em;
-    margin-bottom: 2px;
+    position: relative;
+    margin: 2px;
 }
 .position-line {
-    height: 3px;
-    width: 100%;
     position: absolute;
     bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
 }
 </style>
 
@@ -29,8 +29,11 @@
     
     {% if user_is_admin %}
     <div class="mb-4">
-        <a href="{% url 'teams:invite_member' team.id %}" class="btn btn-primary">
+        <a href="{% url 'teams:invite_member' team.id %}" class="btn btn-primary me-2">
             <i class="fas fa-user-plus"></i> Invite Member
+        </a>
+        <a href="{% url 'teams:add_team_member' team.id %}" class="btn btn-primary">
+            <i class="fas fa-user-plus"></i> Add Member
         </a>
     </div>
     {% endif %}
@@ -55,15 +58,27 @@
                         {% for member in pending_invitations %}
                         <tr>
                             <td>{{ member.email }}</td>
-                            <td>{{ member.get_role_display }}</td>
-                            <td>{% if member.is_team_admin %}Yes{% else %}No{% endif %}</td>
+                            <td>
+                                <span class="badge {% if member.role == 'MANAGER' %}bg-primary{% else %}bg-secondary{% endif %}">
+                                    {{ member.get_role_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if member.is_team_admin %}
+                                    <span class="badge bg-info">Yes</span>
+                                {% else %}
+                                    No
+                                {% endif %}
+                            </td>
                             <td>
                                 {% if user_is_admin %}
-                                <a href="{% url 'teams:remove_pending_invitation' team.id member.id %}" 
-                                   class="btn btn-danger btn-sm"
-                                   onclick="return confirm('Are you sure you want to cancel this invitation?')">
-                                    Cancel Invitation
-                                </a>
+                                <form method="post" action="{% url 'teams:remove_pending_invitation' team.id member.id %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-danger"
+                                            onclick="return confirm('Are you sure you want to cancel this invitation?')">
+                                        Cancel Invitation
+                                    </button>
+                                </form>
                                 {% endif %}
                             </td>
                         </tr>
@@ -84,35 +99,76 @@
                 <table class="table">
                     <thead>
                         <tr>
+                            <th>Player #</th>
+                            <th>Position</th>
                             <th>Name</th>
-                            <th>Email</th>
+                            <th>Country</th>
                             <th>Role</th>
-                            <th>Admin</th>
-                            <th>Actions</th>
+                            {% if user_is_admin %}
+                                <th>Actions</th>
+                            {% endif %}
                         </tr>
                     </thead>
                     <tbody>
                         {% for member in active_members %}
                         <tr>
-                            <td>{{ member.user.get_full_name }}</td>
-                            <td>{{ member.user.email }}</td>
-                            <td>{{ member.get_role_display }}</td>
-                            <td>{% if member.is_team_admin %}Yes{% else %}No{% endif %}</td>
                             <td>
-                                {% if user_is_admin and member.user != user %}
-                                <div class="btn-group">
-                                    <a href="{% url 'teams:toggle_team_admin' team.id member.id %}" 
-                                       class="btn btn-warning btn-sm">
-                                        {% if member.is_team_admin %}Remove Admin{% else %}Make Admin{% endif %}
-                                    </a>
-                                    <a href="{% url 'teams:remove_member' team.id member.id %}" 
-                                       class="btn btn-danger btn-sm"
-                                       onclick="return confirm('Are you sure you want to remove this member?')">
-                                        Remove
-                                    </a>
-                                </div>
+                                {% if member.user.profile and member.user.profile.player_number %}
+                                    {{ member.user.profile.player_number }}
+                                {% else %}
+                                    -
                                 {% endif %}
                             </td>
+                            <td>
+                                {% if member.user.profile and member.user.profile.position %}
+                                    <div class="position-badge">
+                                        {{ member.user.profile.position.code }}
+                                        <div class="position-line" style="background-color: {{ member.user.profile.position.color }};"></div>
+                                    </div>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{% url 'teams:view_profile' member.user.id %}">
+                                    {{ member.user.get_full_name }}
+                                </a>
+                            </td>
+                            <td>
+                                {% if member.user.profile and member.user.profile.country %}
+                                    {{ member.user.profile.country|country_flag }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge {% if member.role == 'MANAGER' %}bg-primary{% else %}bg-secondary{% endif %}">
+                                    {{ member.get_role_display }}
+                                </span>
+                                {% if member.is_team_admin %}
+                                    <span class="badge bg-info">Admin</span>
+                                {% endif %}
+                            </td>
+                            {% if user_is_admin and member.user != user %}
+                            <td>
+                                <div class="btn-group">
+                                    <a href="{% url 'teams:edit_member' team_id=team.id user_id=member.user.id %}" class="btn btn-sm btn-outline-primary">Edit</a>
+                                    <form method="post" action="{% url 'teams:toggle_team_admin' team.id member.id %}" class="d-inline ms-1">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-info">
+                                            {% if member.is_team_admin %}Remove Admin{% else %}Make Admin{% endif %}
+                                        </button>
+                                    </form>
+                                    <form method="post" action="{% url 'teams:remove_member' team.id member.id %}" class="d-inline ms-1">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" 
+                                                onclick="return confirm('Are you sure you want to remove this member?')">
+                                            Remove
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                            {% endif %}
                         </tr>
                         {% endfor %}
                     </tbody>

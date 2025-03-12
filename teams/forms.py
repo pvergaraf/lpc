@@ -1,5 +1,5 @@
 from django import forms
-from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
+from django.contrib.auth.forms import UserCreationForm, AuthenticationForm, PasswordResetForm
 from django.contrib.auth import get_user_model
 from .models import Team, TeamMember, Position, Profile, Season, Match, Payment, PlayerPayment
 
@@ -19,10 +19,16 @@ class UserRegistrationForm(UserCreationForm):
     )
     position = forms.ModelChoiceField(queryset=Position.objects.all(), required=True,
                                     help_text="Select your primary playing position")
+    country = forms.ChoiceField(
+        choices=Profile.COUNTRIES,
+        required=True,
+        initial='CL',
+        help_text="Select your country"
+    )
 
     class Meta:
         model = get_user_model()
-        fields = ('email', 'first_name', 'last_name', 'date_of_birth', 'player_number', 'position', 'password1', 'password2')
+        fields = ('email', 'first_name', 'last_name', 'date_of_birth', 'player_number', 'position', 'country', 'password1', 'password2')
 
     def __init__(self, *args, **kwargs):
         self.invited_email = kwargs.pop('email', None)
@@ -66,11 +72,15 @@ class UserRegistrationForm(UserCreationForm):
             profile = Profile.objects.get_or_create(user=user)[0]
             profile.player_number = self.cleaned_data['player_number']
             profile.position = self.cleaned_data['position']
+            profile.country = self.cleaned_data['country']
             profile.save()
         return user
 
 class EmailAuthenticationForm(AuthenticationForm):
     username = forms.EmailField(widget=forms.EmailInput(attrs={'autofocus': True}))
+
+    def clean_username(self):
+        return self.cleaned_data['username'].lower()
 
 class TeamMemberInviteForm(forms.Form):
     email = forms.EmailField(required=True, widget=forms.EmailInput(attrs={'class': 'form-control'}))
@@ -96,7 +106,7 @@ class TeamMemberInviteForm(forms.Form):
         super().__init__(*args, **kwargs)
 
     def clean_email(self):
-        email = self.cleaned_data['email']
+        email = self.cleaned_data['email'].lower()
         
         # Check for active members with this email
         active_member = TeamMember.objects.filter(
@@ -169,10 +179,15 @@ class UserProfileForm(forms.ModelForm):
         required=False,
         help_text="Upload a profile picture (optional)"
     )
+    country = forms.ChoiceField(
+        choices=Profile.COUNTRIES,
+        required=True,
+        help_text="Select your country"
+    )
 
     class Meta:
         model = get_user_model()
-        fields = ('first_name', 'last_name', 'email', 'player_number', 'position', 'level', 'is_official', 'rut', 'profile_picture')
+        fields = ('first_name', 'last_name', 'email', 'player_number', 'position', 'level', 'is_official', 'rut', 'profile_picture', 'country')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -184,6 +199,7 @@ class UserProfileForm(forms.ModelForm):
                 self.fields['level'].initial = profile.level
                 self.fields['is_official'].initial = profile.is_official
                 self.fields['rut'].initial = profile.rut
+                self.fields['country'].initial = profile.country
                 if profile.profile_picture:
                     self.fields['profile_picture'].initial = profile.profile_picture
             except Profile.DoesNotExist:
@@ -207,6 +223,7 @@ class UserProfileForm(forms.ModelForm):
             profile.level = self.cleaned_data['level']
             profile.is_official = self.cleaned_data['is_official']
             profile.rut = self.cleaned_data['rut']
+            profile.country = self.cleaned_data['country']
             if self.cleaned_data.get('profile_picture'):
                 profile.profile_picture = self.cleaned_data['profile_picture']
             profile.save()
@@ -237,10 +254,15 @@ class AdminMemberProfileForm(forms.ModelForm):
         required=False,
         help_text="Upload a profile picture (optional)"
     )
+    country = forms.ChoiceField(
+        choices=Profile.COUNTRIES,
+        required=True,
+        help_text="Select your country"
+    )
 
     class Meta:
         model = get_user_model()
-        fields = ('first_name', 'last_name', 'email', 'player_number', 'position', 'level', 'is_official', 'rut', 'profile_picture')
+        fields = ('first_name', 'last_name', 'email', 'player_number', 'position', 'level', 'is_official', 'rut', 'profile_picture', 'country')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -252,6 +274,7 @@ class AdminMemberProfileForm(forms.ModelForm):
                 self.fields['level'].initial = profile.level
                 self.fields['is_official'].initial = profile.is_official
                 self.fields['rut'].initial = profile.rut
+                self.fields['country'].initial = profile.country
                 if profile.profile_picture:
                     self.fields['profile_picture'].initial = profile.profile_picture
             except Profile.DoesNotExist:
@@ -275,6 +298,7 @@ class AdminMemberProfileForm(forms.ModelForm):
             profile.level = self.cleaned_data['level']
             profile.is_official = self.cleaned_data['is_official']
             profile.rut = self.cleaned_data['rut']
+            profile.country = self.cleaned_data['country']
             if self.cleaned_data.get('profile_picture'):
                 profile.profile_picture = self.cleaned_data['profile_picture']
             profile.save()
@@ -396,4 +420,9 @@ PlayerPaymentFormSet = forms.inlineformset_factory(
     fields=['amount', 'admin_verified'],
     extra=0,
     can_delete=True
-) 
+)
+
+class CustomPasswordResetForm(PasswordResetForm):
+    def clean_email(self):
+        email = self.cleaned_data['email'].lower()
+        return email 
