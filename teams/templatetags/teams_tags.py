@@ -1,4 +1,5 @@
 from django import template
+from datetime import datetime, timedelta
 
 register = template.Library()
 
@@ -21,4 +22,16 @@ def country_flag(country_code):
         char1, char2 = country_code.upper()
         return chr(base + ord(char1) - ord('A')) + chr(base + ord(char2) - ord('A'))
     except:
-        return '' 
+        return ''
+
+@register.filter
+def arrival_time(time_str, minutes_before):
+    try:
+        # Parse the time string
+        time_obj = datetime.strptime(time_str, '%I:%M %p')
+        # Subtract the minutes
+        arrival_time = time_obj - timedelta(minutes=minutes_before)
+        # Format back to string
+        return arrival_time.strftime('%I:%M %p')
+    except:
+        return time_str 
