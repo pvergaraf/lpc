@@ -187,11 +187,9 @@
     width: 100%;
     height: 100%;
     background-color: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
     z-index: 1050;
     display: none;
-    touch-action: none;
+    -webkit-overflow-scrolling: touch;
 }
 
 .modal.show {
@@ -199,59 +197,30 @@
 }
 
 .modal-dialog {
-    position: fixed;
+    position: absolute;
     left: 0;
     right: 0;
-    bottom: 0;
+    bottom: -100%;
     width: 100%;
-    transform: translateY(100%);
-    transition: transform 0.3s ease-out;
     margin: 0;
-    pointer-events: none;
+    opacity: 0;
+    transition: all 0.3s ease-out;
 }
 
 .modal.show .modal-dialog {
-    transform: translateY(0);
+    bottom: 0;
+    opacity: 1;
 }
 
 .modal-content {
     position: relative;
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    max-height: 90vh;
     background-color: #fff;
-    pointer-events: auto;
     border-top-left-radius: 20px;
     border-top-right-radius: 20px;
     box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.2);
-    overflow: hidden;
-}
-
-.modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 16px;
-    position: relative;
-    border: none;
-}
-
-.modal-header::before {
-    content: '';
-    position: absolute;
-    top: 8px;
-    width: 40px;
-    height: 4px;
-    background-color: #ddd;
-    border-radius: 2px;
-}
-
-.modal-body {
-    flex: 1;
-    padding: 16px;
+    padding: 20px;
+    max-height: 90%;
     overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
 }
 
 .btn-close {
@@ -260,56 +229,41 @@
     top: 16px;
     width: 44px;
     height: 44px;
-    padding: 10px;
-    background-color: rgba(0, 0, 0, 0.1);
+    padding: 0;
+    background: none;
     border: none;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     cursor: pointer;
-    transition: background-color 0.2s;
-}
-
-.btn-close:hover {
-    background-color: rgba(0, 0, 0, 0.2);
 }
 
 .btn-close::before,
 .btn-close::after {
     content: '';
     position: absolute;
+    top: 50%;
+    left: 50%;
     width: 20px;
     height: 2px;
     background-color: #333;
-    transform: rotate(45deg);
+}
+
+.btn-close::before {
+    transform: translate(-50%, -50%) rotate(45deg);
 }
 
 .btn-close::after {
-    transform: rotate(-45deg);
+    transform: translate(-50%, -50%) rotate(-45deg);
 }
 
 @media (min-width: 576px) {
     .modal-dialog {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%) scale(0.9);
+        position: relative;
         width: 500px;
-        max-width: calc(100% - 2rem);
-        margin: 0 auto;
-        opacity: 0;
-        transition: transform 0.3s ease-out, opacity 0.3s ease-out;
-    }
-
-    .modal.show .modal-dialog {
-        transform: translate(-50%, -50%) scale(1);
-        opacity: 1;
+        margin: 1.75rem auto;
+        bottom: auto;
     }
 
     .modal-content {
         border-radius: 15px;
-        max-height: calc(100vh - 4rem);
     }
 }
 
@@ -816,104 +770,26 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Ensure CSRF token is properly set for Safari
-    function getCSRFToken() {
-        let csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-        if (!csrfToken) {
-            // Fallback to cookie if input not found
-            csrfToken = document.cookie.split('; ')
-                .find(row => row.startsWith('csrftoken='))
-                ?.split('=')[1];
-        }
-        return csrfToken;
-    }
-
-    // Payment toggle handlers
-    const toggleButtons = document.querySelectorAll('.toggle-payment-btn');
-    toggleButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const paymentId = this.dataset.paymentId;
-            const isAdmin = this.dataset.isAdmin === 'true';
-            const row = this.closest('tr');
-            const statusElement = row.querySelector('.badge');
-            const currentStatus = statusElement.textContent.trim();
-            
-            let message;
-            if (isAdmin) {
-                if (currentStatus === 'Pending Approval') {
-                    message = 'Are you sure you want to verify this payment?';
-                } else {
-                    message = 'Are you sure you want to mark this payment as paid?';
-                }
-            } else {
-                if (currentStatus === 'Pending Approval') {
-                    message = 'Are you sure you want to cancel your payment notification?';
-                } else {
-                    message = 'Are you sure you want to mark this payment as paid? It will require admin verification.';
-                }
-            }
-            
-            if (confirm(message)) {
-                fetch(`{% url 'teams:toggle_player_payment' team_id=current_team.id season_id=current_season.id payment_id=0 player_payment_id=0 %}`.replace('/0/player/0/', `/${paymentId}/player/${paymentId}/`), {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': getCSRFToken(),
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        is_admin: isAdmin
-                    }),
-                    credentials: 'same-origin'
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok');
-                    }
-                    window.location.reload();
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('There was an error processing your request. Please try again.');
-                });
-            }
-        });
-    });
-
-    // Active filter handler
-    const activeFilter = document.getElementById('activeFilter');
-    activeFilter.addEventListener('change', function() {
-        const url = new URL(window.location.href);
-        url.searchParams.set('active_only', this.checked);
-        window.location.href = url.toString();
-    });
-
-    // Modal behavior with improved mobile support
-    const modals = document.querySelectorAll('.modal');
     let scrollPosition = 0;
-    let startY = 0;
-    let currentY = 0;
+    const html = document.documentElement;
+    const body = document.body;
 
-    function blockBodyScroll() {
+    function lockScroll() {
         scrollPosition = window.pageYOffset;
-        document.documentElement.style.scrollBehavior = 'auto';
-        document.body.style.position = 'fixed';
-        document.body.style.top = `-${scrollPosition}px`;
-        document.body.style.width = '100%';
-        document.body.classList.add('modal-open');
+        body.style.overflow = 'hidden';
+        body.style.position = 'fixed';
+        body.style.top = `-${scrollPosition}px`;
+        body.style.width = '100%';
     }
 
-    function unblockBodyScroll() {
-        document.body.style.position = '';
-        document.body.style.top = '';
-        document.body.style.width = '';
-        document.body.classList.remove('modal-open');
+    function unlockScroll() {
+        body.style.removeProperty('overflow');
+        body.style.removeProperty('position');
+        body.style.removeProperty('top');
+        body.style.removeProperty('width');
         window.scrollTo(0, scrollPosition);
-        setTimeout(() => {
-            document.documentElement.style.scrollBehavior = '';
-        }, 0);
     }
 
-    // Handle FIFA card clicks
     document.querySelectorAll('.show-fifa-card').forEach(link => {
         link.addEventListener('click', function(e) {
             e.preventDefault();
@@ -921,88 +797,55 @@ document.addEventListener('DOMContentLoaded', function() {
             const modal = document.querySelector(modalId);
             
             if (modal) {
-                blockBodyScroll();
+                lockScroll();
                 modal.classList.add('show');
                 
-                // Focus management
-                const closeButton = modal.querySelector('.btn-close');
-                if (closeButton) {
-                    setTimeout(() => closeButton.focus(), 100);
-                }
+                // Prevent touchmove on modal background
+                modal.addEventListener('touchmove', function(e) {
+                    if (e.target === modal) {
+                        e.preventDefault();
+                    }
+                }, { passive: false });
+
+                // Allow scrolling on modal content
+                const modalContent = modal.querySelector('.modal-content');
+                modalContent.addEventListener('touchmove', function(e) {
+                    e.stopPropagation();
+                }, { passive: true });
             }
         });
     });
 
-    // Handle modal interactions
-    modals.forEach(modal => {
-        const modalDialog = modal.querySelector('.modal-dialog');
-        const modalContent = modal.querySelector('.modal-content');
+    document.querySelectorAll('.modal').forEach(modal => {
+        const closeBtn = modal.querySelector('.btn-close');
         
         // Close button handler
-        const closeButton = modal.querySelector('.btn-close');
-        if (closeButton) {
-            closeButton.addEventListener('click', function(e) {
-                e.preventDefault();
-                modal.classList.remove('show');
-                unblockBodyScroll();
-            });
-        }
-
-        // Touch handlers for swipe to dismiss
-        modal.addEventListener('touchstart', function(e) {
-            if (e.target === modal || e.target === modalDialog) {
-                startY = e.touches[0].clientY;
-                currentY = startY;
-                modalDialog.style.transition = 'none';
-            }
-        }, { passive: true });
-
-        modal.addEventListener('touchmove', function(e) {
-            if (e.target === modal || e.target === modalDialog) {
-                currentY = e.touches[0].clientY;
-                const deltaY = currentY - startY;
-                
-                if (deltaY > 0) {
-                    modalDialog.style.transform = `translateY(${deltaY}px)`;
-                }
-            }
-        }, { passive: true });
-
-        modal.addEventListener('touchend', function(e) {
-            if (e.target === modal || e.target === modalDialog) {
-                modalDialog.style.transition = '';
-                const deltaY = currentY - startY;
-                
-                if (deltaY > 100) {
-                    modal.classList.remove('show');
-                    unblockBodyScroll();
-                } else {
-                    modalDialog.style.transform = '';
-                }
-            }
-        });
-
-        // Prevent content click from closing
-        modalContent?.addEventListener('click', function(e) {
-            e.stopPropagation();
+        closeBtn.addEventListener('click', function() {
+            modal.classList.remove('show');
+            unlockScroll();
         });
 
         // Close on backdrop click
         modal.addEventListener('click', function(e) {
             if (e.target === modal) {
                 modal.classList.remove('show');
-                unblockBodyScroll();
+                unlockScroll();
             }
+        });
+
+        // Prevent modal content clicks from closing
+        modal.querySelector('.modal-content').addEventListener('click', function(e) {
+            e.stopPropagation();
         });
     });
 
-    // Handle escape key
+    // Close on escape key
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
-            const visibleModal = document.querySelector('.modal.show');
-            if (visibleModal) {
-                visibleModal.classList.remove('show');
-                unblockBodyScroll();
+            const openModal = document.querySelector('.modal.show');
+            if (openModal) {
+                openModal.classList.remove('show');
+                unlockScroll();
             }
         }
     });
