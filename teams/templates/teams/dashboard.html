@@ -181,14 +181,19 @@
 .modal-content {
     background: transparent;
     border: none;
+    max-height: 90vh;
+    margin: 1rem;
 }
 
 .modal-header {
-    padding: 0.5rem 1rem;
+    padding: 0.5rem;
     background-color: white;
     border-top-left-radius: 15px;
     border-top-right-radius: 15px;
     border: none;
+    position: sticky;
+    top: 0;
+    z-index: 1050;
 }
 
 .modal-body {
@@ -196,11 +201,53 @@
     background-color: white;
     border-bottom-left-radius: 15px;
     border-bottom-right-radius: 15px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 .btn-close {
     margin: 0;
     padding: 0.5rem;
+    font-size: 1.5rem;
+    opacity: 0.8;
+    position: absolute;
+    right: 0.5rem;
+    top: 0.5rem;
+    z-index: 1051;
+    background-color: rgba(255, 255, 255, 0.9);
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal {
+    padding-left: 0 !important;
+}
+
+.modal-open {
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+}
+
+.modal-dialog {
+    margin: 0.5rem auto;
+    max-width: 500px;
+    width: calc(100% - 1rem);
+}
+
+@media (max-width: 576px) {
+    .modal-dialog {
+        margin: 0.5rem;
+        width: auto;
+    }
+    
+    .modal-content {
+        margin: 0;
+    }
 }
 </style>
 
@@ -484,19 +531,20 @@
 
                 <!-- Team Members -->
                 <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0 d-flex align-items-center">
-                            <i class="fas fa-users text-primary me-2"></i>
-                            Team Members
-                        </h5>
-                        {% if is_team_admin %}
-                            <div>
-                                <a href="{% url 'teams:invite_member' team_id=current_team.id %}" class="btn btn-primary btn-sm me-2">
-                                    <i class="fas fa-user-plus"></i> Invite Member
-                                </a>
-                                <a href="{% url 'teams:add_team_member' team_id=current_team.id %}" class="btn btn-primary btn-sm">Add Member</a>
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="card-title mb-0">Team Members</h5>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="activeFilter" {% if show_active_only %}checked{% endif %}>
+                                    <label class="form-check-label" for="activeFilter">Show Active Players Only</label>
+                                </div>
+                                {% if is_team_admin %}
+                                    <a href="{% url 'teams:invite_member' team_id=current_team.id %}" class="btn btn-primary btn-sm">Invite Member</a>
+                                    <a href="{% url 'teams:add_team_member' team_id=current_team.id %}" class="btn btn-success btn-sm">Add Member</a>
+                                {% endif %}
                             </div>
-                        {% endif %}
+                        </div>
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">
@@ -736,6 +784,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
         });
+    });
+
+    const activeFilter = document.getElementById('activeFilter');
+    
+    activeFilter.addEventListener('change', function() {
+        const url = new URL(window.location.href);
+        url.searchParams.set('active_only', this.checked);
+        window.location.href = url.toString();
     });
 });
 </script>

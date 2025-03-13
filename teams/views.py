@@ -112,6 +112,9 @@ def dashboard(request):
     request.user.request = request
     current_team = get_current_team(request.user)
     
+    # Get the filter parameter
+    show_active_only = request.GET.get('active_only', 'false').lower() == 'true'
+    
     log_error(  # Using log_error for all logging until we create a dedicated operational logging function
         request=request,
         error_message="Dashboard access",
@@ -122,7 +125,8 @@ def dashboard(request):
             "current_team": current_team.id if current_team else None,
             "path": request.path,
             "method": request.method,
-            "timestamp": timezone.now().isoformat()
+            "timestamp": timezone.now().isoformat(),
+            "show_active_only": show_active_only
         }
     )
     
@@ -209,12 +213,18 @@ def dashboard(request):
     ).select_related('team')
 
     # Get team members for the current team
-    team_members = TeamMember.objects.filter(
+    team_members_query = TeamMember.objects.filter(
         team=current_team
     ).filter(
         models.Q(is_active=True) | 
         models.Q(is_active=False, invitation_token__isnull=False)
-    ).select_related(
+    )
+    
+    # Apply active filter if requested
+    if show_active_only:
+        team_members_query = team_members_query.filter(user__profile__active_player=True)
+    
+    team_members = team_members_query.select_related(
         'user', 
         'user__profile', 
         'user__profile__position'
@@ -242,7 +252,7 @@ def dashboard(request):
             "user_id": request.user.id,
             "team_id": current_team.id,
             "team_name": current_team.name,
-            "active_members_count": team_members.filter(is_active=True).count(),
+            "active_members_count": team_members.count(),
             "pending_invitations_count": team_members.filter(is_active=False, invitation_token__isnull=False).count(),
             "total_teams": team_memberships.count()
         }
@@ -393,11 +403,20 @@ def team_members(request, team_id):
         team = get_object_or_404(Team, id=team_id)
         team_member = get_object_or_404(TeamMember, team=team, user=request.user, is_active=True)
         
+        # Get the filter parameter
+        show_active_only = request.GET.get('active_only', 'false').lower() == 'true'
+        
         # Get active members
-        active_members = TeamMember.objects.filter(
+        active_members_query = TeamMember.objects.filter(
             team=team,
             is_active=True
-        ).select_related(
+        )
+        
+        # Apply active filter if requested
+        if show_active_only:
+            active_members_query = active_members_query.filter(user__profile__active_player=True)
+        
+        active_members = active_members_query.select_related(
             'user', 
             'user__profile',
             'user__profile__position'
@@ -436,6 +455,7 @@ def team_members(request, team_id):
                 "pending_invitations_count": pending_invitations.count(),
                 "user_role": team_member.role,
                 "user_is_admin": team_member.is_team_admin,
+                "show_active_only": show_active_only,
                 "members_by_position": {
                     "GK": active_members.filter(user__profile__position__type='GK').count(),
                     "DEF": active_members.filter(user__profile__position__type='DEF').count(),
@@ -450,7 +470,8 @@ def team_members(request, team_id):
             'active_members': active_members,
             'pending_invitations': pending_invitations,
             'user': request.user,
-            'user_is_admin': team_member.is_team_admin or team_member.role == TeamMember.Role.MANAGER
+            'user_is_admin': team_member.is_team_admin or team_member.role == TeamMember.Role.MANAGER,
+            'show_active_only': show_active_only
         }
         return render(request, 'teams/team_members.html', context)
         
