@@ -439,6 +439,36 @@
                     </div>
                 </div>
 
+                {% if upcoming_birthdays %}
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Upcoming Birthdays</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="list-group">
+                            {% for birthday in upcoming_birthdays %}
+                            <div class="list-group-item">
+                                {% if birthday.is_today %}
+                                <p class="mb-0">
+                                    <span class="fw-bold">🎂 Today is {{ birthday.member.user.get_full_name }}'s birthday! 🎉</span>
+                                </p>
+                                {% else %}
+                                <p class="mb-0">
+                                    {{ birthday.member.user.get_full_name }} - 
+                                    {% if birthday.days_until == 1 %}
+                                    Tomorrow! 🎈
+                                    {% else %}
+                                    In {{ birthday.days_until }} days ({{ birthday.birthday|date:"M d" }}) 🎈
+                                    {% endif %}
+                                </p>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
                 <!-- Current Season -->
                 <div class="card mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">

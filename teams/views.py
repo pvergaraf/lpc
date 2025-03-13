@@ -291,6 +291,7 @@ def dashboard(request):
         'team_memberships': team_memberships,
         'team_members': team_members,
         'upcoming_matches': upcoming_matches,
+        'upcoming_birthdays': current_team.get_upcoming_birthdays() if current_team else None,
     }
 
     # Log successful dashboard render
@@ -1370,12 +1371,16 @@ def season_detail(request, team_id, season_id):
         id__in=upcoming_matches.values_list('id', flat=True)
     )
     
+    # Get upcoming birthdays
+    upcoming_birthdays = team.get_upcoming_birthdays()
+    
     context = {
         'team': team,
         'season': season,
         'upcoming_matches': upcoming_matches,
         'past_matches': past_matches,
-        'is_admin': team_member.is_team_admin or team_member.role == TeamMember.Role.MANAGER
+        'is_admin': team_member.is_team_admin or team_member.role == TeamMember.Role.MANAGER,
+        'upcoming_birthdays': upcoming_birthdays if upcoming_birthdays else None
     }
     return render(request, 'teams/season_detail.html', context)
 

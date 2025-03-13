@@ -455,11 +455,23 @@ class MatchForm(forms.ModelForm):
         widget=forms.NumberInput(attrs={'class': 'form-control'}),
         help_text="Enter the field number"
     )
+    home_score = forms.IntegerField(
+        min_value=0,
+        required=False,
+        widget=forms.NumberInput(attrs={'class': 'form-control'}),
+        help_text="Home team score"
+    )
+    away_score = forms.IntegerField(
+        min_value=0,
+        required=False,
+        widget=forms.NumberInput(attrs={'class': 'form-control'}),
+        help_text="Away team score"
+    )
 
     class Meta:
         model = Match
         fields = ['opponent', 'match_date', 'match_time', 'field_number', 
-                 'is_home_game', 'notes']
+                 'is_home_game', 'home_score', 'away_score', 'notes']
         widgets = {
             'opponent': forms.TextInput(attrs={'class': 'form-control'}),
             'is_home_game': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
@@ -473,6 +485,8 @@ class MatchForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         match_date = cleaned_data.get('match_date')
+        home_score = cleaned_data.get('home_score')
+        away_score = cleaned_data.get('away_score')
         
         if match_date and self.season:
             if match_date < self.season.start_date or match_date > self.season.end_date:
@@ -481,7 +495,11 @@ class MatchForm(forms.ModelForm):
                     f"({self.season.start_date} to {self.season.end_date})."
                 )
 
-        return cleaned_data 
+        # Validate that both scores are provided if one is provided
+        if (home_score is not None and away_score is None) or (home_score is None and away_score is not None):
+            raise forms.ValidationError("Both scores must be provided to record a result.")
+
+        return cleaned_data
 
 class PaymentForm(forms.ModelForm):
     class Meta:

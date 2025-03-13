@@ -519,6 +519,46 @@ class Team(models.Model):
             # Save the processed image
             img.save(self.team_photo.path, quality=90, optimize=True)
 
+    def get_upcoming_birthdays(self, days=15):
+        """Get team members with birthdays in the next X days."""
+        from datetime import date, timedelta
+        from django.db.models import ExpressionWrapper, BooleanField
+        from django.db.models.functions import ExtractMonth, ExtractDay
+
+        today = date.today()
+        end_date = today + timedelta(days=days)
+        
+        # Get all active team members with their profiles
+        members = TeamMember.objects.filter(
+            team=self,
+            is_active=True,
+            user__isnull=False,
+            user__profile__date_of_birth__isnull=False
+        ).select_related('user', 'user__profile')
+
+        upcoming_birthdays = []
+        for member in members:
+            birth_date = member.user.profile.date_of_birth
+            # Get this year's birthday
+            this_year_bday = date(today.year, birth_date.month, birth_date.day)
+            
+            # If birthday has passed this year, use next year's date
+            if this_year_bday < today:
+                this_year_bday = date(today.year + 1, birth_date.month, birth_date.day)
+            
+            # Check if birthday is within range
+            if today <= this_year_bday <= end_date:
+                days_until = (this_year_bday - today).days
+                upcoming_birthdays.append({
+                    'member': member,
+                    'birthday': this_year_bday,
+                    'days_until': days_until,
+                    'is_today': days_until == 0
+                })
+        
+        # Sort by closest birthday
+        return sorted(upcoming_birthdays, key=lambda x: x['days_until'])
+
     def __str__(self):
         return self.name
 
@@ -556,6 +596,8 @@ class Match(models.Model):
     match_time = models.TimeField()
     field_number = models.PositiveIntegerField(help_text="Enter the field number")
     is_home_game = models.BooleanField(default=True)
+    home_score = models.PositiveIntegerField(null=True, blank=True)
+    away_score = models.PositiveIntegerField(null=True, blank=True)
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -568,6 +610,16 @@ class Match(models.Model):
         home_team = self.season.team.name if self.is_home_game else self.opponent
         away_team = self.opponent if self.is_home_game else self.season.team.name
         return f"{home_team} vs {away_team} - {self.match_date}"
+
+    @property
+    def played(self):
+        return self.home_score is not None and self.away_score is not None
+
+    @property
+    def score_display(self):
+        if not self.played:
+            return "vs"
+        return f"{self.home_score} - {self.away_score}"
 
 class TeamMember(models.Model):
     class Role(models.TextChoices):

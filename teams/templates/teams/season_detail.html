@@ -6,7 +6,7 @@
 <div class="container py-4">
     <div class="card mb-4">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="card-title mb-0">{{ season.name }}</h5>
+            <h5 class="card-title mb-0">Season: {{ season.name }}</h5>
             <div>
                 {% if is_admin %}
                 <a href="{% url 'teams:season_edit' team.id season.id %}" class="btn btn-outline-secondary btn-sm">
@@ -19,23 +19,45 @@
             </div>
         </div>
         <div class="card-body">
-            <div class="row mb-4">
-                <div class="col-md-6">
-                    <p class="mb-1"><strong>Start Date:</strong> {{ season.start_date|date:"M d, Y" }}</p>
-                    <p class="mb-1"><strong>End Date:</strong> {{ season.end_date|date:"M d, Y" }}</p>
-                </div>
-                <div class="col-md-6">
-                    <p class="mb-1">
-                        <strong>Status:</strong>
-                        {% if season.is_current %}
-                        <span class="badge bg-success">Current Season</span>
+            <div class="mb-4">
+                <p class="mb-1"><strong>Start Date:</strong> {{ season.start_date|date:"M d, Y" }}</p>
+                <p class="mb-1"><strong>End Date:</strong> {{ season.end_date|date:"M d, Y" }}</p>
+                <p class="mb-1">
+                    <strong>Status:</strong>
+                    {% if season.is_current %}
+                    <span class="badge bg-success">Current Season</span>
+                    {% endif %}
+                    {% if season.is_active %}
+                    <span class="badge bg-primary">Active</span>
+                    {% endif %}
+                </p>
+            </div>
+
+            {% if upcoming_birthdays %}
+            <div class="mb-4">
+                <h6 class="border-bottom pb-2 mb-3">Upcoming Birthdays</h6>
+                <div class="list-group">
+                    {% for birthday in upcoming_birthdays %}
+                    <div class="list-group-item">
+                        {% if birthday.is_today %}
+                        <p class="mb-0">
+                            <span class="fw-bold">🎂 Today is {{ birthday.member.user.get_full_name }}'s birthday! 🎉</span>
+                        </p>
+                        {% else %}
+                        <p class="mb-0">
+                            {{ birthday.member.user.get_full_name }} - 
+                            {% if birthday.days_until == 1 %}
+                            Tomorrow! 🎈
+                            {% else %}
+                            In {{ birthday.days_until }} days ({{ birthday.birthday|date:"M d" }}) 🎈
+                            {% endif %}
+                        </p>
                         {% endif %}
-                        {% if season.is_active %}
-                        <span class="badge bg-primary">Active</span>
-                        {% endif %}
-                    </p>
+                    </div>
+                    {% endfor %}
                 </div>
             </div>
+            {% endif %}
 
             <!-- Upcoming Matches -->
             <h6 class="border-bottom pb-2 mb-3">Upcoming Matches</h6>
@@ -47,9 +69,9 @@
                         <div>
                             <h6 class="mb-1">
                                 {% if match.is_home_game %}
-                                {{ team.name }} vs {{ match.opponent }}
+                                {{ team.name }} {{ match.score_display }} {{ match.opponent }}
                                 {% else %}
-                                {{ match.opponent }} vs {{ team.name }}
+                                {{ match.opponent }} {{ match.score_display }} {{ team.name }}
                                 {% endif %}
                             </h6>
                             <small class="text-muted">
@@ -61,7 +83,7 @@
                         {% if is_admin %}
                         <div class="d-flex gap-2">
                             <a href="{% url 'teams:match_edit' team.id season.id match.id %}" class="btn btn-outline-secondary btn-sm">
-                                Edit
+                                {% if match.played %}Edit{% else %}Record Result{% endif %}
                             </a>
                             <a href="{% url 'teams:match_stats_edit' team.id season.id match.id %}" class="btn btn-outline-primary btn-sm">
                                 Edit Stats
@@ -91,9 +113,9 @@
                         <div>
                             <h6 class="mb-1">
                                 {% if match.is_home_game %}
-                                {{ team.name }} vs {{ match.opponent }}
+                                {{ team.name }} {{ match.score_display }} {{ match.opponent }}
                                 {% else %}
-                                {{ match.opponent }} vs {{ team.name }}
+                                {{ match.opponent }} {{ match.score_display }} {{ team.name }}
                                 {% endif %}
                             </h6>
                             <small class="text-muted">
@@ -105,7 +127,7 @@
                         {% if is_admin %}
                         <div class="d-flex gap-2">
                             <a href="{% url 'teams:match_edit' team.id season.id match.id %}" class="btn btn-outline-secondary btn-sm">
-                                Edit
+                                {% if match.played %}Edit{% else %}Record Result{% endif %}
                             </a>
                             <a href="{% url 'teams:match_stats_edit' team.id season.id match.id %}" class="btn btn-outline-primary btn-sm">
                                 Edit Stats
