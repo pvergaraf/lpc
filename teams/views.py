@@ -8,7 +8,7 @@ from django.urls import reverse, reverse_lazy
 from django.utils.crypto import get_random_string
 from django.http import HttpResponseForbidden, JsonResponse
 from django.db import transaction
-from .models import Team, TeamMember, Season, Match, Profile, Payment, PlayerPayment
+from .models import Team, TeamMember, Season, Match, Profile, Payment, PlayerPayment, PlayerMatchStats
 from .forms import (
     UserRegistrationForm, TeamMemberInviteForm, TeamForm, 
     EmailAuthenticationForm, AddTeamMemberForm, UserProfileForm,
@@ -25,6 +25,7 @@ import os
 import traceback
 import secrets
 import json
+from django.core.exceptions import PermissionDenied
 
 User = get_user_model()
 
@@ -2052,6 +2053,300 @@ def send_invitation_email(email, team, invitation_url, role='Player', is_team_ad
                 "email": email,
                 "team": team.name,
                 "error": str(e)
+            }
+        )
+        raise
+
+@login_required
+def player_card(request, team_id, user_id):
+    log_error(
+        request=request,
+        error_message="Player card view accessed",
+        error_type="ViewAccess",
+        extra_context={
+            "user_email": request.user.email,
+            "user_id": request.user.id,
+            "requested_team_id": team_id,
+            "requested_user_id": user_id,
+            "path": request.path,
+            "method": request.method
+        }
+    )
+    
+    try:
+        team = get_object_or_404(Team, id=team_id)
+        log_error(
+            request=request,
+            error_message="Team found",
+            error_type="ViewDebug",
+            extra_context={
+                "team_id": team.id,
+                "team_name": team.name
+            }
+        )
+        
+        user = get_object_or_404(User, id=user_id)
+        log_error(
+            request=request,
+            error_message="User found",
+            error_type="ViewDebug",
+            extra_context={
+                "target_user_id": user.id,
+                "target_user_email": user.email,
+                "target_user_name": user.get_full_name()
+            }
+        )
+        
+        # Check if the requesting user is a member of the team
+        requesting_user_membership = TeamMember.objects.filter(team=team, user=request.user).exists()
+        if not requesting_user_membership:
+            log_error(
+                request=request,
+                error_message="Permission denied - User not team member",
+                error_type="AuthorizationError",
+                extra_context={
+                    "user_email": request.user.email,
+                    "user_id": request.user.id,
+                    "team_id": team.id,
+                    "team_name": team.name
+                }
+            )
+            raise PermissionDenied
+        
+        # Get the player's team membership
+        team_member = get_object_or_404(TeamMember, team=team, user=user)
+        log_error(
+            request=request,
+            error_message="Team membership found",
+            error_type="ViewDebug",
+            extra_context={
+                "team_member_id": team_member.id,
+                "role": team_member.role,
+                "is_active": team_member.is_active,
+                "is_team_admin": team_member.is_team_admin
+            }
+        )
+        
+        # Get current season
+        current_season = get_current_season(team)
+        
+        # Get player stats
+        season_stats = PlayerMatchStats.get_player_totals(team_member, current_season) if current_season else None
+        all_time_stats = PlayerMatchStats.get_player_totals(team_member)
+        
+        context = {
+            'player': user,
+            'current_team': team,
+            'team_member': team_member,
+            'current_season': current_season,
+            'season_stats': season_stats,
+            'all_time_stats': all_time_stats,
+        }
+        
+        log_error(
+            request=request,
+            error_message="Rendering player card template",
+            error_type="ViewDebug",
+            extra_context={
+                "template": "teams/player_card.html",
+                "context_keys": list(context.keys())
+            }
+        )
+        
+        return render(request, 'teams/player_card.html', context)
+        
+    except Team.DoesNotExist:
+        log_error(
+            request=request,
+            error_message="Team not found",
+            error_type="NotFoundError",
+            extra_context={
+                "requested_team_id": team_id
+            }
+        )
+        raise
+    except User.DoesNotExist:
+        log_error(
+            request=request,
+            error_message="User not found",
+            error_type="NotFoundError",
+            extra_context={
+                "requested_user_id": user_id
+            }
+        )
+        raise
+    except TeamMember.DoesNotExist:
+        log_error(
+            request=request,
+            error_message="Team membership not found",
+            error_type="NotFoundError",
+            extra_context={
+                "team_id": team_id,
+                "user_id": user_id
+            }
+        )
+        raise
+    except Exception as e:
+        log_error(
+            request=request,
+            error_message=f"Unexpected error in player card view: {str(e)}",
+            error_type="SystemError",
+            extra_context={
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "traceback": traceback.format_exc()
+            }
+        )
+        raise
+
+@login_required
+def match_stats_edit(request, team_id, season_id, match_id):
+    log_error(
+        request=request,
+        error_message="Match stats edit page accessed",
+        error_type="ViewAccess",
+        extra_context={
+            "user_email": request.user.email,
+            "user_id": request.user.id,
+            "team_id": team_id,
+            "season_id": season_id,
+            "match_id": match_id,
+            "path": request.path,
+            "method": request.method
+        }
+    )
+    
+    try:
+        team = get_object_or_404(Team, id=team_id)
+        season = get_object_or_404(Season, id=season_id, team=team)
+        match = get_object_or_404(Match, id=match_id, season=season)
+        
+        # Check if user is team admin
+        if not is_user_team_admin(request.user, team):
+            log_error(
+                request=request,
+                error_message="Unauthorized access attempt to match stats edit",
+                error_type="PermissionError",
+                extra_context={
+                    "user_email": request.user.email,
+                    "user_id": request.user.id,
+                    "team_id": team_id,
+                    "match_id": match_id
+                }
+            )
+            raise PermissionDenied("You must be a team admin to edit match stats.")
+        
+        # Get all active players in the team
+        players = TeamMember.objects.filter(
+            team=team,
+            is_active=True,
+            user__profile__active_player=True,
+            role=TeamMember.Role.PLAYER
+        ).select_related('user', 'user__profile')
+        
+        log_error(
+            request=request,
+            error_message="Retrieved active players for match stats",
+            error_type="ViewDebug",
+            extra_context={
+                "team_id": team_id,
+                "match_id": match_id,
+                "active_players_count": players.count(),
+                "player_ids": list(players.values_list('id', flat=True))
+            }
+        )
+        
+        # Get or create stats for each player
+        stats_dict = {}
+        for player in players:
+            stat, created = PlayerMatchStats.objects.get_or_create(
+                match=match,
+                player=player,
+                defaults={'played': False}
+            )
+            stats_dict[player.id] = {
+                'played': stat.played,
+                'goals': stat.goals,
+                'yellow_cards': stat.yellow_cards,
+                'red_cards': stat.red_cards
+            }
+        
+        if request.method == 'POST':
+            try:
+                with transaction.atomic():
+                    for player in players:
+                        player_stats = PlayerMatchStats.objects.get(match=match, player=player)
+                        player_stats.played = request.POST.get(f'played_{player.id}') == 'on'
+                        player_stats.goals = int(request.POST.get(f'goals_{player.id}', 0))
+                        player_stats.yellow_cards = int(request.POST.get(f'yellow_cards_{player.id}', 0))
+                        player_stats.red_cards = int(request.POST.get(f'red_cards_{player.id}', 0))
+                        player_stats.save()
+                        
+                        log_error(
+                            request=request,
+                            error_message="Updated player match stats",
+                            error_type="StatsUpdate",
+                            extra_context={
+                                "player_id": player.id,
+                                "player_email": player.user.email,
+                                "match_id": match_id,
+                                "stats": {
+                                    "played": player_stats.played,
+                                    "goals": player_stats.goals,
+                                    "yellow_cards": player_stats.yellow_cards,
+                                    "red_cards": player_stats.red_cards
+                                }
+                            }
+                        )
+                
+                messages.success(request, 'Match statistics updated successfully.')
+                return redirect('teams:season_detail', team_id=team_id, season_id=season_id)
+            except Exception as e:
+                log_error(
+                    request=request,
+                    error_message=f"Error updating match statistics: {str(e)}",
+                    error_type="StatsUpdateError",
+                    extra_context={
+                        "error": str(e),
+                        "traceback": traceback.format_exc(),
+                        "team_id": team_id,
+                        "match_id": match_id,
+                        "post_data": dict(request.POST)
+                    }
+                )
+                messages.error(request, f'Error updating match statistics: {str(e)}')
+        
+        context = {
+            'team': team,
+            'season': season,
+            'match': match,
+            'players': players,
+            'stats': stats_dict
+        }
+        
+        log_error(
+            request=request,
+            error_message="Rendering match stats edit template",
+            error_type="ViewDebug",
+            extra_context={
+                "context_keys": list(context.keys()),
+                "stats_count": len(stats_dict)
+            }
+        )
+        
+        return render(request, 'teams/match_stats_edit.html', context)
+        
+    except Exception as e:
+        log_error(
+            request=request,
+            error_message=f"Unexpected error in match stats edit view: {str(e)}",
+            error_type="SystemError",
+            extra_context={
+                "error": str(e),
+                "traceback": traceback.format_exc(),
+                "team_id": team_id,
+                "season_id": season_id,
+                "match_id": match_id
             }
         )
         raise

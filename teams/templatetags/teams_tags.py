@@ -42,4 +42,14 @@ def calculate_age(birth_date):
         return ''
     today = date.today()
     age = today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
-    return f"{age} years old" 
+    return f"{age} years old"
+
+@register.filter
+def get_item(dictionary, key):
+    """Get an item from a dictionary using bracket notation in templates."""
+    if not dictionary:
+        return None
+    try:
+        return dictionary.get(key)
+    except (AttributeError, KeyError, TypeError):
+        return None 

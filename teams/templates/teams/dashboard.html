@@ -288,6 +288,28 @@
         display: none;
     }
 }
+
+.position-badge {
+    display: inline-block;
+    padding: 6px 12px;
+    background-color: #000000;
+    color: white;
+    font-weight: bold;
+    position: relative;
+    margin: 2px;
+    width: 70px;
+    text-align: center;
+}
+
+.position-badge::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background-color: var(--position-color);
+}
 </style>
 
 <div class="container mt-4">
@@ -635,7 +657,7 @@
                                                 </td>
                                                 <td>
                                                     {% if member.user %}
-                                                        <a href="#" class="show-fifa-card" data-bs-toggle="modal" data-bs-target="#playerModal{{ member.user.id }}">
+                                                        <a href="{% url 'teams:player_card' team_id=current_team.id user_id=member.user.id %}" class="text-decoration-none">
                                                             {{ member.user.get_full_name }}
                                                         </a>
                                                     {% else %}
@@ -777,6 +799,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Active filter handler
     const activeFilter = document.getElementById('activeFilter');
     if (activeFilter) {
+        // Set initial state based on URL parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        activeFilter.checked = urlParams.get('active_only') === 'true';
+        
         activeFilter.addEventListener('change', function() {
             const url = new URL(window.location.href);
             url.searchParams.set('active_only', this.checked);

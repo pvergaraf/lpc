@@ -640,3 +640,38 @@ class PlayerPayment(models.Model):
         self.admin_verified = False if is_admin else self.admin_verified
         self.paid_at = None
         self.save()
+
+class PlayerMatchStats(models.Model):
+    match = models.ForeignKey(Match, on_delete=models.CASCADE, related_name='player_stats')
+    player = models.ForeignKey(TeamMember, on_delete=models.CASCADE, related_name='match_stats')
+    played = models.BooleanField(default=False)
+    goals = models.PositiveIntegerField(default=0)
+    yellow_cards = models.PositiveIntegerField(default=0)
+    red_cards = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['match__match_date', 'match__match_time']
+        unique_together = ['match', 'player']
+        verbose_name_plural = 'Player match stats'
+
+    def __str__(self):
+        return f"{self.player.user.get_full_name()} - {self.match} Stats"
+
+    @property
+    def season(self):
+        return self.match.season
+
+    @classmethod
+    def get_player_totals(cls, player, season=None):
+        stats = cls.objects.filter(player=player)
+        if season:
+            stats = stats.filter(match__season=season)
+        
+        return {
+            'matches_played': stats.filter(played=True).count(),
+            'goals': stats.aggregate(total_goals=models.Sum('goals'))['total_goals'] or 0,
+            'yellow_cards': stats.aggregate(total_yellows=models.Sum('yellow_cards'))['total_yellows'] or 0,
+            'red_cards': stats.aggregate(total_reds=models.Sum('red_cards'))['total_reds'] or 0
+        }

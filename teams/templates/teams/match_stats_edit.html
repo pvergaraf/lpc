@@ -1,0 +1,79 @@
+{% extends 'teams/base.html' %}
+{% load static %}
+{% load teams_tags %}
+
+{% block title %}Edit Match Stats - {{ match }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        <h1 class="text-2xl font-bold mb-6">Edit Match Statistics</h1>
+        <h2 class="text-xl mb-4">{{ match }}</h2>
+
+        <form method="post" class="space-y-6">
+            {% csrf_token %}
+            
+            <div class="overflow-x-auto">
+                <table class="min-w-full table-auto">
+                    <thead>
+                        <tr class="bg-gray-100">
+                            <th class="px-4 py-2 text-left">Player</th>
+                            <th class="px-4 py-2 text-center">Played</th>
+                            <th class="px-4 py-2 text-center">Goals</th>
+                            <th class="px-4 py-2 text-center">Yellow Cards</th>
+                            <th class="px-4 py-2 text-center">Red Cards</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for player in players %}
+                        <tr class="border-b hover:bg-gray-50">
+                            <td class="px-4 py-2">
+                                <div>
+                                    <div class="font-medium">
+                                        {{ player.user.get_full_name }}
+                                        {% if player.user.profile.player_number %}
+                                        <span class="text-sm text-gray-500">#{{ player.user.profile.player_number }}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-4 py-2 text-center">
+                                <input type="checkbox" name="played_{{ player.id }}" 
+                                       {% if stats|get_item:player.id|get_item:"played" %}checked{% endif %}
+                                       class="form-checkbox h-5 w-5 text-blue-600">
+                            </td>
+                            <td class="px-4 py-2 text-center">
+                                <input type="number" name="goals_{{ player.id }}" 
+                                       value="{{ stats|get_item:player.id|get_item:'goals' }}"
+                                       min="0" class="form-input w-16 text-center">
+                            </td>
+                            <td class="px-4 py-2 text-center">
+                                <input type="number" name="yellow_cards_{{ player.id }}" 
+                                       value="{{ stats|get_item:player.id|get_item:'yellow_cards' }}"
+                                       min="0" max="2" class="form-input w-16 text-center">
+                            </td>
+                            <td class="px-4 py-2 text-center">
+                                <input type="number" name="red_cards_{{ player.id }}" 
+                                       value="{{ stats|get_item:player.id|get_item:'red_cards' }}"
+                                       min="0" max="1" class="form-input w-16 text-center">
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="flex justify-end space-x-4 mt-6">
+                <a href="{% url 'teams:season_detail' team.id season.id %}" 
+                   class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
+                    Cancel
+                </a>
+                <button type="submit" 
+                        class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                    Save Statistics
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %} 
