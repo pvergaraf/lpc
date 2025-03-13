@@ -178,11 +178,28 @@
     margin-top: 15px;
 }
 
+.modal {
+    padding-left: 0 !important;
+    outline: 0;
+}
+
+.modal-dialog {
+    margin: 1.75rem auto;
+    max-width: 500px;
+    width: calc(100% - 2rem);
+    display: flex;
+    align-items: center;
+    min-height: calc(100% - 3.5rem);
+    position: relative;
+}
+
 .modal-content {
     background: transparent;
     border: none;
-    max-height: 90vh;
-    margin: 1rem;
+    width: 100%;
+    margin: 0;
+    position: relative;
+    outline: 0;
 }
 
 .modal-header {
@@ -203,6 +220,7 @@
     border-bottom-right-radius: 15px;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    max-height: calc(100vh - 120px);
 }
 
 .btn-close {
@@ -221,10 +239,12 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    outline: none !important;
 }
 
-.modal {
-    padding-left: 0 !important;
+.btn-close:focus {
+    box-shadow: 0 0 0 0.25rem rgba(0,0,0,0.1);
 }
 
 .modal-open {
@@ -233,20 +253,18 @@
     width: 100%;
 }
 
-.modal-dialog {
-    margin: 0.5rem auto;
-    max-width: 500px;
-    width: calc(100% - 1rem);
-}
-
 @media (max-width: 576px) {
     .modal-dialog {
         margin: 0.5rem;
-        width: auto;
+        min-height: calc(100% - 1rem);
     }
     
     .modal-content {
-        margin: 0;
+        max-height: none;
+    }
+    
+    .modal-body {
+        max-height: calc(100vh - 80px);
     }
 }
 </style>
@@ -792,6 +810,89 @@ document.addEventListener('DOMContentLoaded', function() {
         const url = new URL(window.location.href);
         url.searchParams.set('active_only', this.checked);
         window.location.href = url.toString();
+    });
+
+    // Modal behavior
+    const modals = document.querySelectorAll('.modal');
+    modals.forEach(modal => {
+        const closeButton = modal.querySelector('.btn-close');
+        let lastFocusedElement;
+
+        modal.addEventListener('show.bs.modal', function (event) {
+            // Store the element that had focus before opening modal
+            lastFocusedElement = document.activeElement;
+            
+            // Store current scroll position
+            const scrollPos = window.pageYOffset;
+            modal.dataset.scrollPosition = scrollPos;
+            
+            // Remove aria-hidden from modal
+            modal.removeAttribute('aria-hidden');
+        });
+
+        modal.addEventListener('shown.bs.modal', function (event) {
+            // Focus the close button
+            if (closeButton) {
+                closeButton.focus();
+            }
+            
+            // Lock body scroll
+            document.body.style.overflow = 'hidden';
+            document.body.style.position = 'fixed';
+            document.body.style.width = '100%';
+            
+            // Ensure modal is visible
+            modal.style.display = 'block';
+        });
+
+        modal.addEventListener('hide.bs.modal', function (event) {
+            // Remove body scroll lock
+            document.body.style.overflow = '';
+            document.body.style.position = '';
+            document.body.style.width = '';
+        });
+
+        modal.addEventListener('hidden.bs.modal', function (event) {
+            // Restore focus to previous element
+            if (lastFocusedElement) {
+                lastFocusedElement.focus();
+            }
+            
+            // Restore scroll position
+            const scrollPos = parseInt(modal.dataset.scrollPosition || '0');
+            window.scrollTo(0, scrollPos);
+        });
+
+        // Handle touch events
+        modal.addEventListener('touchmove', function(event) {
+            const modalBody = event.target.closest('.modal-body');
+            if (modalBody) {
+                event.stopPropagation();
+            }
+        }, { passive: true });
+
+        // Trap focus within modal when open
+        modal.addEventListener('keydown', function(event) {
+            if (event.key === 'Tab') {
+                // Get all focusable elements in modal
+                const focusableElements = modal.querySelectorAll(
+                    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+                );
+                const firstFocusable = focusableElements[0];
+                const lastFocusable = focusableElements[focusableElements.length - 1];
+
+                // If shift+tab and on first element, move to last
+                if (event.shiftKey && document.activeElement === firstFocusable) {
+                    event.preventDefault();
+                    lastFocusable.focus();
+                }
+                // If tab and on last element, move to first
+                else if (!event.shiftKey && document.activeElement === lastFocusable) {
+                    event.preventDefault();
+                    firstFocusable.focus();
+                }
+            }
+        });
     });
 });
 </script>
