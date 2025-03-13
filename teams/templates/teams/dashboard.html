@@ -191,44 +191,60 @@
     bottom: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: transparent;
     z-index: 1050;
     display: none;
-    -webkit-overflow-scrolling: touch;
-    padding: 1rem;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    transition: opacity 0.3s ease;
 }
 
 .modal.show {
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: block;
+}
+
+.modal.show .modal-backdrop {
+    opacity: 1;
 }
 
 .modal-dialog {
-    position: relative;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
     width: 100%;
-    max-width: 500px;
-    margin: auto;
-    opacity: 0;
-    transform: translateY(20px);
-    transition: all 0.3s ease-out;
+    transform: translateY(100%);
+    margin: 0;
+    transition: transform 0.3s ease;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    padding: 1rem;
 }
 
 .modal.show .modal-dialog {
-    opacity: 1;
     transform: translateY(0);
 }
 
 .modal-content {
     position: relative;
-    background-color: transparent;
-    border: none;
-    box-shadow: none;
-    padding: 0;
     width: 100%;
-    max-height: calc(100vh - 2rem);
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+    max-width: 500px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    margin: 0;
+    pointer-events: none;
 }
 
 .btn-close {
@@ -238,9 +254,12 @@
     width: 44px;
     height: 44px;
     padding: 0;
-    background: none;
+    background: rgba(0, 0, 0, 0.1);
     border: none;
+    border-radius: 50%;
     cursor: pointer;
+    z-index: 1060;
+    pointer-events: auto;
 }
 
 .btn-close::before,
@@ -262,29 +281,20 @@
     transform: translate(-50%, -50%) rotate(-45deg);
 }
 
-@media (max-width: 576px) {
-    .modal {
-        padding: 0;
-    }
-    
+@media (min-width: 576px) {
     .modal-dialog {
-        margin: 0;
-        height: 100%;
-        max-width: none;
-        display: flex;
         align-items: center;
-    }
-
-    .modal-content {
-        max-height: none;
+        padding: 1.75rem;
     }
 }
 
 @supports (-webkit-touch-callout: none) {
-    .modal-open {
-        position: fixed;
-        width: 100%;
-        height: -webkit-fill-available;
+    .modal {
+        background-color: rgba(0, 0, 0, 0.5);
+    }
+    
+    .modal-backdrop {
+        display: none;
     }
 }
 </style>
@@ -779,18 +789,23 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function lockScroll() {
         scrollPosition = window.pageYOffset;
-        body.style.overflow = 'hidden';
+        const scrollBarWidth = window.innerWidth - document.documentElement.clientWidth;
+        
         body.style.position = 'fixed';
         body.style.top = `-${scrollPosition}px`;
         body.style.width = '100%';
-        body.style.height = '100%';
+        body.style.paddingRight = `${scrollBarWidth}px`;
+        
+        if (window.navigator.userAgent.includes('iPhone')) {
+            body.style.height = `${window.innerHeight}px`;
+        }
     }
 
     function unlockScroll() {
-        body.style.removeProperty('overflow');
         body.style.removeProperty('position');
         body.style.removeProperty('top');
         body.style.removeProperty('width');
+        body.style.removeProperty('padding-right');
         body.style.removeProperty('height');
         window.scrollTo(0, scrollPosition);
     }
@@ -798,7 +813,6 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.show-fifa-card').forEach(link => {
         link.addEventListener('click', function(e) {
             e.preventDefault();
-            e.stopPropagation();
             const modalId = this.getAttribute('data-bs-target');
             const modal = document.querySelector(modalId);
             
@@ -806,52 +820,53 @@ document.addEventListener('DOMContentLoaded', function() {
                 lockScroll();
                 modal.classList.add('show');
                 
-                // Prevent touchmove on modal background
-                modal.addEventListener('touchmove', function(e) {
-                    if (e.target === modal) {
-                        e.preventDefault();
-                    }
-                }, { passive: false });
-
-                // Allow scrolling on modal content
-                const modalContent = modal.querySelector('.modal-content');
-                if (modalContent) {
-                    modalContent.addEventListener('touchmove', function(e) {
-                        e.stopPropagation();
-                    }, { passive: true });
+                // Create backdrop if it doesn't exist
+                let backdrop = modal.querySelector('.modal-backdrop');
+                if (!backdrop) {
+                    backdrop = document.createElement('div');
+                    backdrop.className = 'modal-backdrop';
+                    modal.insertBefore(backdrop, modal.firstChild);
                 }
             }
         });
     });
 
     document.querySelectorAll('.modal').forEach(modal => {
+        // Create backdrop if it doesn't exist
+        if (!modal.querySelector('.modal-backdrop')) {
+            const backdrop = document.createElement('div');
+            backdrop.className = 'modal-backdrop';
+            modal.insertBefore(backdrop, modal.firstChild);
+        }
+
         const closeBtn = modal.querySelector('.btn-close');
+        const backdrop = modal.querySelector('.modal-backdrop');
         
+        function closeModal() {
+            modal.classList.remove('show');
+            unlockScroll();
+        }
+
         if (closeBtn) {
-            // Close button handler
             closeBtn.addEventListener('click', function(e) {
                 e.preventDefault();
-                e.stopPropagation();
-                modal.classList.remove('show');
-                unlockScroll();
+                closeModal();
             });
         }
 
-        // Close on backdrop click
+        if (backdrop) {
+            backdrop.addEventListener('click', function(e) {
+                if (e.target === backdrop) {
+                    closeModal();
+                }
+            });
+        }
+
         modal.addEventListener('click', function(e) {
             if (e.target === modal) {
-                modal.classList.remove('show');
-                unlockScroll();
+                closeModal();
             }
         });
-
-        // Prevent modal content clicks from closing
-        const modalContent = modal.querySelector('.modal-content');
-        if (modalContent) {
-            modalContent.addEventListener('click', function(e) {
-                e.stopPropagation();
-            });
-        }
     });
 
     // Close on escape key
