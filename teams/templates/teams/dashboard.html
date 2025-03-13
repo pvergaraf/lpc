@@ -181,6 +181,7 @@
 .modal {
     padding-left: 0 !important;
     outline: 0;
+    -webkit-overflow-scrolling: touch;
 }
 
 .modal-dialog {
@@ -191,6 +192,7 @@
     align-items: center;
     min-height: calc(100% - 3.5rem);
     position: relative;
+    -webkit-transform: translate3d(0,0,0);
 }
 
 .modal-content {
@@ -200,6 +202,8 @@
     margin: 0;
     position: relative;
     outline: 0;
+    height: auto;
+    min-height: calc(var(--vh, 1vh) * 80);
 }
 
 .modal-header {
@@ -220,7 +224,8 @@
     border-bottom-right-radius: 15px;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    max-height: calc(100vh - 120px);
+    max-height: calc(var(--vh, 1vh) * 80);
+    position: relative;
 }
 
 .btn-close {
@@ -253,18 +258,35 @@
     width: 100%;
 }
 
-@media (max-width: 576px) {
+@supports (-webkit-touch-callout: none) {
+    /* Safari-specific fixes */
+    .modal-open {
+        position: fixed;
+        width: 100%;
+    }
+    
     .modal-dialog {
-        margin: 0.5rem;
-        min-height: calc(100% - 1rem);
+        transform: none !important;
+        -webkit-transform: none !important;
     }
     
     .modal-content {
-        max-height: none;
+        -webkit-transform: translate3d(0,0,0);
+    }
+}
+
+@media (max-width: 576px) {
+    .modal-dialog {
+        margin: 0.5rem;
+        min-height: calc(var(--vh, 1vh) * 90);
+    }
+    
+    .modal-content {
+        height: calc(var(--vh, 1vh) * 90);
     }
     
     .modal-body {
-        max-height: calc(100vh - 80px);
+        max-height: calc(var(--vh, 1vh) * 80);
     }
 }
 </style>
@@ -753,9 +775,20 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Ensure CSRF token is properly set for Safari
+    function getCSRFToken() {
+        let csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        if (!csrfToken) {
+            // Fallback to cookie if input not found
+            csrfToken = document.cookie.split('; ')
+                .find(row => row.startsWith('csrftoken='))
+                ?.split('=')[1];
+        }
+        return csrfToken;
+    }
+
+    // Payment toggle handlers
     const toggleButtons = document.querySelectorAll('.toggle-payment-btn');
-    const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-    
     toggleButtons.forEach(button => {
         button.addEventListener('click', function() {
             const paymentId = this.dataset.paymentId;
@@ -783,12 +816,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 fetch(`{% url 'teams:toggle_player_payment' team_id=current_team.id season_id=current_season.id payment_id=0 player_payment_id=0 %}`.replace('/0/player/0/', `/${paymentId}/player/${paymentId}/`), {
                     method: 'POST',
                     headers: {
-                        'X-CSRFToken': csrfToken,
+                        'X-CSRFToken': getCSRFToken(),
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
                         is_admin: isAdmin
-                    })
+                    }),
+                    credentials: 'same-origin'
                 })
                 .then(response => {
                     if (!response.ok) {
@@ -804,95 +838,111 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    // Active filter handler
     const activeFilter = document.getElementById('activeFilter');
-    
     activeFilter.addEventListener('change', function() {
         const url = new URL(window.location.href);
         url.searchParams.set('active_only', this.checked);
         window.location.href = url.toString();
     });
 
-    // Modal behavior
+    // Modal behavior with Safari fixes
     const modals = document.querySelectorAll('.modal');
+    let scrollPosition = 0;
+
     modals.forEach(modal => {
         const closeButton = modal.querySelector('.btn-close');
         let lastFocusedElement;
+        
+        function lockBody() {
+            scrollPosition = window.pageYOffset;
+            document.body.style.overflow = 'hidden';
+            document.body.style.position = 'fixed';
+            document.body.style.width = '100%';
+            document.body.style.top = `-${scrollPosition}px`;
+        }
+        
+        function unlockBody() {
+            document.body.style.removeProperty('overflow');
+            document.body.style.removeProperty('position');
+            document.body.style.removeProperty('width');
+            document.body.style.removeProperty('top');
+            window.scrollTo(0, scrollPosition);
+        }
 
         modal.addEventListener('show.bs.modal', function (event) {
-            // Store the element that had focus before opening modal
             lastFocusedElement = document.activeElement;
-            
-            // Store current scroll position
-            const scrollPos = window.pageYOffset;
-            modal.dataset.scrollPosition = scrollPos;
-            
-            // Remove aria-hidden from modal
             modal.removeAttribute('aria-hidden');
+            
+            // Safari-specific viewport height fix
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+            
+            lockBody();
         });
 
         modal.addEventListener('shown.bs.modal', function (event) {
-            // Focus the close button
             if (closeButton) {
                 closeButton.focus();
             }
             
-            // Lock body scroll
-            document.body.style.overflow = 'hidden';
-            document.body.style.position = 'fixed';
-            document.body.style.width = '100%';
-            
-            // Ensure modal is visible
+            // Ensure modal is visible and properly positioned in Safari
             modal.style.display = 'block';
+            modal.style.height = 'calc(var(--vh, 1vh) * 100)';
+            
+            // Force Safari to handle the modal properly
+            modal.style.webkitTransform = 'translate3d(0,0,0)';
         });
 
         modal.addEventListener('hide.bs.modal', function (event) {
-            // Remove body scroll lock
-            document.body.style.overflow = '';
-            document.body.style.position = '';
-            document.body.style.width = '';
+            unlockBody();
         });
 
         modal.addEventListener('hidden.bs.modal', function (event) {
-            // Restore focus to previous element
             if (lastFocusedElement) {
                 lastFocusedElement.focus();
             }
             
-            // Restore scroll position
-            const scrollPos = parseInt(modal.dataset.scrollPosition || '0');
-            window.scrollTo(0, scrollPos);
+            // Clean up Safari-specific styles
+            modal.style.removeProperty('height');
+            modal.style.removeProperty('-webkit-transform');
+            document.documentElement.style.removeProperty('--vh');
         });
 
-        // Handle touch events
+        // Improved touch event handling for Safari
         modal.addEventListener('touchmove', function(event) {
             const modalBody = event.target.closest('.modal-body');
-            if (modalBody) {
-                event.stopPropagation();
+            const modalContent = event.target.closest('.modal-content');
+            
+            if (!modalBody && !modalContent) {
+                event.preventDefault();
             }
-        }, { passive: true });
+        }, { passive: false });
 
-        // Trap focus within modal when open
+        // Handle keyboard navigation
         modal.addEventListener('keydown', function(event) {
             if (event.key === 'Tab') {
-                // Get all focusable elements in modal
                 const focusableElements = modal.querySelectorAll(
                     'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
                 );
                 const firstFocusable = focusableElements[0];
                 const lastFocusable = focusableElements[focusableElements.length - 1];
 
-                // If shift+tab and on first element, move to last
                 if (event.shiftKey && document.activeElement === firstFocusable) {
                     event.preventDefault();
                     lastFocusable.focus();
-                }
-                // If tab and on last element, move to first
-                else if (!event.shiftKey && document.activeElement === lastFocusable) {
+                } else if (!event.shiftKey && document.activeElement === lastFocusable) {
                     event.preventDefault();
                     firstFocusable.focus();
                 }
             }
         });
+    });
+
+    // Update viewport height on resize for Safari
+    window.addEventListener('resize', () => {
+        const vh = window.innerHeight * 0.01;
+        document.documentElement.style.setProperty('--vh', `${vh}px`);
     });
 });
 </script>
