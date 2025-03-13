@@ -179,9 +179,6 @@
 }
 
 .modal {
-    padding: 0 !important;
-    outline: 0;
-    -webkit-overflow-scrolling: touch;
     position: fixed;
     top: 0;
     left: 0;
@@ -190,6 +187,8 @@
     background: rgba(0, 0, 0, 0.5);
     z-index: 1050;
     display: none;
+    -webkit-overflow-scrolling: touch;
+    overflow-y: auto;
 }
 
 .modal.show {
@@ -197,27 +196,26 @@
 }
 
 .modal-dialog {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) !important;
+    position: relative;
     width: calc(100% - 2rem);
     max-width: 500px;
-    margin: 0;
-    -webkit-transform: translate(-50%, -50%) !important;
+    margin: 1.75rem auto;
+    transform: none !important;
+    -webkit-transform: none !important;
 }
 
 .modal-content {
     position: relative;
     width: 100%;
-    background: transparent;
+    background: white;
     border: none;
+    border-radius: 15px;
     pointer-events: auto;
-    margin: 0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .modal-header {
-    padding: 0.5rem;
+    padding: 1rem;
     background-color: white;
     border-top-left-radius: 15px;
     border-top-right-radius: 15px;
@@ -233,13 +231,12 @@
     padding: 1rem;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    position: relative;
 }
 
 .btn-close {
     position: absolute;
-    right: 0.5rem;
-    top: 0.5rem;
+    right: 1rem;
+    top: 1rem;
     z-index: 1052;
     width: 44px;
     height: 44px;
@@ -251,7 +248,7 @@
     justify-content: center;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     border: none;
-    opacity: 0.8;
+    opacity: 1;
     touch-action: manipulation;
 }
 
@@ -260,38 +257,21 @@
         position: fixed;
         width: 100%;
         height: 100%;
+        overflow: hidden;
     }
     
     .modal-dialog {
-        position: fixed;
-        margin: 0;
-        padding: 1rem;
-        max-height: 100vh;
-        max-height: -webkit-fill-available;
-    }
-    
-    .modal-content {
-        max-height: calc(100vh - 2rem);
-        max-height: calc(-webkit-fill-available - 2rem);
-        overflow-y: auto;
-    }
-    
-    .modal-body {
-        -webkit-transform: translateZ(0);
-        transform: translateZ(0);
-        -webkit-overflow-scrolling: touch;
+        margin: 1rem auto;
+        min-height: calc(100% - 2rem);
+        display: flex;
+        align-items: center;
     }
 }
 
 @media (max-width: 576px) {
     .modal-dialog {
+        margin: 0.5rem auto;
         width: calc(100% - 1rem);
-        padding: 0.5rem;
-    }
-    
-    .btn-close {
-        top: 0.25rem;
-        right: 0.25rem;
     }
 }
 </style>
@@ -854,28 +834,21 @@ document.addEventListener('DOMContentLoaded', function() {
     // Modal behavior with improved Safari fixes
     const modals = document.querySelectorAll('.modal');
     let scrollPosition = 0;
-    let bodyScrollBlocked = false;
 
     function blockBodyScroll() {
-        if (!bodyScrollBlocked) {
-            scrollPosition = window.pageYOffset;
-            document.body.style.position = 'fixed';
-            document.body.style.top = `-${scrollPosition}px`;
-            document.body.style.width = '100%';
-            document.body.style.overflow = 'hidden';
-            bodyScrollBlocked = true;
-        }
+        scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
+        document.body.style.position = 'fixed';
+        document.body.style.top = `-${scrollPosition}px`;
+        document.body.style.width = '100%';
+        document.body.style.overflow = 'hidden';
     }
 
     function unblockBodyScroll() {
-        if (bodyScrollBlocked) {
-            document.body.style.removeProperty('position');
-            document.body.style.removeProperty('top');
-            document.body.style.removeProperty('width');
-            document.body.style.removeProperty('overflow');
-            window.scrollTo(0, scrollPosition);
-            bodyScrollBlocked = false;
-        }
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        document.body.style.overflow = '';
+        window.scrollTo(0, scrollPosition);
     }
 
     // Handle FIFA card clicks
@@ -888,7 +861,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (modal) {
                 blockBodyScroll();
                 modal.classList.add('show');
-                modal.style.display = 'block';
                 
                 // Focus management
                 const closeButton = modal.querySelector('.btn-close');
@@ -905,7 +877,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (closeButton) {
             closeButton.addEventListener('click', function() {
                 modal.classList.remove('show');
-                modal.style.display = 'none';
                 unblockBodyScroll();
             });
         }
@@ -914,7 +885,6 @@ document.addEventListener('DOMContentLoaded', function() {
         modal.addEventListener('click', function(e) {
             if (e.target === modal) {
                 modal.classList.remove('show');
-                modal.style.display = 'none';
                 unblockBodyScroll();
             }
         });
@@ -923,14 +893,6 @@ document.addEventListener('DOMContentLoaded', function() {
         modal.querySelector('.modal-content')?.addEventListener('click', function(e) {
             e.stopPropagation();
         });
-
-        // Handle touch events
-        modal.addEventListener('touchmove', function(e) {
-            const modalBody = e.target.closest('.modal-body');
-            if (!modalBody) {
-                e.preventDefault();
-            }
-        }, { passive: false });
     });
 
     // Handle escape key
@@ -939,7 +901,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const visibleModal = document.querySelector('.modal.show');
             if (visibleModal) {
                 visibleModal.classList.remove('show');
-                visibleModal.style.display = 'none';
                 unblockBodyScroll();
             }
         }
