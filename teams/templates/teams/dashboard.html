@@ -11,9 +11,14 @@
     border-radius: 15px;
     padding: 20px;
     position: relative;
+    width: 100%;
     max-width: 300px;
     margin: 0 auto;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
 }
 
 .fifa-card-number {
@@ -190,37 +195,40 @@
     z-index: 1050;
     display: none;
     -webkit-overflow-scrolling: touch;
+    padding: 1rem;
 }
 
 .modal.show {
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .modal-dialog {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: -100%;
+    position: relative;
     width: 100%;
-    margin: 0;
+    max-width: 500px;
+    margin: auto;
     opacity: 0;
+    transform: translateY(20px);
     transition: all 0.3s ease-out;
 }
 
 .modal.show .modal-dialog {
-    bottom: 0;
     opacity: 1;
+    transform: translateY(0);
 }
 
 .modal-content {
     position: relative;
-    background-color: #fff;
-    border-top-left-radius: 20px;
-    border-top-right-radius: 20px;
-    box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.2);
-    padding: 20px;
-    max-height: 90%;
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    width: 100%;
+    max-height: calc(100vh - 2rem);
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 .btn-close {
@@ -254,16 +262,21 @@
     transform: translate(-50%, -50%) rotate(-45deg);
 }
 
-@media (min-width: 576px) {
+@media (max-width: 576px) {
+    .modal {
+        padding: 0;
+    }
+    
     .modal-dialog {
-        position: relative;
-        width: 500px;
-        margin: 1.75rem auto;
-        bottom: auto;
+        margin: 0;
+        height: 100%;
+        max-width: none;
+        display: flex;
+        align-items: center;
     }
 
     .modal-content {
-        border-radius: 15px;
+        max-height: none;
     }
 }
 
@@ -272,16 +285,6 @@
         position: fixed;
         width: 100%;
         height: -webkit-fill-available;
-    }
-}
-
-@media (max-width: 576px) {
-    .modal {
-        padding: 0.5rem;
-    }
-    
-    .modal-dialog {
-        margin: 0;
     }
 }
 </style>
@@ -780,6 +783,7 @@ document.addEventListener('DOMContentLoaded', function() {
         body.style.position = 'fixed';
         body.style.top = `-${scrollPosition}px`;
         body.style.width = '100%';
+        body.style.height = '100%';
     }
 
     function unlockScroll() {
@@ -787,12 +791,14 @@ document.addEventListener('DOMContentLoaded', function() {
         body.style.removeProperty('position');
         body.style.removeProperty('top');
         body.style.removeProperty('width');
+        body.style.removeProperty('height');
         window.scrollTo(0, scrollPosition);
     }
 
     document.querySelectorAll('.show-fifa-card').forEach(link => {
         link.addEventListener('click', function(e) {
             e.preventDefault();
+            e.stopPropagation();
             const modalId = this.getAttribute('data-bs-target');
             const modal = document.querySelector(modalId);
             
@@ -809,9 +815,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // Allow scrolling on modal content
                 const modalContent = modal.querySelector('.modal-content');
-                modalContent.addEventListener('touchmove', function(e) {
-                    e.stopPropagation();
-                }, { passive: true });
+                if (modalContent) {
+                    modalContent.addEventListener('touchmove', function(e) {
+                        e.stopPropagation();
+                    }, { passive: true });
+                }
             }
         });
     });
@@ -819,11 +827,15 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.modal').forEach(modal => {
         const closeBtn = modal.querySelector('.btn-close');
         
-        // Close button handler
-        closeBtn.addEventListener('click', function() {
-            modal.classList.remove('show');
-            unlockScroll();
-        });
+        if (closeBtn) {
+            // Close button handler
+            closeBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                modal.classList.remove('show');
+                unlockScroll();
+            });
+        }
 
         // Close on backdrop click
         modal.addEventListener('click', function(e) {
@@ -834,9 +846,12 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         // Prevent modal content clicks from closing
-        modal.querySelector('.modal-content').addEventListener('click', function(e) {
-            e.stopPropagation();
-        });
+        const modalContent = modal.querySelector('.modal-content');
+        if (modalContent) {
+            modalContent.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
+        }
     });
 
     // Close on escape key
