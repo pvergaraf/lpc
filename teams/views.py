@@ -2272,6 +2272,7 @@ def match_stats_edit(request, team_id, season_id, match_id):
             stats_dict[player.id] = {
                 'played': stat.played,
                 'goals': stat.goals,
+                'assists': stat.assists,
                 'yellow_cards': stat.yellow_cards,
                 'red_cards': stat.red_cards
             }
@@ -2283,6 +2284,7 @@ def match_stats_edit(request, team_id, season_id, match_id):
                         player_stats = PlayerMatchStats.objects.get(match=match, player=player)
                         player_stats.played = request.POST.get(f'played_{player.id}') == 'on'
                         player_stats.goals = int(request.POST.get(f'goals_{player.id}', 0))
+                        player_stats.assists = int(request.POST.get(f'assists_{player.id}', 0))
                         player_stats.yellow_cards = int(request.POST.get(f'yellow_cards_{player.id}', 0))
                         player_stats.red_cards = int(request.POST.get(f'red_cards_{player.id}', 0))
                         player_stats.save()
@@ -2298,6 +2300,7 @@ def match_stats_edit(request, team_id, season_id, match_id):
                                 "stats": {
                                     "played": player_stats.played,
                                     "goals": player_stats.goals,
+                                    "assists": player_stats.assists,
                                     "yellow_cards": player_stats.yellow_cards,
                                     "red_cards": player_stats.red_cards
                                 }
@@ -2408,4 +2411,49 @@ def lineup_simulator(request, team_id):
         'is_team_admin': team_member.is_team_admin or team_member.role == TeamMember.Role.MANAGER,  # Changed is_admin to is_team_admin
     }
     return render(request, 'teams/lineup_simulator.html', context)
+
+@login_required
+def season_stats(request, team_id, season_id):
+    team = get_object_or_404(Team, id=team_id)
+    season = get_object_or_404(Season, id=season_id, team=team)
+    team_member = get_object_or_404(TeamMember, team=team, user=request.user, is_active=True)
+    
+    # Get all active players in the team
+    players = TeamMember.objects.filter(
+        team=team,
+        is_active=True,
+        user__profile__active_player=True,
+        role=TeamMember.Role.PLAYER
+    ).select_related(
+        'user',
+        'user__profile',
+        'user__profile__position'
+    ).annotate(
+        position_order=Case(
+            When(user__profile__position__type='GK', then=Value(1)),
+            When(user__profile__position__type='DEF', then=Value(2)),
+            When(user__profile__position__type='MID', then=Value(3)),
+            When(user__profile__position__type='ATT', then=Value(4)),
+            default=Value(5),
+            output_field=IntegerField(),
+        )
+    ).order_by(
+        'position_order',
+        'user__profile__player_number'
+    )
+    
+    # Get stats for each player
+    stats_dict = {}
+    for player in players:
+        stats_dict[player.id] = PlayerMatchStats.get_player_totals(player, season)
+    
+    context = {
+        'team': team,
+        'season': season,
+        'players': players,
+        'stats': stats_dict,
+        'is_admin': team_member.is_team_admin or team_member.role == TeamMember.Role.MANAGER
+    }
+    
+    return render(request, 'teams/season_stats.html', context)
 

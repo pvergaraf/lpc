@@ -698,6 +698,7 @@ class PlayerMatchStats(models.Model):
     player = models.ForeignKey(TeamMember, on_delete=models.CASCADE, related_name='match_stats')
     played = models.BooleanField(default=False)
     goals = models.PositiveIntegerField(default=0)
+    assists = models.PositiveIntegerField(default=0)
     yellow_cards = models.PositiveIntegerField(default=0)
     red_cards = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -724,6 +725,7 @@ class PlayerMatchStats(models.Model):
         return {
             'matches_played': stats.filter(played=True).count(),
             'goals': stats.aggregate(total_goals=models.Sum('goals'))['total_goals'] or 0,
+            'assists': stats.aggregate(total_assists=models.Sum('assists'))['total_assists'] or 0,
             'yellow_cards': stats.aggregate(total_yellows=models.Sum('yellow_cards'))['total_yellows'] or 0,
             'red_cards': stats.aggregate(total_reds=models.Sum('red_cards'))['total_reds'] or 0
         }

@@ -20,6 +20,7 @@
                             <th class="px-4 py-2 text-left">Player</th>
                             <th class="px-4 py-2 text-center">Played</th>
                             <th class="px-4 py-2 text-center">Goals</th>
+                            <th class="px-4 py-2 text-center">Assists</th>
                             <th class="px-4 py-2 text-center">Yellow Cards</th>
                             <th class="px-4 py-2 text-center">Red Cards</th>
                         </tr>
@@ -45,6 +46,11 @@
                             <td class="px-4 py-2 text-center">
                                 <input type="number" name="goals_{{ player.id }}" 
                                        value="{{ stats|get_item:player.id|get_item:'goals' }}"
+                                       min="0" class="form-input w-16 text-center">
+                            </td>
+                            <td class="px-4 py-2 text-center">
+                                <input type="number" name="assists_{{ player.id }}" 
+                                       value="{{ stats|get_item:player.id|get_item:'assists' }}"
                                        min="0" class="form-input w-16 text-center">
                             </td>
                             <td class="px-4 py-2 text-center">

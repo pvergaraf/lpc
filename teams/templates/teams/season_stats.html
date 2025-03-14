@@ -1,0 +1,69 @@
+{% extends 'teams/base.html' %}
+{% load static %}
+{% load teams_tags %}
+
+{% block title %}{{ season.name }} - Stats{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">{{ season.name }} - Season Stats</h5>
+            <a href="{% url 'teams:season_detail' team.id season.id %}" class="btn btn-outline-secondary btn-sm">
+                Back to Season
+            </a>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Position</th>
+                            <th>Player</th>
+                            <th class="text-center">Matches</th>
+                            <th class="text-center">Goals</th>
+                            <th class="text-center">Assists</th>
+                            <th class="text-center">Yellow Cards</th>
+                            <th class="text-center">Red Cards</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for player in players %}
+                        <tr>
+                            <td>
+                                {% if player.user.profile.player_number %}
+                                    {{ player.user.profile.player_number }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if player.user.profile.position %}
+                                    <div class="position-badge" style="display: inline-block; padding: 6px 12px; background-color: #000000; color: white; font-weight: bold; position: relative; margin: 2px; width: 70px; text-align: center;">
+                                        {{ player.user.profile.position.code }}
+                                        <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 4px; background-color: {{ player.user.profile.position.color }};"></div>
+                                    </div>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{% url 'teams:player_card' team_id=team.id user_id=player.user.id %}" class="text-decoration-none">
+                                    {{ player.user.get_full_name }}
+                                </a>
+                            </td>
+                            <td class="text-center">{{ stats|get_item:player.id|get_item:'matches_played' }}</td>
+                            <td class="text-center">{{ stats|get_item:player.id|get_item:'goals' }}</td>
+                            <td class="text-center">{{ stats|get_item:player.id|get_item:'assists' }}</td>
+                            <td class="text-center">{{ stats|get_item:player.id|get_item:'yellow_cards' }}</td>
+                            <td class="text-center">{{ stats|get_item:player.id|get_item:'red_cards' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

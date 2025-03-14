@@ -12,13 +12,14 @@
                 <a href="{% url 'teams:season_edit' team.id season.id %}" class="btn btn-outline-secondary btn-sm">
                     Edit Season
                 </a>
+                {% endif %}
                 <div>
+                    <a href="{% url 'teams:season_stats' team_id=team.id season_id=season.id %}" class="btn btn-outline-info btn-sm">Season Stats</a>
                     <a href="{% url 'teams:lineup_simulator' team_id=team.id %}" class="btn btn-outline-primary btn-sm">Lineup Simulator</a>
                     {% if is_admin %}
                         <a href="{% url 'teams:match_create' team_id=team.id season_id=season.id %}" class="btn btn-primary btn-sm ms-2">Add Match</a>
                     {% endif %}
                 </div>
-                {% endif %}
             </div>
         </div>
         <div class="card-body">
