@@ -76,7 +76,16 @@
 .position-spot.highlight {
     border: 2px solid white;
     background-color: rgba(255, 255, 255, 0.3);
-    transform: translate(-50%, -50%) scale(1.1);
+    transform: translate(-50%, -50%) scale(1.2);
+}
+
+.position-spot.highlight::before {
+    content: '+';
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+    position: absolute;
+    z-index: 3;
 }
 
 .position-spot .player-card {
@@ -127,6 +136,7 @@
     border: 2px solid white;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     z-index: 11;
+    pointer-events: none;
 }
 
 .player-name {
@@ -249,6 +259,15 @@
     .player-card {
         width: 100px;
         height: 70px;
+        touch-action: none;
+    }
+
+    .position-spot.highlight {
+        transform: translate(-50%, -50%) scale(1.3);
+    }
+
+    .position-spot.highlight::before {
+        font-size: 28px;
     }
 
     .player-name {
@@ -330,9 +349,7 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM Content Loaded');
     const soccerField = document.querySelector('.soccer-field');
     const formationSelect = document.querySelector('.formation-select');
-    
-    console.log('Soccer Field:', soccerField);
-    console.log('Formation Select:', formationSelect);
+    const bench = document.querySelector('.bench');
     
     // Formation definitions
     const formations = {
@@ -377,65 +394,57 @@ document.addEventListener('DOMContentLoaded', function() {
         ]
     };
     
-    // Create position spots for current formation
-    function createPositionSpots(formation) {
-        console.log('Creating position spots for formation:', formation);
-        soccerField.innerHTML = '';
-        formations[formation].forEach(pos => {
-            const spot = document.createElement('div');
-            spot.className = `position-spot ${pos.id}`;
-            spot.dataset.position = pos.id;
-            spot.innerHTML = `<span style="color: white;">${pos.label}</span>`;
-            soccerField.appendChild(spot);
-            console.log('Created spot:', pos.id);
-        });
-        setupDragAndDrop();
-    }
-    
     // Handle formation change
     formationSelect.addEventListener('change', function() {
         console.log('Formation changed to:', this.value);
+        
+        // Move all players from field back to bench before changing formation
+        const playersOnField = soccerField.querySelectorAll('.player-card');
+        playersOnField.forEach(card => {
+            // Reset any styling that might have been applied
+            card.style.opacity = '1';
+            card.classList.remove('dragging');
+            // Move back to bench
+            bench.appendChild(card);
+        });
+        
+        // Change formation and create new spots
         soccerField.className = 'soccer-field formation-' + this.value;
         createPositionSpots(this.value);
     });
     
-    // Setup drag and drop
-    function setupDragAndDrop() {
-        const playerCards = document.querySelectorAll('.player-card');
-        const positionSpots = document.querySelectorAll('.position-spot');
-        const bench = document.querySelector('.bench');
-        
-        console.log('Setting up drag and drop');
-        console.log('Player cards:', playerCards.length);
-        console.log('Position spots:', positionSpots.length);
-        
-        playerCards.forEach(card => {
-            card.addEventListener('dragstart', handleDragStart);
-            card.addEventListener('dragend', handleDragEnd);
-            card.addEventListener('dblclick', handleDoubleClick);
-        });
-        
-        positionSpots.forEach(spot => {
-            spot.addEventListener('dragover', handleDragOver);
-            spot.addEventListener('dragleave', handleDragLeave);
-            spot.addEventListener('drop', handleDrop);
-        });
-    }
-    
     function handleDragStart(e) {
         this.classList.add('dragging');
         e.dataTransfer.setData('text/plain', e.target.dataset.playerId);
+        // Add touch feedback
+        this.style.opacity = '0.5';
         console.log('Drag started:', e.target.dataset.playerId);
     }
     
     function handleDragEnd(e) {
         this.classList.remove('dragging');
+        // Reset touch feedback
+        this.style.opacity = '1';
         console.log('Drag ended');
     }
     
     function handleDragOver(e) {
         e.preventDefault();
         this.classList.add('highlight');
+        
+        // Expand drop target on mobile
+        if (window.innerWidth <= 768) {
+            const rect = this.getBoundingClientRect();
+            const touchX = e.touches ? e.touches[0].clientX : e.clientX;
+            const touchY = e.touches ? e.touches[0].clientY : e.clientY;
+            
+            // Check if touch/mouse is within expanded hit area
+            const expandedArea = 30; // pixels
+            if (Math.abs(touchX - (rect.left + rect.width/2)) < rect.width/2 + expandedArea &&
+                Math.abs(touchY - (rect.top + rect.height/2)) < rect.height/2 + expandedArea) {
+                this.classList.add('highlight');
+            }
+        }
     }
     
     function handleDragLeave(e) {
@@ -452,18 +461,15 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Drop:', playerId);
         console.log('Player card:', playerCard);
         
-        // If there's already a player in this position, swap them
+        // If there's already a player in this position, move them back to bench
         if (this.querySelector('.player-card')) {
             const existingCard = this.querySelector('.player-card');
-            document.querySelector('.bench').appendChild(existingCard);
-            // Show the position label when player is removed
+            bench.appendChild(existingCard);
             this.querySelector('span').style.display = '';
             console.log('Moved existing player back to bench');
         }
         
-        // Move the dragged player to the position
         this.appendChild(playerCard);
-        // Hide the position label when player is added
         this.querySelector('span').style.display = 'none';
         console.log('Moved player to position');
     }
@@ -472,12 +478,84 @@ document.addEventListener('DOMContentLoaded', function() {
         const card = e.target.closest('.player-card');
         if (card && !card.closest('.bench')) {
             const positionSpot = card.parentElement;
-            // Only move to bench if the card is on the field
-            document.querySelector('.bench').appendChild(card);
-            // Show the position label when player is removed
+            bench.appendChild(card);
             positionSpot.querySelector('span').style.display = '';
             console.log('Moved player back to bench via double-click');
         }
+    }
+    
+    // Add touch event handlers for mobile
+    function setupTouchEvents(card) {
+        let touchTimeout;
+        let hasMoved = false;
+        
+        card.addEventListener('touchstart', function(e) {
+            hasMoved = false;
+            touchTimeout = setTimeout(() => {
+                if (!hasMoved) {
+                    this.setAttribute('draggable', 'true');
+                    const event = new DragEvent('dragstart', {
+                        bubbles: true,
+                        cancelable: true,
+                        dataTransfer: new DataTransfer()
+                    });
+                    this.dispatchEvent(event);
+                }
+            }, 200);
+        });
+        
+        card.addEventListener('touchmove', function() {
+            hasMoved = true;
+            clearTimeout(touchTimeout);
+        });
+        
+        card.addEventListener('touchend', function() {
+            clearTimeout(touchTimeout);
+            this.setAttribute('draggable', 'false');
+        });
+    }
+    
+    // Setup drag and drop with improved mobile support
+    function setupDragAndDrop() {
+        const playerCards = document.querySelectorAll('.player-card');
+        const positionSpots = document.querySelectorAll('.position-spot');
+        
+        console.log('Setting up drag and drop');
+        console.log('Player cards:', playerCards.length);
+        console.log('Position spots:', positionSpots.length);
+        
+        playerCards.forEach(card => {
+            card.addEventListener('dragstart', handleDragStart);
+            card.addEventListener('dragend', handleDragEnd);
+            card.addEventListener('dblclick', handleDoubleClick);
+            setupTouchEvents(card);
+        });
+        
+        positionSpots.forEach(spot => {
+            spot.addEventListener('dragover', handleDragOver);
+            spot.addEventListener('dragleave', handleDragLeave);
+            spot.addEventListener('drop', handleDrop);
+            
+            // Add touch events for position spots
+            spot.addEventListener('touchstart', function(e) {
+                e.preventDefault(); // Prevent scrolling
+            });
+        });
+    }
+    
+    // Create position spots for current formation
+    function createPositionSpots(formation) {
+        console.log('Creating position spots for formation:', formation);
+        soccerField.innerHTML = '';
+        formations[formation].forEach(pos => {
+            const spot = document.createElement('div');
+            spot.className = `position-spot ${pos.id}`;
+            spot.dataset.position = pos.id;
+            spot.innerHTML = `<span style="color: white;">${pos.label}</span>`;
+            soccerField.appendChild(spot);
+            console.log('Created spot:', pos.id);
+        });
+        setupDragAndDrop();
     }
     
     // Initialize with 4-4-2 formation
