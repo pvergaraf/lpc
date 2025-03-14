@@ -80,6 +80,7 @@ urlpatterns = [
     path('team/<int:team_id>/season/<int:season_id>/payments/<int:payment_id>/player/<int:player_payment_id>/toggle/', views.toggle_player_payment, name='toggle_player_payment'),
     path('update-condition/', views.update_condition, name='update_condition'),
     path('team/<int:team_id>/player/<int:user_id>/', views.player_card, name='player_card'),
+    path('team/<int:team_id>/lineup/', views.lineup_simulator, name='lineup_simulator'),
     # Profile URLs
     path('profile/edit/', views.edit_profile, name='edit_profile'),
     path('profile/<int:user_id>/', views.view_profile, name='view_profile'),

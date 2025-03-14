@@ -2356,3 +2356,56 @@ def match_stats_edit(request, team_id, season_id, match_id):
         )
         raise
 
+@login_required
+def lineup_simulator(request, team_id):
+    team = get_object_or_404(Team, id=team_id)
+    team_member = get_object_or_404(TeamMember, team=team, user=request.user, is_active=True)
+    
+    # Get current season
+    current_season = Season.objects.filter(team=team, is_active=True).first()
+    
+    # Get all active players in the team
+    players = TeamMember.objects.filter(
+        team=team,
+        is_active=True,
+        user__profile__active_player=True,
+        role=TeamMember.Role.PLAYER
+    ).select_related(
+        'user',
+        'user__profile',
+        'user__profile__position'
+    ).annotate(
+        position_order=Case(
+            When(user__profile__position__type='GK', then=Value(1)),
+            When(user__profile__position__type='DEF', then=Value(2)),
+            When(user__profile__position__type='MID', then=Value(3)),
+            When(user__profile__position__type='ATT', then=Value(4)),
+            default=Value(5),
+            output_field=IntegerField(),
+        )
+    ).order_by(
+        'position_order',
+        'user__profile__player_number'
+    )
+
+    # Add condition symbol for each player
+    for player in players:
+        condition = player.user.profile.condition
+        player.condition_symbol = {
+            'TOP': '↑',
+            'GOOD': '↗',
+            'NORMAL': '→',
+            'BAD': '↘',
+            'AWFUL': '↓',
+            'INJURED': '+'
+        }.get(condition, '•')
+    
+    context = {
+        'team': team,
+        'current_team': team,  # Add this for navbar
+        'current_season': current_season,  # Add this for navbar
+        'players': players,
+        'is_team_admin': team_member.is_team_admin or team_member.role == TeamMember.Role.MANAGER,  # Changed is_admin to is_team_admin
+    }
+    return render(request, 'teams/lineup_simulator.html', context)
+

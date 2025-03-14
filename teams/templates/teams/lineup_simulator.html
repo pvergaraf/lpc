@@ -1,0 +1,488 @@
+{% extends "teams/base.html" %}
+{% load static %}
+
+{% block title %}Lineup Simulator - {{ team.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.soccer-field {
+    background-color: #2E7D32;
+    background: #2E7D32;
+    background-image: 
+        linear-gradient(to bottom, #2E7D32, #1B5E20),
+        linear-gradient(to right, rgba(255,255,255,0.2) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.2) 1px, transparent 1px);
+    background-size: 100% 100%, 50px 50px, 50px 50px;
+    background-position: 0 0, 0 0, 0 0;
+    position: relative;
+    width: 100%;
+    max-width: 600px;
+    aspect-ratio: 3/4;
+    height: auto;
+    border: 2px solid white;
+    border-radius: 10px;
+    margin: 20px auto;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.soccer-field::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100px;
+    height: 100px;
+    border: 2px solid rgba(255,255,255,0.6);
+    border-radius: 50%;
+    z-index: 1;
+}
+
+.soccer-field::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: rgba(255,255,255,0.6);
+    transform: translateY(-50%);
+    z-index: 1;
+}
+
+.position-spot {
+    width: 60px;
+    height: 60px;
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    border-radius: 50%;
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    background-color: rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    transform: translate(-50%, -50%);
+    z-index: 2;
+}
+
+.position-spot span {
+    color: white;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+    pointer-events: none;
+}
+
+.position-spot.highlight {
+    border: 2px solid white;
+    background-color: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%) scale(1.1);
+}
+
+.position-spot .player-card {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    margin: 0;
+    width: 120px;
+    height: 80px;
+    border-radius: 8px;
+    background-color: #fff;
+}
+
+.player-card {
+    width: 120px;
+    height: 80px;
+    background: #fff;
+    border-radius: 8px;
+    padding: 8px;
+    margin: 5px;
+    cursor: move;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.3s ease;
+    z-index: 10;
+    position: relative;
+    margin-top: 20px;
+}
+
+.player-card.dragging {
+    opacity: 0.5;
+    transform: scale(0.95);
+}
+
+.player-photo {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    object-fit: cover;
+    position: absolute;
+    top: -15px;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    z-index: 11;
+}
+
+.player-name {
+    font-size: 0.75rem;
+    font-weight: bold;
+    text-align: center;
+    margin-top: 12px;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+}
+
+.player-info {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    width: 100%;
+}
+
+.player-position {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #fff;
+    background: #000;
+    padding: 2px 4px;
+    border-radius: 4px 4px 0 0;
+    min-width: 28px;
+    text-align: center;
+    position: relative;
+    margin-bottom: 2px;
+}
+
+.player-position::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background-color: var(--position-color, #666);
+}
+
+.player-condition {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #fff;
+    background: #000;
+    padding: 2px 4px;
+    border-radius: 4px;
+    min-width: 28px;
+    text-align: center;
+}
+
+.bench {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    min-height: 150px;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.formation-select {
+    margin-bottom: 20px;
+    min-width: 120px;
+}
+
+/* Formation positions - Vertical orientation */
+.formation-442 .position-spot.gk { left: 50%; top: 90%; }
+.formation-442 .position-spot.lb { left: 15%; top: 75%; }
+.formation-442 .position-spot.cb1 { left: 35%; top: 75%; }
+.formation-442 .position-spot.cb2 { left: 65%; top: 75%; }
+.formation-442 .position-spot.rb { left: 85%; top: 75%; }
+.formation-442 .position-spot.lm { left: 15%; top: 45%; }
+.formation-442 .position-spot.cm1 { left: 35%; top: 45%; }
+.formation-442 .position-spot.cm2 { left: 65%; top: 45%; }
+.formation-442 .position-spot.rm { left: 85%; top: 45%; }
+.formation-442 .position-spot.st1 { left: 35%; top: 15%; }
+.formation-442 .position-spot.st2 { left: 65%; top: 15%; }
+
+.formation-433 .position-spot.gk { left: 50%; top: 90%; }
+.formation-433 .position-spot.lb { left: 15%; top: 75%; }
+.formation-433 .position-spot.cb1 { left: 35%; top: 75%; }
+.formation-433 .position-spot.cb2 { left: 65%; top: 75%; }
+.formation-433 .position-spot.rb { left: 85%; top: 75%; }
+.formation-433 .position-spot.cm1 { left: 30%; top: 45%; }
+.formation-433 .position-spot.cm2 { left: 50%; top: 45%; }
+.formation-433 .position-spot.cm3 { left: 70%; top: 45%; }
+.formation-433 .position-spot.lw { left: 20%; top: 15%; }
+.formation-433 .position-spot.st { left: 50%; top: 15%; }
+.formation-433 .position-spot.rw { left: 80%; top: 15%; }
+
+.formation-352 .position-spot.gk { left: 50%; top: 90%; }
+.formation-352 .position-spot.cb1 { left: 30%; top: 75%; }
+.formation-352 .position-spot.cb2 { left: 50%; top: 75%; }
+.formation-352 .position-spot.cb3 { left: 70%; top: 75%; }
+.formation-352 .position-spot.lwb { left: 15%; top: 55%; }
+.formation-352 .position-spot.cm1 { left: 35%; top: 45%; }
+.formation-352 .position-spot.cm2 { left: 50%; top: 45%; }
+.formation-352 .position-spot.cm3 { left: 65%; top: 45%; }
+.formation-352 .position-spot.rwb { left: 85%; top: 55%; }
+.formation-352 .position-spot.st1 { left: 35%; top: 15%; }
+.formation-352 .position-spot.st2 { left: 65%; top: 15%; }
+
+@media (max-width: 768px) {
+    .position-spot {
+        width: 50px;
+        height: 50px;
+    }
+
+    .position-spot .player-card {
+        width: 100px;
+        height: 70px;
+    }
+
+    .player-card {
+        width: 100px;
+        height: 70px;
+    }
+
+    .player-name {
+        font-size: 0.7rem;
+    }
+
+    .player-position, .player-condition {
+        font-size: 0.65rem;
+        min-width: 24px;
+    }
+}
+
+@media (max-width: 480px) {
+    .position-spot {
+        width: 40px;
+        height: 40px;
+    }
+
+    .position-spot .player-card {
+        width: 90px;
+        height: 65px;
+    }
+
+    .player-card {
+        width: 90px;
+        height: 65px;
+    }
+
+    .player-name {
+        font-size: 0.65rem;
+    }
+
+    .player-photo {
+        width: 25px;
+        height: 25px;
+        top: -12px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">Lineup Simulator - {{ team.name }}</h5>
+            <select class="form-select formation-select" style="width: auto;">
+                <option value="442">4-4-2</option>
+                <option value="433">4-3-3</option>
+                <option value="352">3-5-2</option>
+            </select>
+        </div>
+        <div class="card-body d-flex flex-column align-items-center">
+            <div class="soccer-field formation-442">
+                <!-- Position spots will be added by JavaScript -->
+            </div>
+            
+            <h6 class="mt-4 align-self-start">Available Players</h6>
+            <div class="bench w-100">
+                {% for player in players %}
+                    <div class="player-card" draggable="true" data-player-id="{{ player.id }}">
+                        <img src="{% if player.user.profile.profile_picture %}{{ player.user.profile.profile_picture.url }}{% else %}{% static 'teams/images/default-profile.png' %}{% endif %}" alt="{{ player.user.get_full_name }}" class="player-photo">
+                        <div class="player-name">{{ player.user.last_name }}</div>
+                        <div class="player-info">
+                            <div class="player-position" style="--position-color: {{ player.user.profile.position.color }}">{{ player.user.profile.position.code }}</div>
+                            <div class="player-condition">{% if player.condition_symbol %}{{ player.condition_symbol }}{% else %}•{% endif %}</div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM Content Loaded');
+    const soccerField = document.querySelector('.soccer-field');
+    const formationSelect = document.querySelector('.formation-select');
+    
+    console.log('Soccer Field:', soccerField);
+    console.log('Formation Select:', formationSelect);
+    
+    // Formation definitions
+    const formations = {
+        '442': [
+            { id: 'gk', label: 'GK' },
+            { id: 'lb', label: 'LB' },
+            { id: 'cb1', label: 'CB' },
+            { id: 'cb2', label: 'CB' },
+            { id: 'rb', label: 'RB' },
+            { id: 'lm', label: 'LM' },
+            { id: 'cm1', label: 'CM' },
+            { id: 'cm2', label: 'CM' },
+            { id: 'rm', label: 'RM' },
+            { id: 'st1', label: 'ST' },
+            { id: 'st2', label: 'ST' }
+        ],
+        '433': [
+            { id: 'gk', label: 'GK' },
+            { id: 'lb', label: 'LB' },
+            { id: 'cb1', label: 'CB' },
+            { id: 'cb2', label: 'CB' },
+            { id: 'rb', label: 'RB' },
+            { id: 'cm1', label: 'CM' },
+            { id: 'cm2', label: 'CM' },
+            { id: 'cm3', label: 'CM' },
+            { id: 'lw', label: 'LW' },
+            { id: 'st', label: 'ST' },
+            { id: 'rw', label: 'RW' }
+        ],
+        '352': [
+            { id: 'gk', label: 'GK' },
+            { id: 'cb1', label: 'CB' },
+            { id: 'cb2', label: 'CB' },
+            { id: 'cb3', label: 'CB' },
+            { id: 'lwb', label: 'LWB' },
+            { id: 'cm1', label: 'CM' },
+            { id: 'cm2', label: 'CM' },
+            { id: 'cm3', label: 'CM' },
+            { id: 'rwb', label: 'RWB' },
+            { id: 'st1', label: 'ST' },
+            { id: 'st2', label: 'ST' }
+        ]
+    };
+    
+    // Create position spots for current formation
+    function createPositionSpots(formation) {
+        console.log('Creating position spots for formation:', formation);
+        soccerField.innerHTML = '';
+        formations[formation].forEach(pos => {
+            const spot = document.createElement('div');
+            spot.className = `position-spot ${pos.id}`;
+            spot.dataset.position = pos.id;
+            spot.innerHTML = `<span style="color: white;">${pos.label}</span>`;
+            soccerField.appendChild(spot);
+            console.log('Created spot:', pos.id);
+        });
+        setupDragAndDrop();
+    }
+    
+    // Handle formation change
+    formationSelect.addEventListener('change', function() {
+        console.log('Formation changed to:', this.value);
+        soccerField.className = 'soccer-field formation-' + this.value;
+        createPositionSpots(this.value);
+    });
+    
+    // Setup drag and drop
+    function setupDragAndDrop() {
+        const playerCards = document.querySelectorAll('.player-card');
+        const positionSpots = document.querySelectorAll('.position-spot');
+        const bench = document.querySelector('.bench');
+        
+        console.log('Setting up drag and drop');
+        console.log('Player cards:', playerCards.length);
+        console.log('Position spots:', positionSpots.length);
+        
+        playerCards.forEach(card => {
+            card.addEventListener('dragstart', handleDragStart);
+            card.addEventListener('dragend', handleDragEnd);
+            card.addEventListener('dblclick', handleDoubleClick);
+        });
+        
+        positionSpots.forEach(spot => {
+            spot.addEventListener('dragover', handleDragOver);
+            spot.addEventListener('dragleave', handleDragLeave);
+            spot.addEventListener('drop', handleDrop);
+        });
+    }
+    
+    function handleDragStart(e) {
+        this.classList.add('dragging');
+        e.dataTransfer.setData('text/plain', e.target.dataset.playerId);
+        console.log('Drag started:', e.target.dataset.playerId);
+    }
+    
+    function handleDragEnd(e) {
+        this.classList.remove('dragging');
+        console.log('Drag ended');
+    }
+    
+    function handleDragOver(e) {
+        e.preventDefault();
+        this.classList.add('highlight');
+    }
+    
+    function handleDragLeave(e) {
+        this.classList.remove('highlight');
+    }
+    
+    function handleDrop(e) {
+        e.preventDefault();
+        this.classList.remove('highlight');
+        
+        const playerId = e.dataTransfer.getData('text/plain');
+        const playerCard = document.querySelector(`[data-player-id="${playerId}"]`);
+        
+        console.log('Drop:', playerId);
+        console.log('Player card:', playerCard);
+        
+        // If there's already a player in this position, swap them
+        if (this.querySelector('.player-card')) {
+            const existingCard = this.querySelector('.player-card');
+            document.querySelector('.bench').appendChild(existingCard);
+            // Show the position label when player is removed
+            this.querySelector('span').style.display = '';
+            console.log('Moved existing player back to bench');
+        }
+        
+        // Move the dragged player to the position
+        this.appendChild(playerCard);
+        // Hide the position label when player is added
+        this.querySelector('span').style.display = 'none';
+        console.log('Moved player to position');
+    }
+    
+    function handleDoubleClick(e) {
+        const card = e.target.closest('.player-card');
+        if (card && !card.closest('.bench')) {
+            const positionSpot = card.parentElement;
+            // Only move to bench if the card is on the field
+            document.querySelector('.bench').appendChild(card);
+            // Show the position label when player is removed
+            positionSpot.querySelector('span').style.display = '';
+            console.log('Moved player back to bench via double-click');
+        }
+    }
+    
+    // Initialize with 4-4-2 formation
+    console.log('Initializing with 4-4-2 formation');
+    createPositionSpots('442');
+});
+</script>
+{% endblock %} 

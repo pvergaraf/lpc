@@ -22,6 +22,7 @@
         line-height: 1;
     }
     </style>
+    {% block extra_css %}{% endblock %}
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
@@ -39,6 +40,11 @@
                     {% if current_team %}
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'teams:team_members' current_team.id %}">Team Members</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'teams:lineup_simulator' team_id=current_team.id %}">
+                            <i class="fas fa-users"></i> Lineup
+                        </a>
                     </li>
                     {% endif %}
                     {% if is_team_admin and current_season %}
