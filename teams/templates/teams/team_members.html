@@ -27,14 +27,16 @@
 
 .position-badge {
     display: inline-block;
-    padding: 6px 12px;
+    padding: 4px 8px;
     background-color: #000000;
     color: white;
     font-weight: bold;
     position: relative;
-    margin: 2px;
-    width: 70px;
+    margin: 0;
+    width: 52px;
     text-align: center;
+    font-size: 14px;
+    line-height: 1.2;
 }
 
 .position-badge::after {
@@ -43,24 +45,27 @@
     bottom: 0;
     left: 0;
     width: 100%;
-    height: 4px;
+    height: 3px;
     background-color: var(--position-color);
 }
 
 .inactive-photo {
     filter: grayscale(100%);
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: 50%;
 }
 
 .condition-arrow {
-    font-size: 1.5rem;
+    font-size: 1.2rem;
     display: inline-block;
     background-color: #000000;
     color: inherit;
-    width: 30px;
-    height: 30px;
-    line-height: 30px;
+    width: 24px;
+    height: 24px;
+    line-height: 24px;
     text-align: center;
-    margin-left: 0;
+    margin-left: 4px;
 }
 
 .condition-top { color: #00ff00; }
@@ -91,18 +96,121 @@
     font-weight: 600;
     margin-bottom: 4px;
 }
+
+.player-card {
+    position: relative;
+    padding: 20px;
+    border: 1px solid #E9ECEF;
+    border-radius: 12px;
+    box-shadow: 0px 1px 3px rgba(16, 24, 40, 0.1), 0px 1px 2px rgba(16, 24, 40, 0.06);
+    background: white;
+    height: 220px;
+    overflow: hidden;
+}
+
+.player-card-photo {
+    position: absolute;
+    right: 20px;
+    top: 20px;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.player-card-content {
+    width: calc(100% - 100px);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.player-card-number {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #343A40;
+    line-height: 1;
+    margin: 0;
+}
+
+.player-card-country {
+    font-size: 1.5rem;
+    line-height: 1;
+}
+
+.player-card-position {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #343A40;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.player-card-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #101828;
+    margin: 4px 0;
+    line-height: 1.2;
+    min-height: 2.4em;
+}
+
+.player-card-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: auto;
+}
+
+.card-body .btn-success,
+.card-body .btn-primary,
+.card-body .btn-outline-primary {
+    display: inline-flex;
+    align-items: center;
+}
+
+.card-body .d-flex {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-primary {
+    background-color: #343A40;
+    border-color: #343A40;
+    color: #FFFFFF;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 8px;
+    text-align: center;
+    justify-content: center;
+}
+
+.btn-outline-primary {
+    color: #343A40;
+    border-color: #343A40;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 8px;
+    text-align: center;
+    justify-content: center;
+}
+
+.btn-success {
+    background-color: #12B76A;
+    border-color: #12B76A;
+    color: #FFFFFF;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 8px;
+    text-align: center;
+    justify-content: center;
+}
 </style>
 
 <div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>{{ team.name }} - Team Members</h2>
-        {% if user_is_admin %}
-        <div>
-            <a href="{% url 'teams:invite_member' team.id %}" class="btn btn-primary me-2">Invite Member</a>
-            <a href="{% url 'teams:add_team_member' team.id %}" class="btn btn-success">Add Member</a>
-        </div>
-        {% endif %}
-    </div>
+    <h2>{{ team.name }} - Team Members</h2>
 
     {% if pending_invitations %}
     <div class="card mb-4">
@@ -159,7 +267,10 @@
     <div class="card">
         <div class="card-header">
             <div class="d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">Active Members</h5>
+                <div>
+                    <h5 class="card-title mb-0">Active Members</h5>
+                    <small class="text-muted">{{ active_members|length }} active players</small>
+                </div>
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" id="activeFilter" {% if show_active_only %}checked{% endif %}>
                     <label class="form-check-label" for="activeFilter">Show Active Players Only</label>
@@ -167,87 +278,99 @@
             </div>
         </div>
         <div class="card-body">
-            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
-                {% for member in active_members %}
-                    <div class="col">
-                        <div class="card h-100 border-light shadow-sm">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-start mb-3">
-                                    <div class="d-flex align-items-center gap-2">
-                                        {% if member.user and member.user.profile and member.user.profile.position %}
-                                            <div class="position-badge">
+            {% if user_is_admin %}
+            <div class="mb-4">
+                <a href="{% url 'teams:invite_member' team.id %}" class="btn btn-primary">Invite Member</a>
+            </div>
+            {% endif %}
+            
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width: 80px">#</th>
+                            <th style="width: 120px">Position</th>
+                            <th>Name</th>
+                            {% if user_is_admin %}
+                            <th style="width: 80px">Actions</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for member in active_members %}
+                            <tr>
+                                <td class="fw-bold fs-5">
+                                    {% if member.user.profile and member.user.profile.player_number %}
+                                        {% if member.user and member.user.profile and member.user.profile.country %}
+                                            {{ member.user.profile.country|country_flag }}
+                                        {% endif %}
+                                        {{ member.user.profile.player_number }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if member.user and member.user.profile and member.user.profile.position %}
+                                        <div class="d-flex align-items-center">
+                                            <div class="position-badge" style="--position-color: {{ member.user.profile.position.color }}">
                                                 {{ member.user.profile.position.code }}
-                                                <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 4px; background-color: {{ member.user.profile.position.color }};"></div>
                                             </div>
-                                        {% endif %}
-                                        {% if member.user and member.user.profile and member.user.profile.condition %}
-                                            <span class="condition-arrow condition-{{ member.user.profile.condition|lower }}">
-                                                {% if member.user.profile.condition == 'TOP' %}↑{% endif %}
-                                                {% if member.user.profile.condition == 'GOOD' %}↗{% endif %}
-                                                {% if member.user.profile.condition == 'NORMAL' %}→{% endif %}
-                                                {% if member.user.profile.condition == 'BAD' %}↘{% endif %}
-                                                {% if member.user.profile.condition == 'AWFUL' %}↓{% endif %}
-                                                {% if member.user.profile.condition == 'INJURED' %}+{% endif %}
-                                            </span>
-                                        {% endif %}
-                                    </div>
-                                </div>
-
-                                <div class="d-flex align-items-center gap-3 mb-3">
-                                    <div class="flex-shrink-0">
+                                            {% if member.user and member.user.profile and member.user.profile.condition %}
+                                                <span class="condition-arrow condition-{{ member.user.profile.condition|lower }}">
+                                                    {% if member.user.profile.condition == 'TOP' %}↑{% endif %}
+                                                    {% if member.user.profile.condition == 'GOOD' %}↗{% endif %}
+                                                    {% if member.user.profile.condition == 'NORMAL' %}→{% endif %}
+                                                    {% if member.user.profile.condition == 'BAD' %}↘{% endif %}
+                                                    {% if member.user.profile.condition == 'AWFUL' %}↓{% endif %}
+                                                    {% if member.user.profile.condition == 'INJURED' %}+{% endif %}
+                                                </span>
+                                            {% endif %}
+                                        </div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
                                         {% if member.user.profile and member.user.profile.profile_picture %}
                                             <img src="{{ member.user.profile.profile_picture.url }}" 
                                                  alt="Profile Picture" 
                                                  class="rounded-circle {% if not member.user.profile.active_player %}inactive-photo{% endif %}"
-                                                 style="width: 80px; height: 80px; object-fit: cover;">
+                                                 style="width: 32px; height: 32px; object-fit: cover;">
                                         {% else %}
                                             <img src="{% static 'teams/images/default-profile.png' %}" 
                                                  alt="Default Profile Picture" 
                                                  class="rounded-circle {% if not member.user.profile.active_player %}inactive-photo{% endif %}"
-                                                 style="width: 80px; height: 80px; object-fit: cover;">
+                                                 style="width: 32px; height: 32px; object-fit: cover;">
                                         {% endif %}
-                                    </div>
-                                    <div>
-                                        <div class="d-flex align-items-center gap-2 mb-1">
-                                            <h6 class="card-title mb-0">
-                                                {% if member.user %}
-                                                    <a href="{% url 'teams:player_card' team_id=team.id user_id=member.user.id %}" class="text-decoration-none text-dark">
-                                                        {{ member.user.get_full_name }}
-                                                    </a>
-                                                {% else %}
-                                                    Pending Invitation
+                                        <div>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <a href="{% url 'teams:player_card' team_id=team.id user_id=member.user.id %}" 
+                                                   class="text-decoration-none text-dark">
+                                                    {{ member.user.get_full_name }}
+                                                </a>
+                                            </div>
+                                            <div class="d-flex gap-1">
+                                                <span class="badge {% if member.role == 'MANAGER' %}badge-primary{% else %}badge-secondary{% endif %}">
+                                                    {{ member.get_role_display }}
+                                                </span>
+                                                {% if not member.user.profile.active_player and not member.user.profile.is_official %}
+                                                    <span class="badge badge-secondary">Inactive</span>
+                                                {% elif not member.user.profile.is_official %}
+                                                    <span class="badge badge-secondary">Galleta</span>
                                                 {% endif %}
-                                            </h6>
-                                        </div>
-                                        <div class="d-flex align-items-center gap-2">
-                                            {% if member.user and member.user.profile and member.user.profile.country %}
-                                                <span>{{ member.user.profile.country|country_flag }}</span>
-                                            {% endif %}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-
-                                <div class="d-flex flex-wrap gap-2 mb-3">
-                                    <span class="badge {% if member.role == 'MANAGER' %}badge-primary{% else %}badge-secondary{% endif %}">
-                                        {{ member.get_role_display }}
-                                    </span>
-                                    {% if not member.user.profile.active_player and not member.user.profile.is_official %}
-                                        <span class="badge badge-secondary">Inactive</span>
-                                    {% elif not member.user.profile.is_official %}
-                                        <span class="badge badge-secondary">Galleta</span>
-                                    {% endif %}
-                                </div>
-
+                                </td>
                                 {% if user_is_admin and member.user != user %}
+                                <td>
                                     <a href="{% url 'teams:edit_member' team_id=team.id user_id=member.user.id %}" 
                                        class="btn btn-sm btn-outline-primary">
-                                        <i class="fas fa-edit me-1"></i> Edit
+                                        <i class="fas fa-edit"></i>
                                     </a>
+                                </td>
                                 {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                {% endfor %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
