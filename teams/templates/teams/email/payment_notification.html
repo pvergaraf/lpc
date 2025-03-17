@@ -67,7 +67,7 @@
         <p>Please verify this payment in the team's payment management section.</p>
         
         <div style="text-align: center;">
-            <a href="{% url 'teams:payment_edit' team.id payment.season.id payment.id %}" class="button">
+            <a href="{{ protocol }}://{{ domain }}{% url 'teams:payment_list' team.id payment.season.id %}" class="button">
                 Verify Payment
             </a>
         </div>

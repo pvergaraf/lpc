@@ -845,6 +845,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const table = this.closest('table');
             const currentStatus = button.textContent.trim() === 'Mark as Unpaid';
             
+            // Debug logging
+            console.log('Payment Toggle Debug:');
+            console.log('Current Status (from button):', currentStatus);
+            console.log('Payment ID:', paymentId);
+            console.log('Is Admin:', isAdmin);
+            
             // Get team and season IDs from table data attributes
             const teamId = table.dataset.teamId;
             const seasonId = table.dataset.seasonId;
@@ -853,38 +859,56 @@ document.addEventListener('DOMContentLoaded', function() {
             const url = `/team/${teamId}/season/${seasonId}/payments/${paymentId}/player/${paymentId}/toggle/`;
             const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
+            // Log request details
+            console.log('Request Details:');
+            console.log('URL:', url);
+            console.log('Payload:', {
+                is_paid: !currentStatus,
+                send_email: !currentStatus
+            });
+
             fetch(url, {
                 method: 'POST',
                 headers: {
                     'X-CSRFToken': csrfToken,
-                    'X-Admin-Action': 'false', // Always set to false to prevent verification
-                    'X-Current-Status': currentStatus ? 'paid' : 'unpaid'
+                    'X-Admin-Action': 'false',
+                    'Content-Type': 'application/json'
                 },
-                credentials: 'same-origin'
+                body: JSON.stringify({
+                    is_paid: !currentStatus,
+                    send_email: !currentStatus
+                })
             })
             .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
+                // Log response details
+                console.log('Response Status:', response.status);
+                console.log('Response OK:', response.ok);
+                
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    throw new Error('Server error');
                 }
-                return response.json();
             })
             .then(data => {
+                // Log parsed response data
+                console.log('Response Data:', data);
+                
                 if (data.status === 'success') {
-                    // Show success message
-                    const message = data.is_paid ? 'Payment marked as paid.' : 'Payment marked as unpaid.';
-                    showAlert('success', message);
-                    
-                    // Reload the page after a short delay to show the alert
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 1000);
+                    showAlert('success', currentStatus ? 'Payment marked as unpaid' : 'Payment marked as paid');
                 } else {
-                    throw new Error(data.message || 'Failed to update payment status');
+                    showAlert('warning', data.message || 'Failed to update payment status');
                 }
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
             })
             .catch(error => {
-                console.error('Error:', error);
-                showAlert('danger', 'An error occurred while updating the payment status.');
+                console.error('Fetch Error:', error);
+                showAlert('warning', 'There was an issue updating the payment status. The page will refresh to show the current status.');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
             });
         });
     });

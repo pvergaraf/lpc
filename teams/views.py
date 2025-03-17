@@ -1813,8 +1813,16 @@ def toggle_player_payment(request, team_id, season_id, payment_id, player_paymen
     if request.method == 'POST':
         team = get_object_or_404(Team, id=team_id)
         player_payment = get_object_or_404(PlayerPayment, id=player_payment_id)
+        
+        # Parse JSON data from request body
+        try:
+            data = json.loads(request.body)
+            is_paid = data.get('is_paid', False)
+            send_email = data.get('send_email', False)
+        except json.JSONDecodeError:
+            return JsonResponse({'status': 'error', 'message': 'Invalid JSON data'}, status=400)
+        
         is_admin = request.headers.get('X-Admin-Action') == 'true'
-        current_status = request.headers.get('X-Current-Status')
         
         # Check permissions
         if is_admin and not (request.user.is_superuser or TeamMember.objects.filter(team=team, user=request.user, is_team_admin=True).exists()):
@@ -1827,7 +1835,7 @@ def toggle_player_payment(request, team_id, season_id, payment_id, player_paymen
 
         # Handle admin actions
         if is_admin:
-            if current_status == 'paid':
+            if not is_paid:
                 # Admin unmarking a payment (from paid to unpaid)
                 player_payment.mark_as_unpaid(is_admin=True)
             elif player_payment.is_paid and not player_payment.admin_verified:
@@ -1844,55 +1852,56 @@ def toggle_player_payment(request, team_id, season_id, payment_id, player_paymen
             if player_payment.admin_verified:
                 return HttpResponseForbidden("This payment has been verified by an admin and cannot be modified.")
             
-            if current_status == 'paid':
+            if not is_paid:
                 # Player canceling their payment notification
                 player_payment.mark_as_unpaid()
             else:
                 # Player marking as paid (pending approval)
                 player_payment.mark_as_paid()
                 
-                # Send email notification to team admins
-                admin_emails = [
-                    member.user.email 
-                    for member in TeamMember.objects.filter(
-                        team=team, 
-                        is_team_admin=True, 
-                        is_active=True
-                    ).select_related('user')
-                ]
-                
-                if admin_emails:
-                    subject = f'Payment Marked as Paid - {team.name}'
-                    context = {
-                        'team': team,
-                        'player': request.user,
-                        'payment': player_payment.payment,
-                        'amount': player_payment.amount,
-                    }
-                    html_message = render_to_string('teams/email/payment_notification.html', context)
-                    plain_message = f'{request.user.get_full_name()} marked payment "{player_payment.payment.name}" as paid. Please verify.'
+                # Send email notification to team admins only if send_email is True
+                if send_email:
+                    admin_emails = [
+                        member.user.email 
+                        for member in TeamMember.objects.filter(
+                            team=team, 
+                            is_team_admin=True, 
+                            is_active=True
+                        ).select_related('user')
+                    ]
                     
-                    try:
-                        send_mail(
-                            subject=subject,
-                            message=plain_message,
-                            from_email=settings.DEFAULT_FROM_EMAIL,
-                            recipient_list=admin_emails,
-                            html_message=html_message,
-                            fail_silently=False,
-                        )
-                    except Exception as e:
-                        log_error(
-                            request=request,
-                            error_message=f"Failed to send payment notification email: {str(e)}",
-                            error_type="EmailError",
-                            extra_context={
-                                "team_id": team.id,
-                                "payment_id": payment_id,
-                                "player_payment_id": player_payment_id,
-                                "error": str(e)
-                            }
-                        )
+                    if admin_emails:
+                        subject = f'Payment Marked as Paid - {team.name}'
+                        context = {
+                            'team': team,
+                            'player': request.user,
+                            'payment': player_payment.payment,
+                            'amount': player_payment.amount,
+                        }
+                        html_message = render_to_string('teams/email/payment_notification.html', context)
+                        plain_message = f'{request.user.get_full_name()} marked payment "{player_payment.payment.name}" as paid. Please verify.'
+                        
+                        try:
+                            send_mail(
+                                subject=subject,
+                                message=plain_message,
+                                from_email=settings.DEFAULT_FROM_EMAIL,
+                                recipient_list=admin_emails,
+                                html_message=html_message,
+                                fail_silently=False,
+                            )
+                        except Exception as e:
+                            log_error(
+                                request=request,
+                                error_message=f"Failed to send payment notification email: {str(e)}",
+                                error_type="EmailError",
+                                extra_context={
+                                    "team_id": team.id,
+                                    "payment_id": payment_id,
+                                    "player_payment_id": player_payment_id,
+                                    "error": str(e)
+                                }
+                            )
         
         return JsonResponse({
             'status': 'success',
