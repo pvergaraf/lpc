@@ -6,6 +6,25 @@
 
 {% block content %}
 <style>
+.badge {
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 10px;
+    line-height: 1.21em;
+    padding: 4px 8px;
+    border-radius: 12px;
+}
+
+.badge-primary {
+    background-color: #343A40;
+    color: #FFFFFF;
+}
+
+.badge-secondary {
+    background-color: #ADB5BD;
+    color: #343A40;
+}
+
 .position-badge {
     display: inline-block;
     padding: 6px 12px;
@@ -14,94 +33,81 @@
     font-weight: bold;
     position: relative;
     margin: 2px;
+    width: 70px;
+    text-align: center;
 }
-.position-line {
+
+.position-badge::after {
+    content: '';
     position: absolute;
     bottom: 0;
     left: 0;
     width: 100%;
     height: 4px;
+    background-color: var(--position-color);
 }
-.fifa-card {
-    background: linear-gradient(135deg, #FFD700 0%, #FDB931 100%);
-    border-radius: 15px;
-    padding: 20px;
-    position: relative;
-    max-width: 300px;
-    margin: 0 auto;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+
+.inactive-photo {
+    filter: grayscale(100%);
 }
-.fifa-card-number {
-    font-size: 3.5rem;
-    font-weight: bold;
-    color: #333;
-    margin-bottom: 10px;
-    text-align: left;
-}
-.fifa-card-position {
-    font-size: 1.8rem;
-    font-weight: bold;
-    color: #333;
-    margin-bottom: 20px;
-    text-align: left;
-}
-.fifa-card-image {
-    width: 120px;
-    height: 120px;
-    border-radius: 50%;
-    object-fit: cover;
-    position: absolute;
-    right: 20px;
-    top: 20px;
-}
-.fifa-card-name {
+
+.condition-arrow {
     font-size: 1.5rem;
-    font-weight: bold;
-    color: #333;
-    margin-top: 20px;
-    text-transform: uppercase;
-    border-top: 2px solid rgba(0,0,0,0.1);
-    padding-top: 10px;
+    display: inline-block;
+    background-color: #000000;
+    color: inherit;
+    width: 30px;
+    height: 30px;
+    line-height: 30px;
+    text-align: center;
+    margin-left: 0;
 }
-.fifa-card-country {
-    font-size: 2rem;
-    position: absolute;
-    top: 80px;
-    left: 20px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
+
+.condition-top { color: #00ff00; }
+.condition-good { color: #90ee90; }
+.condition-normal { color: #ffd700; }
+.condition-bad { color: #ffa500; }
+.condition-awful { color: #ff0000; }
+.condition-injured { color: #ff0000; }
+
+.card {
+    border: 1px solid #E9ECEF;
+    border-radius: 12px;
+    box-shadow: 0px 1px 3px rgba(16, 24, 40, 0.1), 0px 1px 2px rgba(16, 24, 40, 0.06);
 }
-.fifa-card-team-logo {
-    width: 32px;
-    height: 32px;
-    object-fit: cover;
-    border-radius: 50%;
+
+.card-header {
+    background: none;
+    border-bottom: 1px solid #E9ECEF;
+    padding: 24px;
 }
-.fifa-card-details {
-    margin-top: 10px;
-    color: #333;
+
+.card-body {
+    padding: 24px;
+}
+
+.card-title {
+    color: #101828;
+    font-weight: 600;
+    margin-bottom: 4px;
 }
 </style>
 
 <div class="container mt-4">
-    <h2>{{ team.name }} - Team Members</h2>
-    
-    {% if user_is_admin %}
-    <div class="mb-4">
-        <a href="{% url 'teams:invite_member' team.id %}" class="btn btn-primary me-2">
-            <i class="fas fa-user-plus"></i> Invite Member
-        </a>
-        <a href="{% url 'teams:add_team_member' team.id %}" class="btn btn-primary">
-            <i class="fas fa-user-plus"></i> Add Member
-        </a>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{{ team.name }} - Team Members</h2>
+        {% if user_is_admin %}
+        <div>
+            <a href="{% url 'teams:invite_member' team.id %}" class="btn btn-primary me-2">Invite Member</a>
+            <a href="{% url 'teams:add_team_member' team.id %}" class="btn btn-success">Add Member</a>
+        </div>
+        {% endif %}
     </div>
-    {% endif %}
 
     {% if pending_invitations %}
     <div class="card mb-4">
         <div class="card-header">
-            <h4>Pending Invitations</h4>
+            <h5 class="card-title mb-0">Pending Invitations</h5>
         </div>
         <div class="card-body">
             <div class="table-responsive">
@@ -119,13 +125,13 @@
                         <tr>
                             <td>{{ member.email }}</td>
                             <td>
-                                <span class="badge {% if member.role == 'MANAGER' %}bg-primary{% else %}bg-secondary{% endif %}">
+                                <span class="badge {% if member.role == 'MANAGER' %}badge-primary{% else %}badge-secondary{% endif %}">
                                     {{ member.get_role_display }}
                                 </span>
                             </td>
                             <td>
                                 {% if member.is_team_admin %}
-                                    <span class="badge bg-info">Yes</span>
+                                    <span class="badge badge-primary">Yes</span>
                                 {% else %}
                                     No
                                 {% endif %}
@@ -153,7 +159,7 @@
     <div class="card">
         <div class="card-header">
             <div class="d-flex justify-content-between align-items-center">
-                <h4>Active Members</h4>
+                <h5 class="card-title mb-0">Active Members</h5>
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" id="activeFilter" {% if show_active_only %}checked{% endif %}>
                     <label class="form-check-label" for="activeFilter">Show Active Players Only</label>
@@ -161,146 +167,95 @@
             </div>
         </div>
         <div class="card-body">
-            <div class="table-responsive">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Player #</th>
-                            <th>Position</th>
-                            <th>Name</th>
-                            <th>Country</th>
-                            <th>Role</th>
-                            {% if user_is_admin %}
-                                <th>Actions</th>
-                            {% endif %}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for member in active_members %}
-                        <tr>
-                            <td>
-                                {% if member.user.profile and member.user.profile.player_number %}
-                                    {{ member.user.profile.player_number }}
-                                {% else %}
-                                    -
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if member.user.profile and member.user.profile.position %}
-                                    <div class="position-badge">
-                                        {{ member.user.profile.position.code }}
-                                        <div class="position-line" style="background-color: {{ member.user.profile.position.color }};"></div>
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                {% for member in active_members %}
+                    <div class="col">
+                        <div class="card h-100 border-light shadow-sm">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <div class="d-flex align-items-center gap-2">
+                                        {% if member.user and member.user.profile and member.user.profile.position %}
+                                            <div class="position-badge">
+                                                {{ member.user.profile.position.code }}
+                                                <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 4px; background-color: {{ member.user.profile.position.color }};"></div>
+                                            </div>
+                                        {% endif %}
+                                        {% if member.user and member.user.profile and member.user.profile.condition %}
+                                            <span class="condition-arrow condition-{{ member.user.profile.condition|lower }}">
+                                                {% if member.user.profile.condition == 'TOP' %}↑{% endif %}
+                                                {% if member.user.profile.condition == 'GOOD' %}↗{% endif %}
+                                                {% if member.user.profile.condition == 'NORMAL' %}→{% endif %}
+                                                {% if member.user.profile.condition == 'BAD' %}↘{% endif %}
+                                                {% if member.user.profile.condition == 'AWFUL' %}↓{% endif %}
+                                                {% if member.user.profile.condition == 'INJURED' %}+{% endif %}
+                                            </span>
+                                        {% endif %}
                                     </div>
-                                {% else %}
-                                    -
-                                {% endif %}
-                            </td>
-                            <td>
-                                <a href="#" class="show-fifa-card" data-bs-toggle="modal" data-bs-target="#playerModal{{ member.user.id }}">
-                                    {{ member.user.get_full_name }}
-                                </a>
-                            </td>
-                            <td>
-                                {% if member.user.profile and member.user.profile.country %}
-                                    {{ member.user.profile.country|country_flag }}
-                                {% else %}
-                                    -
-                                {% endif %}
-                            </td>
-                            <td>
-                                <span class="badge {% if member.role == 'MANAGER' %}bg-primary{% else %}bg-secondary{% endif %}">
-                                    {{ member.get_role_display }}
-                                </span>
-                                {% if member.is_team_admin %}
-                                    <span class="badge bg-info">Admin</span>
-                                {% endif %}
-                            </td>
-                            {% if user_is_admin and member.user != user %}
-                            <td>
-                                <div class="btn-group">
-                                    <a href="{% url 'teams:edit_member' team_id=team.id user_id=member.user.id %}" class="btn btn-sm btn-outline-primary">Edit</a>
-                                    <form method="post" action="{% url 'teams:toggle_team_admin' team.id member.id %}" class="d-inline ms-1">
-                                        {% csrf_token %}
-                                        <button type="submit" class="btn btn-sm btn-outline-info">
-                                            {% if member.is_team_admin %}Remove Admin{% else %}Make Admin{% endif %}
-                                        </button>
-                                    </form>
-                                    <form method="post" action="{% url 'teams:remove_member' team.id member.id %}" class="d-inline ms-1">
-                                        {% csrf_token %}
-                                        <button type="submit" class="btn btn-sm btn-outline-danger" 
-                                                onclick="return confirm('Are you sure you want to remove this member?')">
-                                            Remove
-                                        </button>
-                                    </form>
                                 </div>
-                            </td>
-                            {% endif %}
-                        </tr>
-                        
-                        <!-- FIFA Card Modal for each player -->
-                        <div class="modal fade" id="playerModal{{ member.user.id }}" tabindex="-1" aria-hidden="true">
-                            <div class="modal-dialog modal-dialog-centered">
-                                <div class="modal-content">
-                                    <div class="modal-header border-0">
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+
+                                <div class="d-flex align-items-center gap-3 mb-3">
+                                    <div class="flex-shrink-0">
+                                        {% if member.user.profile and member.user.profile.profile_picture %}
+                                            <img src="{{ member.user.profile.profile_picture.url }}" 
+                                                 alt="Profile Picture" 
+                                                 class="rounded-circle {% if not member.user.profile.active_player %}inactive-photo{% endif %}"
+                                                 style="width: 80px; height: 80px; object-fit: cover;">
+                                        {% else %}
+                                            <img src="{% static 'teams/images/default-profile.png' %}" 
+                                                 alt="Default Profile Picture" 
+                                                 class="rounded-circle {% if not member.user.profile.active_player %}inactive-photo{% endif %}"
+                                                 style="width: 80px; height: 80px; object-fit: cover;">
+                                        {% endif %}
                                     </div>
-                                    <div class="modal-body">
-                                        <div class="fifa-card">
-                                            {% if member.user.profile and member.user.profile.player_number %}
-                                                <div class="fifa-card-number">{{ member.user.profile.player_number }}</div>
-                                            {% endif %}
-                                            {% if member.user.profile and member.user.profile.position %}
-                                                <div class="fifa-card-position">{{ member.user.profile.position.code }}</div>
-                                            {% endif %}
-                                            {% if member.user.profile and member.user.profile.country %}
-                                                <div class="fifa-card-country">
-                                                    {{ member.user.profile.country|country_flag }}
-                                                    {% if team.team_photo %}
-                                                        <img src="{{ team.team_photo.url }}" alt="{{ team.name }}" class="fifa-card-team-logo">
-                                                    {% else %}
-                                                        <img src="{{ MEDIA_URL }}team_photos/default.png" alt="Default team photo" class="fifa-card-team-logo">
-                                                    {% endif %}
-                                                </div>
-                                            {% endif %}
-                                            {% if member.user.profile and member.user.profile.profile_picture %}
-                                                <img src="{{ member.user.profile.profile_picture.url }}" alt="Profile Picture" class="fifa-card-image">
-                                            {% else %}
-                                                <img src="{% static 'teams/images/default-profile.png' %}" alt="Default Profile Picture" class="fifa-card-image">
-                                            {% endif %}
-                                            <div class="fifa-card-name">
-                                                {% with name_parts=member.user.get_full_name.split %} 
-                                                    {{ name_parts.0.0 }}. {{ name_parts|last }}
-                                                {% endwith %}
-                                            </div>
-                                            <div class="fifa-card-details">
-                                                {% if member.user.profile and member.user.profile.rut %}
-                                                    <div>RUT: {{ member.user.profile.rut }}</div>
+                                    <div>
+                                        <div class="d-flex align-items-center gap-2 mb-1">
+                                            <h6 class="card-title mb-0">
+                                                {% if member.user %}
+                                                    <a href="{% url 'teams:player_card' team_id=team.id user_id=member.user.id %}" class="text-decoration-none text-dark">
+                                                        {{ member.user.get_full_name }}
+                                                    </a>
+                                                {% else %}
+                                                    Pending Invitation
                                                 {% endif %}
-                                                <div>{{ member.user.email }}</div>
-                                                {% if member.user.profile and member.user.profile.level %}
-                                                    <div>Level: {{ member.user.profile.level }} {% if member.user.profile.date_of_birth %}• {{ member.user.profile.date_of_birth|calculate_age }}{% endif %}</div>
-                                                {% endif %}
-                                                {% if member.user.profile and member.user.profile.description %}
-                                                    <div class="mt-1 text-muted fst-italic">"{{ member.user.profile.description }}"</div>
-                                                {% endif %}
-                                            </div>
+                                            </h6>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-2">
+                                            {% if member.user and member.user.profile and member.user.profile.country %}
+                                                <span>{{ member.user.profile.country|country_flag }}</span>
+                                            {% endif %}
                                         </div>
                                     </div>
                                 </div>
+
+                                <div class="d-flex flex-wrap gap-2 mb-3">
+                                    <span class="badge {% if member.role == 'MANAGER' %}badge-primary{% else %}badge-secondary{% endif %}">
+                                        {{ member.get_role_display }}
+                                    </span>
+                                    {% if not member.user.profile.active_player and not member.user.profile.is_official %}
+                                        <span class="badge badge-secondary">Inactive</span>
+                                    {% elif not member.user.profile.is_official %}
+                                        <span class="badge badge-secondary">Galleta</span>
+                                    {% endif %}
+                                </div>
+
+                                {% if user_is_admin and member.user != user %}
+                                    <a href="{% url 'teams:edit_member' team_id=team.id user_id=member.user.id %}" 
+                                       class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-edit me-1"></i> Edit
+                                    </a>
+                                {% endif %}
                             </div>
                         </div>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                    </div>
+                {% endfor %}
             </div>
         </div>
     </div>
-</div>
 
-<div class="mt-3">
-    <a href="{% url 'teams:dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
+    <div class="mt-3">
+        <a href="{% url 'teams:dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
+    </div>
 </div>
-{% endblock %}
 
 {% block extra_js %}
 <script>
@@ -314,4 +269,5 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+{% endblock %}
 {% endblock %} 

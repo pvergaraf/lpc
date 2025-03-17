@@ -16,41 +16,35 @@
     </div>
     <div class="card-body">
         {% if all_payments %}
-            <div class="table-responsive">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Payment</th>
-                            <th>Amount</th>
-                            <th>Due Date</th>
-                            <th>Status</th>
-                            <th>Team %</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for payment in all_payments %}
-                            <tr>
-                                <td>{{ payment.payment.name }}</td>
-                                <td>${{ payment.amount|currency_no_decimals }}</td>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        {% if payment.payment.due_date|date:"Y-m-d" < today %}
-                                            <span class="badge bg-danger me-2">Overdue</span>
-                                        {% endif %}
-                                        {{ payment.payment.due_date|date:"M d, Y" }}
+            <div class="row row-cols-1 row-cols-md-2 g-4">
+                {% for payment in all_payments %}
+                    <div class="col">
+                        <div class="card h-100 border-light shadow-sm">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <div>
+                                        <h5 class="card-title mb-1">{{ payment.payment.name }}</h5>
+                                        <h6 class="card-subtitle text-muted">${{ payment.amount|currency_no_decimals }}</h6>
                                     </div>
-                                </td>
-                                <td>
-                                    {% if payment.admin_verified %}
-                                        <span class="badge bg-success">Paid & Verified</span>
-                                    {% elif payment.is_paid %}
-                                        <span class="badge bg-info">Pending Approval</span>
-                                    {% else %}
-                                        <span class="badge bg-warning text-dark">Not Paid</span>
-                                    {% endif %}
-                                </td>
-                                <td>
+                                    <div class="text-end">
+                                        <div class="d-flex align-items-center mb-1">
+                                            {% if payment.payment.due_date|date:"Y-m-d" < today %}
+                                                <span class="badge bg-danger me-2">Overdue</span>
+                                            {% endif %}
+                                            <small class="text-muted">{{ payment.payment.due_date|date:"M d, Y" }}</small>
+                                        </div>
+                                        {% if payment.admin_verified %}
+                                            <span class="badge bg-success">Paid & Verified</span>
+                                        {% elif payment.is_paid %}
+                                            <span class="badge bg-info">Pending Approval</span>
+                                        {% else %}
+                                            <span class="badge bg-warning text-dark">Not Paid</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label small text-muted mb-1">Team Payment Progress</label>
                                     <div class="d-flex align-items-center">
                                         <div class="progress flex-grow-1" style="height: 8px;">
                                             <div class="progress-bar {% if payment.verification_percentage >= 75 %}bg-success{% elif payment.verification_percentage >= 50 %}bg-info{% elif payment.verification_percentage >= 25 %}bg-warning{% else %}bg-danger{% endif %}" 
@@ -63,30 +57,33 @@
                                         </div>
                                         <small class="text-muted ms-2">{{ payment.verification_percentage|floatformat:0 }}%</small>
                                     </div>
-                                </td>
-                                <td>
-                                    {% if not payment.admin_verified %}
-                                        <div class="d-flex flex-column flex-sm-row gap-2">
-                                            {% if not payment.is_paid %}
-                                                <a href="https://slach.cl/lpcfc/{{ payment.amount|stringformat:'d' }}" 
-                                                   target="_blank" 
-                                                   class="btn btn-sm btn-primary">
-                                                    Pay Now
-                                                </a>
+                                </div>
+
+                                {% if not payment.admin_verified %}
+                                    <div class="d-flex gap-2">
+                                        {% if not payment.is_paid %}
+                                            <a href="https://slach.cl/lpcfc/{{ payment.amount|stringformat:'d' }}" 
+                                               target="_blank" 
+                                               class="btn btn-primary btn-sm">
+                                                <i class="fas fa-credit-card me-1"></i> Pay Now
+                                            </a>
+                                        {% endif %}
+                                        <button type="button" 
+                                                class="btn btn-sm {% if payment.is_paid %}btn-outline-success{% else %}btn-success{% endif %} toggle-payment-btn"
+                                                data-payment-id="{{ payment.id }}"
+                                                data-is-admin="{% if is_team_admin %}true{% else %}false{% endif %}">
+                                            {% if payment.is_paid %}
+                                                <i class="fas fa-times me-1"></i> Mark as Unpaid
+                                            {% else %}
+                                                <i class="fas fa-check me-1"></i> Mark as Paid
                                             {% endif %}
-                                            <button type="button" 
-                                                    class="btn btn-sm {% if payment.is_paid %}btn-outline-success{% else %}btn-success{% endif %} toggle-payment-btn"
-                                                    data-payment-id="{{ payment.id }}"
-                                                    data-is-admin="{% if is_team_admin %}true{% else %}false{% endif %}">
-                                                {% if payment.is_paid %}Mark as Unpaid{% else %}Mark as Paid{% endif %}
-                                            </button>
-                                        </div>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                                        </button>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
             </div>
         {% else %}
             <div class="alert alert-info">
