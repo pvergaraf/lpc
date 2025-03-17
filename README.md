@@ -6,6 +6,9 @@ A Django web application for managing soccer teams and matches.
 
 - Team management
 - Player profiles with FIFA-style cards
+  - Player numbers with country flags
+  - Position badges with color indicators
+  - Condition status tracking
 - Season and match scheduling
 - Email notifications
 - AWS S3 for static and media files
@@ -22,6 +25,10 @@ A Django web application for managing soccer teams and matches.
   - Defense: Lime Green
   - Midfield: Royal Blue
   - Attack: Orange Red
+- Modern UI components:
+  - Responsive button layouts
+  - Clean card designs
+  - Consistent spacing and alignment
 - AWS CloudWatch integration for monitoring
 - Real-time performance metrics
 - Mobile-responsive design

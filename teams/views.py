@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.contrib.auth import login
+from django.contrib.auth import login as auth_login
 from django.contrib.auth import get_user_model
 from django.contrib import messages
 from django.core.mail import send_mail
@@ -28,6 +28,7 @@ import json
 from django.core.exceptions import PermissionDenied
 from django.utils.html import strip_tags
 from django.contrib.sites.shortcuts import get_current_site
+from django.contrib.auth import views as auth_views
 
 User = get_user_model()
 
@@ -1055,7 +1056,7 @@ def register(request):
                     request.session.pop(f'invite_{token}_is_official', None)
 
                     # Log in the user
-                    login(request, user)
+                    auth_login(request, user)
                     messages.success(request, f'Registration successful! You are now a member of {team_member.team.name}.')
                     return redirect('teams:dashboard')
 
@@ -2662,4 +2663,12 @@ def send_payment_reminder(request, team_id, season_id, payment_id):
         )
         messages.error(request, "There was an error sending the payment reminders.")
         return redirect('teams:payment_list', team_id=team_id, season_id=season_id)
+
+class CustomLoginView(auth_views.LoginView):
+    def form_valid(self, form):
+        remember_me = form.cleaned_data.get('remember_me', False)
+        if not remember_me:
+            # Session expires when browser closes
+            self.request.session.set_expiry(0)
+        return super().form_valid(form)
 

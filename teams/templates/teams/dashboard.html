@@ -541,6 +541,37 @@ body {
     text-align: center;
     justify-content: center;
 }
+
+/* Button group styling */
+.btn-group-header {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* Responsive adjustments */
+@media (max-width: 576px) {
+    .card-header {
+        flex-direction: column;
+        gap: 12px;
+        align-items: stretch !important;
+    }
+
+    .card-header .btn-group-header {
+        justify-content: stretch;
+    }
+
+    .card-header .btn {
+        flex: 1;
+        white-space: nowrap;
+    }
+}
+
+/* Ensure consistent button sizing */
+.btn-sm {
+    min-width: auto;
+    padding: 8px 16px;
+}
 </style>
 
 <div class="container mt-4">
@@ -703,10 +734,10 @@ body {
                             <h5 class="card-title mb-0 d-flex align-items-center">
                                 Current Season: {{ current_season.name }}
                             </h5>
-                            <div>
+                            <div class="btn-group-header">
                                 <a href="{% url 'teams:season_stats' team_id=current_team.id season_id=current_season.id %}" class="btn btn-outline-primary btn-sm">Season Stats</a>
                                 {% if is_team_admin %}
-                                    <a href="{% url 'teams:season_list' current_team.id %}" class="btn btn-primary btn-sm ms-2">Manage Seasons</a>
+                                    <a href="{% url 'teams:season_list' current_team.id %}" class="btn btn-primary btn-sm">Manage Seasons</a>
                                 {% endif %}
                             </div>
                         {% else %}
@@ -714,7 +745,9 @@ body {
                                 No Active Season
                             </h5>
                             {% if is_team_admin %}
-                                <a href="{% url 'teams:season_list' current_team.id %}" class="btn btn-primary btn-sm">Manage Seasons</a>
+                                <div class="btn-group-header">
+                                    <a href="{% url 'teams:season_list' current_team.id %}" class="btn btn-primary btn-sm">Manage Seasons</a>
+                                </div>
                             {% endif %}
                         {% endif %}
                     </div>
@@ -727,10 +760,10 @@ body {
                             <h5 class="card-title mb-0 d-flex align-items-center">
                                 Upcoming Matches
                             </h5>
-                            <div>
+                            <div class="btn-group-header">
                                 <a href="{% url 'teams:season_detail' team_id=current_team.id season_id=current_season.id %}" class="btn btn-outline-primary btn-sm">All Matches</a>
                                 {% if is_team_admin %}
-                                    <a href="{% url 'teams:match_create' team_id=current_team.id season_id=current_season.id %}" class="btn btn-primary btn-sm ms-2">Add Match</a>
+                                    <a href="{% url 'teams:match_create' team_id=current_team.id season_id=current_season.id %}" class="btn btn-primary btn-sm">Add Match</a>
                                 {% endif %}
                             </div>
                         </div>

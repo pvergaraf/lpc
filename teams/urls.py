@@ -21,7 +21,7 @@ log_error(
 
 urlpatterns = [
     path('', views.dashboard, name='dashboard'),
-    path('login/', auth_views.LoginView.as_view(
+    path('login/', views.CustomLoginView.as_view(
         template_name='teams/login.html',
         authentication_form=EmailAuthenticationForm
     ), name='login'),
