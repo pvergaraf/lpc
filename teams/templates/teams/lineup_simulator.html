@@ -189,7 +189,16 @@
     padding: 2px 4px;
     border-radius: 4px;
     min-width: 28px;
-    text-align: center;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.player-condition svg {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
 }
 
 .bench {
@@ -333,7 +342,13 @@
                         <div class="player-name">{{ player.user.last_name }}</div>
                         <div class="player-info">
                             <div class="player-position" style="--position-color: {{ player.user.profile.position.color }}">{{ player.user.profile.position.code }}</div>
-                            <div class="player-condition">{% if player.condition_symbol %}{{ player.condition_symbol }}{% else %}•{% endif %}</div>
+                            <div class="player-condition">
+                                {% if player.condition_symbol %}
+                                    <svg><use href="{% static 'teams/images/condition-icons.svg' %}#condition-{{ player.user.profile.condition|lower }}"/></svg>
+                                {% else %}
+                                    •
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
                 {% endfor %}

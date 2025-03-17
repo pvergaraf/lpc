@@ -2475,18 +2475,6 @@ def lineup_simulator(request, team_id):
         'position_order',
         'user__profile__player_number'
     )
-
-    # Add condition symbol for each player
-    for player in players:
-        condition = player.user.profile.condition
-        player.condition_symbol = {
-            'TOP': '↑',
-            'GOOD': '↗',
-            'NORMAL': '→',
-            'BAD': '↘',
-            'AWFUL': '↓',
-            'INJURED': '+'
-        }.get(condition, '•')
     
     context = {
         'team': team,
@@ -2666,9 +2654,77 @@ def send_payment_reminder(request, team_id, season_id, payment_id):
 
 class CustomLoginView(auth_views.LoginView):
     def form_valid(self, form):
-        remember_me = form.cleaned_data.get('remember_me', False)
-        if not remember_me:
-            # Session expires when browser closes
-            self.request.session.set_expiry(0)
-        return super().form_valid(form)
+        """Security check complete. Log the user in."""
+        print("\n=== LOGIN PROCESS STARTED ===")
+        print(f"User attempting login: {form.cleaned_data.get('username')}")
+        print(f"Remember me checked: {form.cleaned_data.get('remember_me', False)}")
+        print(f"Session ID before login: {self.request.session.session_key}")
+        
+        try:
+            remember_me = form.cleaned_data.get('remember_me', False)
+            print(f"\nCalling parent's form_valid...")
+            response = super().form_valid(form)
+            print(f"Parent form_valid completed successfully")
+            print(f"User authenticated: {self.request.user.is_authenticated}")
+            print(f"Session ID after auth: {self.request.session.session_key}")
+            
+            try:
+                print(f"\nSetting session expiry...")
+                if not remember_me:
+                    print("Remember me is False - Session will expire when browser closes")
+                    self.request.session.set_expiry(0)
+                else:
+                    print("Remember me is True - Session will expire in 24 hours")
+                    self.request.session.set_expiry(24 * 60 * 60)
+                
+                print(f"Final session state:")
+                print(f"- Session expiry age: {self.request.session.get_expiry_age()}")
+                print(f"- Expires at browser close: {self.request.session.get_expire_at_browser_close()}")
+                print(f"- Session modified: {self.request.session.modified}")
+                print("=== LOGIN PROCESS COMPLETED ===\n")
+                
+            except Exception as session_error:
+                print(f"\n!!! ERROR SETTING SESSION EXPIRY !!!")
+                print(f"Error type: {type(session_error).__name__}")
+                print(f"Error message: {str(session_error)}")
+                print(f"Session state when error occurred:")
+                print(f"- Session exists: {hasattr(self.request, 'session')}")
+                print(f"- Session ID: {self.request.session.session_key}")
+                print(f"- Session modified: {self.request.session.modified}")
+                raise
+            
+            return response
+            
+        except Exception as e:
+            print(f"\n!!! ERROR IN LOGIN PROCESS !!!")
+            print(f"Error type: {type(e).__name__}")
+            print(f"Error message: {str(e)}")
+            print(f"Current session state:")
+            print(f"- Session exists: {hasattr(self.request, 'session')}")
+            if hasattr(self.request, 'session'):
+                print(f"- Session ID: {self.request.session.session_key}")
+                print(f"- Session modified: {self.request.session.modified}")
+            print("=== LOGIN PROCESS FAILED ===\n")
+            raise
+
+    def form_invalid(self, form):
+        """Log failed login attempts and return the invalid form."""
+        print("\n=== LOGIN VALIDATION FAILED ===")
+        attempted_username = self.request.POST.get('username', '')
+        print(f"Attempted login for user: {attempted_username}")
+        print(f"Form errors: {dict(form.errors)}")
+        print(f"Error codes: {[error.code for error in form.errors.get('__all__', [])]}")
+        print("=== END OF FAILED LOGIN ===\n")
+        
+        log_error(
+            self.request,
+            error_message="Login attempt failed",
+            error_type="AuthenticationError",
+            extra_context={
+                "errors": dict(form.errors),
+                "attempted_username": attempted_username,
+                "error_codes": [error.code for error in form.errors.get('__all__', [])]
+            }
+        )
+        return super().form_invalid(form)
 

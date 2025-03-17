@@ -151,15 +151,22 @@
 
 .condition-arrow {
     font-size: 1.5rem;
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     background-color: #000000;
-    color: inherit;
     width: 30px;
     height: 30px;
     line-height: 30px;
     text-align: center;
     margin-left: 0;
     border-radius: 4px;
+}
+
+.condition-arrow svg {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
 }
 
 .condition-top { color: #00ff00; }
@@ -206,12 +213,7 @@
                     {{ player.profile.position.code }}
                     {% with condition=player.profile.condition %}
                         <span class="condition-arrow condition-{{ condition|lower }}">
-                            {% if condition == 'TOP' %}↑{% endif %}
-                            {% if condition == 'GOOD' %}↗{% endif %}
-                            {% if condition == 'NORMAL' %}→{% endif %}
-                            {% if condition == 'BAD' %}↘{% endif %}
-                            {% if condition == 'AWFUL' %}↓{% endif %}
-                            {% if condition == 'INJURED' %}+{% endif %}
+                            <svg><use href="{% static 'teams/images/condition-icons.svg' %}#condition-{{ condition|lower }}"/></svg>
                         </span>
                     {% endwith %}
                 </div>

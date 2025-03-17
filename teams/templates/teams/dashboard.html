@@ -49,14 +49,21 @@ body {
 
 .condition-arrow {
     font-size: 1.2rem;
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     background-color: #000000;
-    color: inherit;
     width: 24px;
     height: 24px;
     line-height: 24px;
     text-align: center;
     margin-left: 4px;
+}
+
+.condition-arrow svg {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
 }
 
 .condition-option {
@@ -589,12 +596,7 @@ body {
                         {{ request.user.profile.position.code }}
                         {% with condition=request.user.profile.condition %}
                             <span class="condition-arrow condition-{{ condition|lower }}">
-                                {% if condition == 'TOP' %}↑{% endif %}
-                                {% if condition == 'GOOD' %}↗{% endif %}
-                                {% if condition == 'NORMAL' %}→{% endif %}
-                                {% if condition == 'BAD' %}↘{% endif %}
-                                {% if condition == 'AWFUL' %}↓{% endif %}
-                                {% if condition == 'INJURED' %}+{% endif %}
+                                <svg><use href="{% static 'teams/images/condition-icons.svg' %}#condition-{{ condition|lower }}"/></svg>
                             </span>
                         {% endwith %}
                     </div>
@@ -684,12 +686,6 @@ body {
                                 {% for value, label in request.user.profile.CONDITION_CHOICES %}
                                     <option value="{{ value }}" {% if request.user.profile.condition == value %}selected{% endif %}>
                                         {{ label }}
-                                        {% if value == 'TOP' %}↑{% endif %}
-                                        {% if value == 'GOOD' %}↗{% endif %}
-                                        {% if value == 'NORMAL' %}→{% endif %}
-                                        {% if value == 'BAD' %}↘{% endif %}
-                                        {% if value == 'AWFUL' %}↓{% endif %}
-                                        {% if value == 'INJURED' %}+{% endif %}
                                     </option>
                                 {% endfor %}
                             </select>
@@ -956,12 +952,7 @@ body {
                                                             </div>
                                                             {% if member.user and member.user.profile and member.user.profile.condition %}
                                                                 <span class="condition-arrow condition-{{ member.user.profile.condition|lower }}">
-                                                                    {% if member.user.profile.condition == 'TOP' %}↑{% endif %}
-                                                                    {% if member.user.profile.condition == 'GOOD' %}↗{% endif %}
-                                                                    {% if member.user.profile.condition == 'NORMAL' %}→{% endif %}
-                                                                    {% if member.user.profile.condition == 'BAD' %}↘{% endif %}
-                                                                    {% if member.user.profile.condition == 'AWFUL' %}↓{% endif %}
-                                                                    {% if member.user.profile.condition == 'INJURED' %}+{% endif %}
+                                                                    <svg><use href="{% static 'teams/images/condition-icons.svg' %}#condition-{{ member.user.profile.condition|lower }}"/></svg>
                                                                 </span>
                                                             {% endif %}
                                                         </div>
