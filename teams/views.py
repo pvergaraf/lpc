@@ -1679,7 +1679,12 @@ def payment_list(request, team_id, season_id):
     if not request.user.is_superuser and not TeamMember.objects.filter(team=team, user=request.user, is_team_admin=True).exists():
         return HttpResponseForbidden("You don't have permission to manage payments.")
     
-    payments = Payment.objects.filter(season=season)
+    # Get payments with annotated sum and count of players with payments
+    payments = Payment.objects.filter(season=season).annotate(
+        sum_of_payments=models.Sum('player_payments__amount'),
+        players_with_payments=models.Count('player_payments', filter=models.Q(player_payments__amount__gt=0))
+    )
+    
     return render(request, 'teams/payment_list.html', {
         'team': team,
         'season': season,

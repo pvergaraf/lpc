@@ -18,6 +18,7 @@
                         <tr>
                             <th>Name</th>
                             <th>Total Amount</th>
+                            <th>Sum of Payments</th>
                             <th>Due Date</th>
                             <th>Players Paid</th>
                             <th>Actions</th>
@@ -29,6 +30,12 @@
                             <tr>
                                 <td>{{ payment.name }}</td>
                                 <td>${{ payment.total_amount }}</td>
+                                <td>
+                                    ${{ payment.sum_of_payments|default:0 }}
+                                    {% if payment.players_with_payments > 0 %}
+                                        <small class="text-muted">({{ payment.players_with_payments }} players)</small>
+                                    {% endif %}
+                                </td>
                                 <td>{{ payment.due_date|date:"M d, Y" }}</td>
                                 <td>{{ paid_count }}/{{ total_count }}</td>
                                 <td>
