@@ -1,6 +1,7 @@
 {% extends "teams/base.html" %}
 {% load static %}
 {% load teams_tags %}
+{% csrf_token %}
 
 {% block title %}fubol.club{% endblock %}
 
@@ -558,9 +559,12 @@
                         </h5>
                     </div>
                     <div class="card-body">
+                        {% csrf_token %}
                         {% if pending_payments %}
                             <div class="table-responsive">
-                                <table class="table">
+                                <table class="table" 
+                                       data-team-id="{{ current_team.id }}" 
+                                       data-season-id="{{ current_season.id }}">
                                     <thead>
                                         <tr>
                                             <th>Payment</th>
@@ -832,6 +836,73 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Payment toggle functionality
+    document.querySelectorAll('.toggle-payment-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const paymentId = this.dataset.paymentId;
+            const isAdmin = this.dataset.isAdmin === 'true';
+            const row = this.closest('tr');
+            const table = this.closest('table');
+            const currentStatus = button.textContent.trim() === 'Mark as Unpaid';
+            
+            // Get team and season IDs from table data attributes
+            const teamId = table.dataset.teamId;
+            const seasonId = table.dataset.seasonId;
+            
+            // Construct the URL using the correct URL pattern
+            const url = `/team/${teamId}/season/${seasonId}/payments/${paymentId}/player/${paymentId}/toggle/`;
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                    'X-Admin-Action': 'false', // Always set to false to prevent verification
+                    'X-Current-Status': currentStatus ? 'paid' : 'unpaid'
+                },
+                credentials: 'same-origin'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status === 'success') {
+                    // Show success message
+                    const message = data.is_paid ? 'Payment marked as paid.' : 'Payment marked as unpaid.';
+                    showAlert('success', message);
+                    
+                    // Reload the page after a short delay to show the alert
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    throw new Error(data.message || 'Failed to update payment status');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showAlert('danger', 'An error occurred while updating the payment status.');
+            });
+        });
+    });
+
+    // Helper function to show alerts
+    function showAlert(type, message) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+        alertDiv.role = 'alert';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        
+        const container = document.querySelector('.container');
+        container.insertBefore(alertDiv, container.firstChild);
+    }
+
     // Active filter handler
     const activeFilter = document.getElementById('activeFilter');
     if (activeFilter) {
