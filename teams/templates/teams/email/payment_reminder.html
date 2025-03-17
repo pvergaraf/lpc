@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            padding: 20px 0;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .content {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #007bff;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .payment-details {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .footer {
+            text-align: center;
+            padding-top: 20px;
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Payment Reminder</h1>
+    </div>
+    
+    <div class="content">
+        <p>Hello {{ player.get_full_name }},</p>
+        
+        <p>This is a friendly reminder about your pending payment for <strong>{{ team.name }}</strong>.</p>
+        
+        <div class="payment-details">
+            <h3>Payment Details:</h3>
+            <p><strong>Payment Name:</strong> {{ payment.name }}</p>
+            <p><strong>Amount:</strong> ${{ amount }}</p>
+            <p><strong>Due Date:</strong> {{ payment.due_date|date:"M d, Y" }}</p>
+            {% if payment.due_date|date:"Y-m-d" < today %}
+                <p><strong class="text-danger">This payment is overdue!</strong></p>
+            {% endif %}
+        </div>
+        
+        <p>Please complete your payment as soon as possible to help keep the team running smoothly.</p>
+        
+        <div style="text-align: center;">
+            <a href="{{ protocol }}://{{ domain }}{% url 'teams:dashboard' %}" class="button">
+                Go to Dashboard to Pay
+            </a>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>This is an automated message from Fubol Club. Please do not reply to this email.</p>
+    </div>
+</body>
+</html> 

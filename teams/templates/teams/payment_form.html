@@ -102,6 +102,13 @@
             <div class="mt-3">
                 <button type="submit" class="btn btn-primary">Save Payment</button>
                 <a href="{% url 'teams:payment_list' team.id season.id %}" class="btn btn-secondary">Cancel</a>
+                {% if payment %}
+                    <a href="{% url 'teams:send_payment_reminder' team_id=team.id season_id=season.id payment_id=payment.id %}" 
+                       class="btn btn-info"
+                       onclick="return confirm('Send payment reminder to all members with pending payments?')">
+                        <i class="fas fa-envelope me-1"></i> Send Reminder
+                    </a>
+                {% endif %}
             </div>
         </form>
     </div>

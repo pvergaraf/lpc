@@ -26,6 +26,8 @@ import traceback
 import secrets
 import json
 from django.core.exceptions import PermissionDenied
+from django.utils.html import strip_tags
+from django.contrib.sites.shortcuts import get_current_site
 
 User = get_user_model()
 
@@ -2582,4 +2584,82 @@ def user_payments(request, team_id, season_id):
     }
     
     return render(request, 'teams/user_payments.html', context)
+
+@login_required
+def send_payment_reminder(request, team_id, season_id, payment_id):
+    try:
+        team = get_object_or_404(Team, id=team_id)
+        if not is_user_team_admin(request.user, team):
+            messages.error(request, "You don't have permission to send payment reminders.")
+            return redirect('teams:payment_list', team_id=team_id, season_id=season_id)
+
+        payment = get_object_or_404(Payment, id=payment_id, season_id=season_id)
+        pending_payments = PlayerPayment.objects.filter(
+            payment=payment,
+            amount__gt=0,
+            admin_verified=False
+        ).select_related('player__user', 'player__user__profile')
+
+        if not pending_payments.exists():
+            messages.info(request, "No pending payments to remind about.")
+            return redirect('teams:payment_list', team_id=team_id, season_id=season_id)
+
+        current_site = get_current_site(request)
+        protocol = 'https' if request.is_secure() else 'http'
+        today = timezone.now().date()
+
+        for player_payment in pending_payments:
+            if not player_payment.player.user.email:
+                continue
+
+            context = {
+                'player': player_payment.player.user,
+                'team': team,
+                'payment': payment,
+                'amount': player_payment.amount,
+                'domain': current_site.domain,
+                'protocol': protocol,
+                'today': today,
+            }
+
+            subject = f"Payment Reminder - {payment.name}"
+            html_message = render_to_string('teams/email/payment_reminder.html', context)
+            plain_message = strip_tags(html_message)
+
+            try:
+                send_mail(
+                    subject,
+                    plain_message,
+                    settings.DEFAULT_FROM_EMAIL,
+                    [player_payment.player.user.email],
+                    html_message=html_message,
+                    fail_silently=False,
+                )
+            except Exception as e:
+                log_error(
+                    e,
+                    error_message=f"Failed to send payment reminder email to {player_payment.player.user.email}",
+                    error_type="EmailError",
+                    extra_context={
+                        "team_id": team_id,
+                        "payment_id": payment_id,
+                        "user_id": player_payment.player.user.id
+                    }
+                )
+
+        messages.success(request, "Payment reminders have been sent successfully.")
+        return redirect('teams:payment_list', team_id=team_id, season_id=season_id)
+
+    except Exception as e:
+        log_error(
+            e,
+            error_message="Error sending payment reminders",
+            error_type="PaymentReminderError",
+            extra_context={
+                "team_id": team_id,
+                "payment_id": payment_id
+            }
+        )
+        messages.error(request, "There was an error sending the payment reminders.")
+        return redirect('teams:payment_list', team_id=team_id, season_id=season_id)
 
