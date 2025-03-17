@@ -1,0 +1,162 @@
+{% extends 'teams/base.html' %}
+{% load teams_tags %}
+
+{% block title %}All Payments - {{ season.name }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-money-bill text-primary me-2"></i>
+            All Payments - {{ season.name }}
+        </h5>
+        <a href="{% url 'teams:dashboard' %}" class="btn btn-secondary btn-sm">
+            <i class="fas fa-arrow-left me-1"></i> Back to Dashboard
+        </a>
+    </div>
+    <div class="card-body">
+        {% if all_payments %}
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Payment</th>
+                            <th>Amount</th>
+                            <th>Due Date</th>
+                            <th>Status</th>
+                            <th>Team %</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for payment in all_payments %}
+                            <tr>
+                                <td>{{ payment.payment.name }}</td>
+                                <td>${{ payment.amount|currency_no_decimals }}</td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        {% if payment.payment.due_date|date:"Y-m-d" < today %}
+                                            <span class="badge bg-danger me-2">Overdue</span>
+                                        {% endif %}
+                                        {{ payment.payment.due_date|date:"M d, Y" }}
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if payment.admin_verified %}
+                                        <span class="badge bg-success">Paid & Verified</span>
+                                    {% elif payment.is_paid %}
+                                        <span class="badge bg-info">Pending Approval</span>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark">Not Paid</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="progress flex-grow-1" style="height: 8px;">
+                                            <div class="progress-bar {% if payment.verification_percentage >= 75 %}bg-success{% elif payment.verification_percentage >= 50 %}bg-info{% elif payment.verification_percentage >= 25 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                                 role="progressbar" 
+                                                 style="width: {{ payment.verification_percentage }}%;" 
+                                                 aria-valuenow="{{ payment.verification_percentage }}" 
+                                                 aria-valuemin="0" 
+                                                 aria-valuemax="100">
+                                            </div>
+                                        </div>
+                                        <small class="text-muted ms-2">{{ payment.verification_percentage|floatformat:0 }}%</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if not payment.admin_verified %}
+                                        <div class="d-flex flex-column flex-sm-row gap-2">
+                                            {% if not payment.is_paid %}
+                                                <a href="https://slach.cl/lpcfc/{{ payment.amount|stringformat:'d' }}" 
+                                                   target="_blank" 
+                                                   class="btn btn-sm btn-primary">
+                                                    Pay Now
+                                                </a>
+                                            {% endif %}
+                                            <button type="button" 
+                                                    class="btn btn-sm {% if payment.is_paid %}btn-outline-success{% else %}btn-success{% endif %} toggle-payment-btn"
+                                                    data-payment-id="{{ payment.id }}"
+                                                    data-is-admin="{% if is_team_admin %}true{% else %}false{% endif %}">
+                                                {% if payment.is_paid %}Mark as Unpaid{% else %}Mark as Paid{% endif %}
+                                            </button>
+                                        </div>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                You don't have any payments in this season yet.
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Payment toggle functionality
+    document.querySelectorAll('.toggle-payment-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const paymentId = this.dataset.paymentId;
+            const isAdmin = this.dataset.isAdmin === 'true';
+            const row = this.closest('tr');
+            const table = this.closest('table');
+            const currentStatus = button.textContent.trim() === 'Mark as Unpaid';
+            
+            // Get team and season IDs from URL
+            const pathParts = window.location.pathname.split('/');
+            const teamId = pathParts[2];
+            const seasonId = pathParts[4];
+            
+            // Construct the URL using the correct URL pattern with domain prefix
+            const url = `${window.location.protocol}//${window.location.host}/team/${teamId}/season/${seasonId}/payments/${paymentId}/player/${paymentId}/toggle/`;
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                    'X-Admin-Action': 'false',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    is_paid: !currentStatus,
+                    send_email: !currentStatus
+                })
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    throw new Error('Server error');
+                }
+            })
+            .then(data => {
+                if (data.status === 'success') {
+                    showAlert('success', currentStatus ? 'Payment marked as unpaid' : 'Payment marked as paid');
+                } else {
+                    showAlert('warning', data.message || 'Failed to update payment status');
+                }
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showAlert('warning', 'There was an issue updating the payment status. The page will refresh to show the current status.');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            });
+        });
+    });
+});
+</script>
+{% endblock %} 

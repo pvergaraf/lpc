@@ -189,8 +189,27 @@ def dashboard(request):
         player__user=request.user,
         player__team=current_team,
         payment__season=current_season,
-        amount__gt=0  # Only show payments with amount > 0
-    ).select_related('payment')
+        amount__gt=0,  # Only show payments with amount > 0
+        admin_verified=False  # Exclude verified payments
+    ).select_related('payment').annotate(
+        total_players=models.Count(
+            'payment__player_payments',
+            filter=models.Q(payment__player_payments__amount__gt=0)
+        ),
+        verified_players=models.Count(
+            'payment__player_payments',
+            filter=models.Q(payment__player_payments__amount__gt=0, payment__player_payments__admin_verified=True)
+        ),
+        verification_percentage=models.Case(
+            When(total_players__gt=0,
+                 then=models.ExpressionWrapper(
+                     100.0 * models.F('verified_players') / models.F('total_players'),
+                     output_field=models.FloatField()
+                 )),
+            default=Value(0.0),
+            output_field=models.FloatField(),
+        )
+    )
 
     # Log payment status
     log_error(
@@ -1877,6 +1896,8 @@ def toggle_player_payment(request, team_id, season_id, payment_id, player_paymen
                             'player': request.user,
                             'payment': player_payment.payment,
                             'amount': player_payment.amount,
+                            'protocol': request.scheme,
+                            'domain': request.get_host(),
                         }
                         html_message = render_to_string('teams/email/payment_notification.html', context)
                         plain_message = f'{request.user.get_full_name()} marked payment "{player_payment.payment.name}" as paid. Please verify.'
@@ -2517,4 +2538,48 @@ def season_stats(request, team_id, season_id):
     }
     
     return render(request, 'teams/season_stats.html', context)
+
+@login_required
+def user_payments(request, team_id, season_id):
+    team = get_object_or_404(Team, id=team_id)
+    season = get_object_or_404(Season, id=season_id)
+    team_member = get_object_or_404(TeamMember, team=team, user=request.user, is_active=True)
+    
+    # Get all payments for the current user, including verified ones
+    all_payments = PlayerPayment.objects.filter(
+        player__user=request.user,
+        player__team=team,
+        payment__season=season,
+        amount__gt=0
+    ).select_related('payment').annotate(
+        total_players=models.Count(
+            'payment__player_payments',
+            filter=models.Q(payment__player_payments__amount__gt=0)
+        ),
+        verified_players=models.Count(
+            'payment__player_payments',
+            filter=models.Q(payment__player_payments__amount__gt=0, payment__player_payments__admin_verified=True)
+        ),
+        verification_percentage=models.Case(
+            When(total_players__gt=0,
+                 then=models.ExpressionWrapper(
+                     100.0 * models.F('verified_players') / models.F('total_players'),
+                     output_field=models.FloatField()
+                 )),
+            default=Value(0.0),
+            output_field=models.FloatField(),
+        )
+    ).order_by('-payment__due_date')
+    
+    context = {
+        'team': team,
+        'current_team': team,
+        'season': season,
+        'current_season': season,
+        'all_payments': all_payments,
+        'today': timezone.now().date().isoformat(),
+        'is_team_admin': team_member.is_team_admin
+    }
+    
+    return render(request, 'teams/user_payments.html', context)
 
