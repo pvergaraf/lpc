@@ -322,7 +322,7 @@
                                             </div>
                                             {% if member.user and member.user.profile and member.user.profile.condition %}
                                                 <span class="condition-arrow condition-{{ member.user.profile.condition|lower }}">
-                                                    <svg><use href="{% static 'teams/images/condition-icons.svg' %}#condition-{{ member.user.profile.condition|lower }}"/></svg>
+                                                    <svg><use href="#condition-{{ member.user.profile.condition|lower }}"/></svg>
                                                 </span>
                                             {% endif %}
                                         </div>

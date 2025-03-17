@@ -211,11 +211,11 @@
             {% if player.profile and player.profile.position %}
                 <div class="fifa-card-position">
                     {{ player.profile.position.code }}
-                    {% with condition=player.profile.condition %}
-                        <span class="condition-arrow condition-{{ condition|lower }}">
-                            <svg><use href="{% static 'teams/images/condition-icons.svg' %}#condition-{{ condition|lower }}"/></svg>
+                    {% if player.user and player.user.profile and player.user.profile.condition %}
+                        <span class="condition-arrow condition-{{ player.user.profile.condition|lower }}">
+                            <svg><use href="#condition-{{ player.user.profile.condition|lower }}"/></svg>
                         </span>
-                    {% endwith %}
+                    {% endif %}
                 </div>
             {% endif %}
             {% if player.profile and player.profile.country %}

@@ -344,7 +344,9 @@
                             <div class="player-position" style="--position-color: {{ player.user.profile.position.color }}">{{ player.user.profile.position.code }}</div>
                             <div class="player-condition">
                                 {% if player.condition_symbol %}
-                                    <svg><use href="{% static 'teams/images/condition-icons.svg' %}#condition-{{ player.user.profile.condition|lower }}"/></svg>
+                                    <span class="condition-arrow condition-{{ player.user.profile.condition|lower }}">
+                                        <svg><use href="#condition-{{ player.user.profile.condition|lower }}"/></svg>
+                                    </span>
                                 {% else %}
                                     •
                                 {% endif %}

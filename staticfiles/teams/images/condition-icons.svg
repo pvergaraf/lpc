@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+    <symbol id="condition-top" viewBox="0 0 24 24">
+        <path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z" />
+    </symbol>
+    <symbol id="condition-good" viewBox="0 0 24 24">
+        <path d="M14 4l-1.41 1.41L16.17 11H4v2h12.17l-3.58 3.59L14 18l6-6z" />
+    </symbol>
+    <symbol id="condition-normal" viewBox="0 0 24 24">
+        <path d="M4 12h16v2H4z" />
+    </symbol>
+    <symbol id="condition-bad" viewBox="0 0 24 24">
+        <path d="M10 20l1.41-1.41L7.83 13H20v-2H7.83l3.58-3.59L10 6l-6 6z" />
+    </symbol>
+    <symbol id="condition-awful" viewBox="0 0 24 24">
+        <path d="M12 20l1.41-1.41L7.83 13H20v-2H7.83l5.58-5.59L12 4l-8 8z" />
+    </symbol>
+    <symbol id="condition-injured" viewBox="0 0 24 24">
+        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+    </symbol>
+</svg> 
