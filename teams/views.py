@@ -43,10 +43,6 @@ def get_current_team(user):
     if not team_memberships.exists():
         return None
 
-    # If there's only one team, return it
-    if team_memberships.count() == 1:
-        return team_memberships.first().team
-
     # Try to get team from session
     current_team_id = user.request.session.get('current_team') if hasattr(user, 'request') else None
     
@@ -56,8 +52,14 @@ def get_current_team(user):
         if team_from_session:
             return team_from_session.team
     
-    # If no team in session or invalid, return first active team
-    return team_memberships.first().team
+    # If no valid team in session, return first active team and update session
+    first_team = team_memberships.first()
+    if not first_team:
+        return None
+        
+    if hasattr(user, 'request'):
+        user.request.session['current_team'] = first_team.team.id
+    return first_team.team
 
 def get_current_season(team):
     """Get the current season for a team."""
@@ -112,227 +114,326 @@ def dashboard(request):
         )
         return redirect('teams:login')
 
+    # Log initial request state
+    log_error(
+        request=request,
+        error_message="Dashboard initial state",
+        error_type="DebugInfo",
+        extra_context={
+            "user_email": request.user.email,
+            "user_id": request.user.id,
+            "session_id": request.session.session_key,
+            "session_data": {k: v for k, v in request.session.items()},
+            "has_profile": hasattr(request.user, 'profile'),
+            "profile_id": getattr(request.user.profile, 'id', None) if hasattr(request.user, 'profile') else None
+        }
+    )
+
     # Attach request to user for session access
     request.user.request = request
-    current_team = get_current_team(request.user)
     
-    # Get the filter parameter
-    show_active_only = request.GET.get('active_only', 'false').lower() == 'true'
-    
-    log_error(  # Using log_error for all logging until we create a dedicated operational logging function
-        request=request,
-        error_message="Dashboard access",
-        error_type="UserActivity",
-        extra_context={
-            "user_email": request.user.email,
-            "user_id": request.user.id,
-            "current_team": current_team.id if current_team else None,
-            "path": request.path,
-            "method": request.method,
-            "timestamp": timezone.now().isoformat(),
-            "show_active_only": show_active_only
-        }
-    )
-    
-    if not current_team:
-        log_error(
-            request=request,
-            error_message="User has no active teams",
-            error_type="TeamAccess",
-            extra_context={
-                "user_email": request.user.email,
-                "user_id": request.user.id
-            }
-        )
-        messages.warning(request, "You are not a member of any team. Please join or create a team.")
-        return redirect('teams:team_list')
-
     try:
-        # Get the user's team membership
-        team_member = TeamMember.objects.get(
-            team=current_team,
+        # Get team memberships first
+        team_memberships = TeamMember.objects.filter(
             user=request.user,
             is_active=True
+        ).select_related('team')
+        
+        current_team = get_current_team(request.user)
+        current_season = get_current_season(current_team)
+        
+        log_error(
+            request=request,
+            error_message="Season data check",
+            error_type="DebugInfo",
+            extra_context={
+                "user_email": request.user.email,
+                "user_id": request.user.id,
+                "team_id": getattr(current_team, 'id', None),
+                "has_season": current_season is not None,
+                "season_id": getattr(current_season, 'id', None),
+                "season_name": getattr(current_season, 'name', None),
+                "season_is_active": getattr(current_season, 'is_active', None),
+                "season_dates": {
+                    "start": str(getattr(current_season, 'start_date', None)),
+                    "end": str(getattr(current_season, 'end_date', None))
+                } if current_season else None
+            }
         )
         
         log_error(
             request=request,
-            error_message="Team member details loaded",
-            error_type="TeamAccess",
+            error_message="Team memberships query result",
+            error_type="DebugInfo",
             extra_context={
                 "user_email": request.user.email,
                 "user_id": request.user.id,
-                "team_id": current_team.id,
-                "team_name": current_team.name,
-                "role": team_member.role,
-                "is_admin": team_member.is_team_admin
+                "memberships_count": team_memberships.count(),
+                "memberships": [
+                    {
+                        "id": tm.id,
+                        "team_id": tm.team.id,
+                        "team_name": tm.team.name,
+                        "is_active": tm.is_active,
+                        "role": tm.role
+                    }
+                    for tm in team_memberships
+                ]
             }
         )
-    except TeamMember.DoesNotExist:
-        log_error(
-            request=request,
-            error_message="Invalid team membership access attempt",
-            error_type="TeamAccessError",
-            extra_context={
-                "user_email": request.user.email,
-                "user_id": request.user.id,
-                "team_id": current_team.id,
-                "team_name": current_team.name
-            }
-        )
-        messages.error(request, "There was an error accessing your team membership.")
-        return redirect('teams:team_list')
-
-    current_season = get_current_season(current_team)
-    is_team_admin = is_user_team_admin(request.user, current_team)
-    today = timezone.now().date()
-
-    # Get pending payments for the current user
-    pending_payments = PlayerPayment.objects.filter(
-        player__user=request.user,
-        player__team=current_team,
-        payment__season=current_season,
-        amount__gt=0,  # Only show payments with amount > 0
-        admin_verified=False  # Exclude verified payments
-    ).select_related('payment').annotate(
-        total_players=models.Count(
-            'payment__player_payments',
-            filter=models.Q(payment__player_payments__amount__gt=0)
-        ),
-        verified_players=models.Count(
-            'payment__player_payments',
-            filter=models.Q(payment__player_payments__amount__gt=0, payment__player_payments__admin_verified=True)
-        ),
-        verification_percentage=models.Case(
-            When(total_players__gt=0,
-                 then=models.ExpressionWrapper(
-                     100.0 * models.F('verified_players') / models.F('total_players'),
-                     output_field=models.FloatField()
-                 )),
-            default=Value(0.0),
-            output_field=models.FloatField(),
-        )
-    )
-
-    # Log payment status
-    log_error(
-        request=request,
-        error_message="Payment status check",
-        error_type="PaymentActivity",
-        extra_context={
-            "user_email": request.user.email,
-            "user_id": request.user.id,
-            "team_id": current_team.id,
-            "season_id": current_season.id if current_season else None,
-            "pending_payments_count": pending_payments.count(),
-            "total_pending_amount": sum(p.amount for p in pending_payments)
-        }
-    )
-
-    # Get team memberships for the teams list
-    team_memberships = TeamMember.objects.filter(
-        user=request.user,
-        is_active=True
-    ).select_related('team')
-
-    # Get team members for the current team
-    team_members_query = TeamMember.objects.filter(
-        team=current_team
-    ).filter(
-        models.Q(is_active=True) | 
-        models.Q(is_active=False, invitation_token__isnull=False)
-    )
-    
-    # Apply active filter if requested
-    if show_active_only:
-        team_members_query = team_members_query.filter(user__profile__active_player=True)
-    
-    team_members = team_members_query.select_related(
-        'user', 
-        'user__profile', 
-        'user__profile__position'
-    ).annotate(
-        position_order=Case(
-            When(user__profile__position__type='GK', then=Value(1)),
-            When(user__profile__position__type='DEF', then=Value(2)),
-            When(user__profile__position__type='MID', then=Value(3)),
-            When(user__profile__position__type='ATT', then=Value(4)),
-            default=Value(5),
-            output_field=IntegerField(),
-        )
-    ).order_by(
-        'position_order',
-        'user__profile__player_number'
-    )
-
-    # Log team composition
-    log_error(
-        request=request,
-        error_message="Team composition loaded",
-        error_type="TeamActivity",
-        extra_context={
-            "user_email": request.user.email,
-            "user_id": request.user.id,
-            "team_id": current_team.id,
-            "team_name": current_team.name,
-            "active_members_count": team_members.count(),
-            "pending_invitations_count": team_members.filter(is_active=False, invitation_token__isnull=False).count(),
-            "total_teams": team_memberships.count()
-        }
-    )
-
-    # Get upcoming matches if there's a current season
-    upcoming_matches = None
-    if current_season:
-        upcoming_matches = Match.objects.filter(
-            season=current_season,
-            match_date__gte=today
-        ).order_by('match_date', 'match_time')
         
-        # Log upcoming matches
         log_error(
             request=request,
-            error_message="Upcoming matches loaded",
-            error_type="MatchActivity",
+            error_message="Current team resolution",
+            error_type="DebugInfo",
             extra_context={
                 "user_email": request.user.email,
                 "user_id": request.user.id,
-                "team_id": current_team.id,
-                "season_id": current_season.id,
-                "upcoming_matches_count": upcoming_matches.count(),
-                "next_match_date": upcoming_matches.first().match_date.isoformat() if upcoming_matches.exists() else None
+                "session_team_id": request.session.get('current_team'),
+                "resolved_team_id": getattr(current_team, 'id', None),
+                "resolved_team_name": getattr(current_team, 'name', None)
             }
         )
+    
+        # Get the filter parameter
+        show_active_only = request.GET.get('active_only', 'false').lower() == 'true'
+        
+        if not current_team:
+            log_error(
+                request=request,
+                error_message="No current team available",
+                error_type="TeamAccess",
+                extra_context={
+                    "user_email": request.user.email,
+                    "user_id": request.user.id,
+                    "session_data": {k: v for k, v in request.session.items()},
+                    "available_teams": [tm.team.id for tm in team_memberships]
+                }
+            )
+            messages.warning(request, "You are not a member of any team. Please join or create a team.")
+            return redirect('teams:team_list')
 
-    context = {
-        'current_team': current_team,
-        'current_season': current_season,
-        'is_team_admin': is_team_admin,
-        'pending_payments': pending_payments,
-        'today': today.isoformat(),
-        'team_memberships': team_memberships,
-        'team_members': team_members,
-        'upcoming_matches': upcoming_matches,
-        'upcoming_birthdays': current_team.get_upcoming_birthdays() if current_team else None,
-    }
+        try:
+            # Get the user's team membership
+            team_member = TeamMember.objects.select_related('team').get(
+                team=current_team,
+                user=request.user,
+                is_active=True
+            )
+            
+            log_error(
+                request=request,
+                error_message="Team member details loaded",
+                error_type="DebugInfo",
+                extra_context={
+                    "user_email": request.user.email,
+                    "user_id": request.user.id,
+                    "team_id": current_team.id,
+                    "team_name": current_team.name,
+                    "role": team_member.role,
+                    "is_admin": team_member.is_team_admin,
+                    "membership_id": team_member.id
+                }
+            )
+        except TeamMember.DoesNotExist as e:
+            log_error(
+                request=request,
+                error_message="Invalid team membership access attempt",
+                error_type="TeamAccessError",
+                extra_context={
+                    "user_email": request.user.email,
+                    "user_id": request.user.id,
+                    "team_id": current_team.id,
+                    "team_name": current_team.name,
+                    "error": str(e),
+                    "traceback": traceback.format_exc()
+                }
+            )
+            messages.error(request, "There was an error accessing your team membership.")
+            return redirect('teams:team_list')
+        
+        try:
+            is_team_admin = is_user_team_admin(request.user, current_team)
+            today = timezone.now().date()
 
-    # Log successful dashboard render
-    log_error(
-        request=request,
-        error_message="Dashboard rendered successfully",
-        error_type="PageView",
-        extra_context={
-            "user_email": request.user.email,
-            "user_id": request.user.id,
-            "team_id": current_team.id,
-            "team_name": current_team.name,
-            "is_admin": is_team_admin,
-            "has_season": bool(current_season),
-            "render_timestamp": timezone.now().isoformat()
-        }
-    )
+            # Get pending payments for the current user
+            pending_payments = PlayerPayment.objects.filter(
+                player__user=request.user,
+                player__team=current_team,
+                payment__season=current_season,
+                amount__gt=0,  # Only show payments with amount > 0
+                admin_verified=False  # Exclude verified payments
+            ).select_related('payment').annotate(
+                total_players=models.Count(
+                    'payment__player_payments',
+                    filter=models.Q(payment__player_payments__amount__gt=0)
+                ),
+                verified_players=models.Count(
+                    'payment__player_payments',
+                    filter=models.Q(payment__player_payments__amount__gt=0, payment__player_payments__admin_verified=True)
+                ),
+                verification_percentage=models.Case(
+                    When(total_players__gt=0,
+                         then=models.ExpressionWrapper(
+                             100.0 * models.F('verified_players') / models.F('total_players'),
+                             output_field=models.FloatField()
+                         )),
+                    default=Value(0.0),
+                    output_field=models.FloatField(),
+                )
+            )
 
-    return render(request, 'teams/dashboard.html', context)
+            # Log payment status
+            log_error(
+                request=request,
+                error_message="Payment status check",
+                error_type="PaymentActivity",
+                extra_context={
+                    "user_email": request.user.email,
+                    "user_id": request.user.id,
+                    "team_id": current_team.id,
+                    "season_id": current_season.id if current_season else None,
+                    "pending_payments_count": pending_payments.count(),
+                    "total_pending_amount": sum(p.amount for p in pending_payments)
+                }
+            )
+
+            # Get team memberships for the teams list
+            team_memberships = TeamMember.objects.filter(
+                user=request.user,
+                is_active=True
+            ).select_related('team')
+
+            # Get team members for the current team
+            team_members_query = TeamMember.objects.filter(
+                team=current_team
+            ).filter(
+                models.Q(is_active=True) | 
+                models.Q(is_active=False, invitation_token__isnull=False)
+            )
+            
+            # Apply active filter if requested
+            if show_active_only:
+                team_members_query = team_members_query.filter(user__profile__active_player=True)
+            
+            team_members = team_members_query.select_related(
+                'user', 
+                'user__profile', 
+                'user__profile__position'
+            ).annotate(
+                position_order=Case(
+                    When(user__profile__position__type='GK', then=Value(1)),
+                    When(user__profile__position__type='DEF', then=Value(2)),
+                    When(user__profile__position__type='MID', then=Value(3)),
+                    When(user__profile__position__type='ATT', then=Value(4)),
+                    default=Value(5),
+                    output_field=IntegerField(),
+                )
+            ).order_by(
+                'position_order',
+                'user__profile__player_number'
+            )
+
+            # Log team composition
+            log_error(
+                request=request,
+                error_message="Team composition loaded",
+                error_type="TeamActivity",
+                extra_context={
+                    "user_email": request.user.email,
+                    "user_id": request.user.id,
+                    "team_id": current_team.id,
+                    "team_name": current_team.name,
+                    "active_members_count": team_members.count(),
+                    "pending_invitations_count": team_members.filter(is_active=False, invitation_token__isnull=False).count(),
+                    "total_teams": team_memberships.count()
+                }
+            )
+
+            # Get upcoming matches if there's a current season
+            upcoming_matches = None
+            if current_season:
+                upcoming_matches = Match.objects.filter(
+                    season=current_season,
+                    match_date__gte=today
+                ).order_by('match_date', 'match_time')
+                
+                # Log upcoming matches
+                log_error(
+                    request=request,
+                    error_message="Upcoming matches loaded",
+                    error_type="MatchActivity",
+                    extra_context={
+                        "user_email": request.user.email,
+                        "user_id": request.user.id,
+                        "team_id": current_team.id,
+                        "season_id": current_season.id,
+                        "upcoming_matches_count": upcoming_matches.count(),
+                        "next_match_date": upcoming_matches.first().match_date.isoformat() if upcoming_matches.exists() else None
+                    }
+                )
+
+            context = {
+                'current_team': current_team,
+                'current_season': current_season,
+                'is_team_admin': is_team_admin,
+                'pending_payments': pending_payments,
+                'today': today.isoformat(),
+                'team_memberships': team_memberships,
+                'team_members': team_members,
+                'upcoming_matches': upcoming_matches,
+                'upcoming_birthdays': current_team.get_upcoming_birthdays() if current_team else None,
+            }
+
+            # Log successful dashboard render
+            log_error(
+                request=request,
+                error_message="Dashboard rendered successfully",
+                error_type="PageView",
+                extra_context={
+                    "user_email": request.user.email,
+                    "user_id": request.user.id,
+                    "team_id": current_team.id,
+                    "team_name": current_team.name,
+                    "is_admin": is_team_admin,
+                    "has_season": bool(current_season),
+                    "render_timestamp": timezone.now().isoformat()
+                }
+            )
+
+            return render(request, 'teams/dashboard.html', context)
+        except Exception as e:
+            log_error(
+                request=request,
+                error_message="Error in dashboard view execution",
+                error_type="SystemError",
+                extra_context={
+                    "user_email": request.user.email,
+                    "user_id": request.user.id,
+                    "team_id": current_team.id if current_team else None,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "traceback": traceback.format_exc(),
+                    "session_data": {k: v for k, v in request.session.items()},
+                }
+            )
+            raise
+
+    except Exception as e:
+        log_error(
+            request=request,
+            error_message="Critical error in dashboard view",
+            error_type="SystemError",
+            extra_context={
+                "user_email": request.user.email,
+                "user_id": request.user.id,
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "traceback": traceback.format_exc(),
+                "session_data": {k: v for k, v in request.session.items()},
+            }
+        )
+        raise
 
 @login_required
 def switch_team(request, team_id):
@@ -351,8 +452,20 @@ def switch_team(request, team_id):
     )
     
     try:
-        team_member = get_object_or_404(TeamMember, team_id=team_id, user=request.user, is_active=True)
+        # Get the team membership and verify it's active
+        team_member = TeamMember.objects.select_related('team').get(
+            team_id=team_id,
+            user=request.user,
+            is_active=True
+        )
+        
+        # Update session with new team
         request.session['current_team'] = team_id
+        
+        # Clear any team-specific session data
+        keys_to_clear = [k for k in request.session.keys() if k.startswith('team_')]
+        for key in keys_to_clear:
+            del request.session[key]
         
         log_error(
             request=request,
@@ -367,7 +480,10 @@ def switch_team(request, team_id):
                 "is_admin": team_member.is_team_admin
             }
         )
+        
+        messages.success(request, f'Switched to team: {team_member.team.name}')
         return redirect('teams:dashboard')
+        
     except TeamMember.DoesNotExist:
         log_error(
             request=request,
@@ -1977,6 +2093,10 @@ def team_list(request):
             }
         )
         
+        # Check if user has no teams
+        if not team_memberships.exists():
+            messages.info(request, "You are not a member of any team. Please contact an administrator to join a team.")
+        
         return render(request, 'teams/team_list.html', {
             'team_memberships': team_memberships
         })
@@ -1994,7 +2114,8 @@ def team_list(request):
             }
         )
         messages.error(request, "An error occurred while loading your teams.")
-        return redirect('teams:dashboard')
+        # Return to team list instead of dashboard to avoid redirect loop
+        return render(request, 'teams/team_list.html', {'team_memberships': []})
 
 @login_required
 def refresh_players(request, team_id, season_id, payment_id):
@@ -2655,66 +2776,74 @@ def send_payment_reminder(request, team_id, season_id, payment_id):
 class CustomLoginView(auth_views.LoginView):
     def form_valid(self, form):
         """Security check complete. Log the user in."""
-        print("\n=== LOGIN PROCESS STARTED ===")
-        print(f"User attempting login: {form.cleaned_data.get('username')}")
-        print(f"Remember me checked: {form.cleaned_data.get('remember_me', False)}")
-        print(f"Session ID before login: {self.request.session.session_key}")
+        print("\033[95m" + "="*50)  # Magenta separator
+        print("\033[94m=== LOGIN PROCESS STARTED ===")  # Blue text
+        print("\033[92m>> User attempting login: " + form.cleaned_data.get('username'))  # Green text
+        print(">> Remember me checked: " + str(form.cleaned_data.get('remember_me', False)))
+        print(">> Session ID before login: " + str(self.request.session.session_key))
+        print("\033[0m")  # Reset color
         
         try:
             remember_me = form.cleaned_data.get('remember_me', False)
-            print(f"\nCalling parent's form_valid...")
+            print("\033[96m>> Calling parent's form_valid...")  # Cyan text
             response = super().form_valid(form)
-            print(f"Parent form_valid completed successfully")
-            print(f"User authenticated: {self.request.user.is_authenticated}")
-            print(f"Session ID after auth: {self.request.session.session_key}")
+            print(">> Parent form_valid completed successfully")
+            print(">> User authenticated: " + str(self.request.user.is_authenticated))
+            print(">> Session ID after auth: " + str(self.request.session.session_key))
+            print("\033[0m")  # Reset color
             
             try:
-                print(f"\nSetting session expiry...")
+                print("\033[93m>> Setting session expiry...")  # Yellow text
                 if not remember_me:
-                    print("Remember me is False - Session will expire when browser closes")
+                    print(">> Remember me is False - Session will expire when browser closes")
                     self.request.session.set_expiry(0)
                 else:
-                    print("Remember me is True - Session will expire in 24 hours")
+                    print(">> Remember me is True - Session will expire in 24 hours")
                     self.request.session.set_expiry(24 * 60 * 60)
                 
-                print(f"Final session state:")
-                print(f"- Session expiry age: {self.request.session.get_expiry_age()}")
-                print(f"- Expires at browser close: {self.request.session.get_expire_at_browser_close()}")
-                print(f"- Session modified: {self.request.session.modified}")
-                print("=== LOGIN PROCESS COMPLETED ===\n")
+                print("\n\033[92m>> Final session state:")  # Green text
+                print(">> - Session expiry age: " + str(self.request.session.get_expiry_age()))
+                print(">> - Expires at browser close: " + str(self.request.session.get_expire_at_browser_close()))
+                print(">> - Session modified: " + str(self.request.session.modified))
+                print("\033[94m=== LOGIN PROCESS COMPLETED ===")  # Blue text
+                print("\033[95m" + "="*50 + "\033[0m\n")  # Magenta separator
                 
             except Exception as session_error:
-                print(f"\n!!! ERROR SETTING SESSION EXPIRY !!!")
-                print(f"Error type: {type(session_error).__name__}")
-                print(f"Error message: {str(session_error)}")
-                print(f"Session state when error occurred:")
-                print(f"- Session exists: {hasattr(self.request, 'session')}")
-                print(f"- Session ID: {self.request.session.session_key}")
-                print(f"- Session modified: {self.request.session.modified}")
+                print("\n\033[91m!!! ERROR SETTING SESSION EXPIRY !!!")  # Red text
+                print(">> Error type: " + type(session_error).__name__)
+                print(">> Error message: " + str(session_error))
+                print("\n>> Session state when error occurred:")
+                print(">> - Session exists: " + str(hasattr(self.request, 'session')))
+                print(">> - Session ID: " + str(self.request.session.session_key))
+                print(">> - Session modified: " + str(self.request.session.modified))
+                print("\033[95m" + "="*50 + "\033[0m\n")  # Magenta separator
                 raise
             
             return response
             
         except Exception as e:
-            print(f"\n!!! ERROR IN LOGIN PROCESS !!!")
-            print(f"Error type: {type(e).__name__}")
-            print(f"Error message: {str(e)}")
-            print(f"Current session state:")
-            print(f"- Session exists: {hasattr(self.request, 'session')}")
+            print("\n\033[91m!!! ERROR IN LOGIN PROCESS !!!")  # Red text
+            print(">> Error type: " + type(e).__name__)
+            print(">> Error message: " + str(e))
+            print("\n>> Current session state:")
+            print(">> - Session exists: " + str(hasattr(self.request, 'session')))
             if hasattr(self.request, 'session'):
-                print(f"- Session ID: {self.request.session.session_key}")
-                print(f"- Session modified: {self.request.session.modified}")
-            print("=== LOGIN PROCESS FAILED ===\n")
+                print(">> - Session ID: " + str(self.request.session.session_key))
+                print(">> - Session modified: " + str(self.request.session.modified))
+            print("\033[91m=== LOGIN PROCESS FAILED ===")  # Red text
+            print("\033[95m" + "="*50 + "\033[0m\n")  # Magenta separator
             raise
 
     def form_invalid(self, form):
         """Log failed login attempts and return the invalid form."""
-        print("\n=== LOGIN VALIDATION FAILED ===")
+        print("\n\033[95m" + "="*50)  # Magenta separator
+        print("\033[91m=== LOGIN VALIDATION FAILED ===")  # Red text
         attempted_username = self.request.POST.get('username', '')
-        print(f"Attempted login for user: {attempted_username}")
-        print(f"Form errors: {dict(form.errors)}")
-        print(f"Error codes: {[error.code for error in form.errors.get('__all__', [])]}")
-        print("=== END OF FAILED LOGIN ===\n")
+        print("\033[93m>> Attempted login for user: " + attempted_username)  # Yellow text
+        print(">> Form errors: " + str(dict(form.errors)))
+        print(">> Error codes: " + str([error.code for error in form.errors.get('__all__', [])]))
+        print("\033[91m=== END OF FAILED LOGIN ===")  # Red text
+        print("\033[95m" + "="*50 + "\033[0m\n")  # Magenta separator
         
         log_error(
             self.request,

@@ -9,24 +9,35 @@ import traceback
 import threading
 from django.http import HttpRequest
 
+# Configure logging
+logger = logging.getLogger('django')
+logger.setLevel(logging.INFO)
+
+# Remove existing handlers
+for handler in logger.handlers[:]:
+    logger.removeHandler(handler)
+
+# Create a file handler for JSON logs
+file_handler = logging.FileHandler('app.log')
+file_handler.setLevel(logging.INFO)
+logger.addHandler(file_handler)
+
 # Disable all other loggers
 logging.getLogger('django.db.backends').disabled = True
 logging.getLogger('django.template').disabled = True
 logging.getLogger('django.utils.autoreload').disabled = True
 logging.getLogger('django.request').disabled = True
 
-logger = logging.getLogger('django')
-
 # ANSI color codes
 COLORS = {
-    'BLUE': '\033[94m',
-    'GREEN': '\033[92m',
-    'YELLOW': '\033[93m',
-    'RED': '\033[91m',
-    'MAGENTA': '\033[95m',
-    'CYAN': '\033[96m',
-    'ENDC': '\033[0m',  # End color
-    'BOLD': '\033[1m',
+    'HEADER': '\033[95m',     # Magenta
+    'INFO': '\033[94m',       # Blue
+    'SUCCESS': '\033[92m',    # Green
+    'WARNING': '\033[93m',    # Yellow
+    'ERROR': '\033[91m',      # Red
+    'RESET': '\033[0m',       # Reset
+    'BOLD': '\033[1m',        # Bold
+    'DIM': '\033[2m',         # Dim
 }
 
 class CustomJSONEncoder(json.JSONEncoder):
@@ -117,61 +128,93 @@ def get_error_context(error: Optional[Exception] = None) -> Dict[str, Any]:
         'module': error.__class__.__module__
     }
 
-def log_error(
-    request: Optional[HttpRequest],
-    error_message: str,
-    error_type: str,
-    extra_context: Optional[Dict] = None,
-    error: Optional[Exception] = None,
-    level: str = 'error'
-) -> None:
+def format_value(value: Any, indent: int = 0) -> str:
+    """Format a value for console output with proper indentation."""
+    indent_str = "  " * indent
+    
+    if isinstance(value, dict):
+        if not value:
+            return "{}"
+        formatted = "\n"
+        for k, v in value.items():
+            formatted += f"{indent_str}  {k}: {format_value(v, indent + 1)}\n"
+        return formatted.rstrip()
+    elif isinstance(value, (list, tuple)):
+        if not value:
+            return "[]"
+        formatted = "\n"
+        for item in value:
+            formatted += f"{indent_str}  - {format_value(item, indent + 1)}\n"
+        return formatted.rstrip()
+    else:
+        return str(value)
+
+def print_log(title: str, data: Dict[str, Any], log_type: str = 'INFO') -> None:
     """
-    Enhanced error logging with detailed context.
+    Print a formatted, colored log message to the console.
+    
+    Args:
+        title: The title/header of the log message
+        data: Dictionary of data to log
+        log_type: Type of log (INFO, SUCCESS, WARNING, ERROR)
     """
-    try:
-        # Base log data
-        log_data = {
-            'timestamp': datetime.utcnow().isoformat(),
-            'level': level,
-            'message': error_message,
-            'error_type': error_type,
-            'environment': os.getenv('DJANGO_ENV', 'development'),
-            'process_id': os.getpid(),
-            'thread_id': threading.get_ident(),
-        }
+    color = COLORS.get(log_type, COLORS['INFO'])
+    separator = COLORS['HEADER'] + "=" * 80 + COLORS['RESET']
+    
+    # Get timestamp
+    timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
+    
+    print(f"\n{separator}")
+    print(f"{color}{COLORS['BOLD']}=== {title} === {COLORS['DIM']}[{timestamp}]{COLORS['RESET']}")
+    
+    # Print each key-value pair with proper formatting
+    for key, value in data.items():
+        if key in ['request', 'context', 'code_location']:
+            print(f"{color}>> {key}:{format_value(value, 1)}{COLORS['RESET']}")
+        else:
+            print(f"{color}>> {key}: {value}{COLORS['RESET']}")
+    
+    print(f"{color}=== END {title} ==={COLORS['RESET']}")
+    print(f"{separator}")
 
-        # Add request information
-        if request:
-            log_data['request'] = get_request_info(request)
-
-        # Add error information if available
-        if error:
-            log_data['error'] = get_error_context(error)
-
-        # Add any extra context
-        if extra_context:
-            log_data['context'] = extra_context
-
-        # Add code location
-        frame = sys._getframe(1)
-        log_data['code_location'] = {
-            'file': frame.f_code.co_filename,
-            'function': frame.f_code.co_name,
-            'line': frame.f_lineno
-        }
-
-        # Convert to JSON string
-        log_message = json.dumps(log_data, cls=CustomJSONEncoder)
-
-        # Log at appropriate level
-        log_method = getattr(logger, level.lower(), logger.error)
-        log_method(log_message)
-
-    except Exception as e:
-        # Fallback logging if something goes wrong
-        logger.error(f"Error in logging: {str(e)}")
-        logger.error(f"Original message: {error_message}")
-        logger.error(f"Original context: {extra_context}")
+def log_error(request: Optional[HttpRequest], error_message: str, error_type: str, extra_context: Optional[Dict] = None) -> None:
+    """Log an error with request and context information."""
+    # Prepare the log data
+    log_data = {
+        "message": error_message,
+        "error_type": error_type,
+        "environment": os.getenv('DJANGO_ENV', 'development'),
+        "timestamp": datetime.now().isoformat()
+    }
+    
+    # Add request information if available
+    if request:
+        log_data["request"] = get_request_info(request)
+    
+    # Add extra context if provided
+    if extra_context:
+        log_data["context"] = format_context(extra_context)
+    
+    # Add code location
+    frame = traceback.extract_stack()[-2]  # Get the caller's frame
+    log_data["code_location"] = {
+        "file": frame.filename,
+        "function": frame.name,
+        "line": frame.lineno
+    }
+    
+    # Determine log type based on error_type
+    log_type = 'ERROR' if 'error' in error_type.lower() else 'INFO'
+    if 'success' in error_type.lower():
+        log_type = 'SUCCESS'
+    elif 'warning' in error_type.lower():
+        log_type = 'WARNING'
+    
+    # Print colorful console log
+    print_log(error_type, log_data, log_type)
+    
+    # Log to file as JSON
+    logger.info(json.dumps(log_data, cls=CustomJSONEncoder))
 
 def log_upload_error(
     request: HttpRequest,
