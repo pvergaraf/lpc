@@ -181,6 +181,15 @@ cloudwatch_client = boto3.client(
     region_name=AWS_S3_REGION_NAME
 )
 
+# Create CloudWatch handler
+cloudwatch_handler = watchtower.CloudWatchLogHandler(
+    log_group_name=CLOUDWATCH_LOG_GROUP,
+    stream_name=CLOUDWATCH_LOG_STREAM,
+    boto3_client=cloudwatch_client,
+    use_queues=False,  # Synchronous logging for reliability
+    create_log_group=True
+)
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -189,10 +198,10 @@ LOGGING = {
             'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
             'style': '{',
         },
-        'simple': {
-            'format': '{levelname} {message}',
-            'style': '{',
-        },
+        'json': {
+            'format': '%(asctime)s %(levelname)s %(name)s %(message)s',
+            'class': 'pythonjsonlogger.jsonlogger.JsonFormatter',
+        }
     },
     'handlers': {
         'console': {
@@ -206,29 +215,39 @@ LOGGING = {
             'formatter': 'verbose',
             'level': 'DEBUG',
         },
+        'cloudwatch': {
+            'class': 'watchtower.CloudWatchLogHandler',
+            'log_group_name': CLOUDWATCH_LOG_GROUP,
+            'stream_name': CLOUDWATCH_LOG_STREAM,
+            'formatter': 'json',
+            'boto3_client': cloudwatch_client,
+            'use_queues': False,
+            'create_log_group': True,
+            'level': 'INFO',
+        }
     },
     'loggers': {
         'django': {
-            'handlers': ['console', 'file'],
-            'level': 'DEBUG',
+            'handlers': ['console', 'file', 'cloudwatch'],
+            'level': 'INFO',
             'propagate': True,
         },
         'django.template': {
-            'handlers': ['console', 'file'],
-            'level': 'DEBUG',
+            'handlers': ['console', 'file', 'cloudwatch'],
+            'level': 'INFO',
             'propagate': True,
         },
         'django.request': {
-            'handlers': ['console', 'file'],
-            'level': 'DEBUG',
+            'handlers': ['console', 'file', 'cloudwatch'],
+            'level': 'INFO',
             'propagate': True,
         },
         'teams': {
-            'handlers': ['console', 'file'],
-            'level': 'DEBUG',
+            'handlers': ['console', 'file', 'cloudwatch'],
+            'level': 'INFO',
             'propagate': True,
-        },
-    },
+        }
+    }
 }
 
 # S3 Static Files Configuration
