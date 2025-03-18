@@ -9,6 +9,7 @@ from django.dispatch import receiver
 from django.utils import timezone
 from .utils.logging_utils import log_error
 import traceback
+import logging
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -477,47 +478,59 @@ class Team(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
-        is_new = self.pk is None
-        
-        if not is_new and self.team_photo:
-            try:
-                old_instance = Team.objects.get(pk=self.pk)
-                if (old_instance.team_photo and 
-                    old_instance.team_photo != self.team_photo and 
-                    old_instance.team_photo.name != 'team_photos/default.png'):
-                    # Delete the old picture only if it's not the default
-                    old_instance.team_photo.delete(save=False)
-            except Team.DoesNotExist:
-                pass
+        logger = logging.getLogger('django')
 
-        super().save(*args, **kwargs)
+        try:
+            is_new = self.pk is None
+            
+            if not is_new and self.team_photo:
+                try:
+                    old_instance = Team.objects.get(pk=self.pk)
+                    if (old_instance.team_photo and 
+                        old_instance.team_photo != self.team_photo and 
+                        old_instance.team_photo.name != 'team_photos/default.png'):
+                        # Delete the old picture only if it's not the default
+                        old_instance.team_photo.delete(save=False)
+                except Team.DoesNotExist:
+                    pass
 
-        # Process the team photo if it exists and has changed
-        if self.team_photo and (is_new or self.team_photo.name != 'team_photos/default.png'):
-            img = Image.open(self.team_photo.path)
-            
-            # Convert to RGB if necessary
-            if img.mode != 'RGB':
-                img = img.convert('RGB')
-            
-            # Get the minimum dimension to make it square
-            min_dim = min(img.width, img.height)
-            
-            # Calculate cropping box
-            left = (img.width - min_dim) // 2
-            top = (img.height - min_dim) // 2
-            right = left + min_dim
-            bottom = top + min_dim
-            
-            # Crop to square
-            img = img.crop((left, top, right, bottom))
-            
-            # Resize if larger than 300x300
-            if min_dim > 300:
-                img = img.resize((300, 300), Image.Resampling.LANCZOS)
-            
-            # Save the processed image
-            img.save(self.team_photo.path, quality=90, optimize=True)
+            super().save(*args, **kwargs)
+
+            # Process the team photo if it exists and has changed
+            if self.team_photo and (is_new or self.team_photo.name != 'team_photos/default.png'):
+                try:
+                    img = Image.open(self.team_photo.path)
+                    
+                    # Convert to RGB if necessary
+                    if img.mode != 'RGB':
+                        img = img.convert('RGB')
+                    
+                    # Get the minimum dimension to make it square
+                    min_dim = min(img.width, img.height)
+                    
+                    # Calculate cropping box
+                    left = (img.width - min_dim) // 2
+                    top = (img.height - min_dim) // 2
+                    right = left + min_dim
+                    bottom = top + min_dim
+                    
+                    # Crop to square
+                    img = img.crop((left, top, right, bottom))
+                    
+                    # Resize if larger than 300x300
+                    if min_dim > 300:
+                        img = img.resize((300, 300), Image.Resampling.LANCZOS)
+                    
+                    # Save the processed image
+                    img.save(self.team_photo.path, quality=90, optimize=True)
+                except Exception as e:
+                    logger.error(f"Error processing team photo for team {self.name}: {str(e)}")
+                    # If there's an error processing the image, set it to default
+                    self.team_photo = 'team_photos/default.png'
+                    super().save(update_fields=['team_photo'])
+        except Exception as e:
+            logger.error(f"Error saving team {self.name}: {str(e)}")
+            raise
 
     def get_upcoming_birthdays(self, days=15):
         """Get team members with birthdays in the next X days."""
