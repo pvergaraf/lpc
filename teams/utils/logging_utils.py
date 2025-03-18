@@ -4,7 +4,9 @@ from datetime import datetime, date
 from typing import Any, Dict, Optional
 from functools import wraps
 import os
-
+import sys
+import traceback
+import threading
 from django.http import HttpRequest
 
 # Disable all other loggers
@@ -75,72 +77,101 @@ def format_context(context: Dict) -> Dict:
     # Remove any None values
     return {k: v for k, v in context.items() if v is not None}
 
+def get_request_info(request: Optional[HttpRequest]) -> Dict[str, Any]:
+    """Extract useful information from the request object."""
+    if not request:
+        return {}
+
+    info = {
+        'method': request.method,
+        'path': request.path,
+        'user': str(request.user) if hasattr(request, 'user') and request.user.is_authenticated else 'anonymous',
+        'ip': request.META.get('REMOTE_ADDR'),
+        'user_agent': request.META.get('HTTP_USER_AGENT'),
+        'referer': request.META.get('HTTP_REFERER'),
+    }
+
+    # Add request parameters
+    if request.method == 'GET':
+        info['query_params'] = dict(request.GET)
+    elif request.method == 'POST':
+        # Exclude sensitive data
+        post_data = dict(request.POST)
+        sensitive_fields = {'password', 'token', 'key', 'secret', 'credit_card'}
+        info['post_data'] = {
+            k: '******' if any(sensitive in k.lower() for sensitive in sensitive_fields)
+            else v for k, v in post_data.items()
+        }
+
+    return info
+
+def get_error_context(error: Optional[Exception] = None) -> Dict[str, Any]:
+    """Get detailed error information if an exception occurred."""
+    if not error:
+        return {}
+
+    return {
+        'error_type': error.__class__.__name__,
+        'error_message': str(error),
+        'traceback': traceback.format_exc(),
+        'module': error.__class__.__module__
+    }
+
 def log_error(
-    request: HttpRequest,
+    request: Optional[HttpRequest],
     error_message: str,
     error_type: str,
     extra_context: Optional[Dict] = None,
-    file_info: Optional[Dict] = None
+    error: Optional[Exception] = None,
+    level: str = 'error'
 ) -> None:
     """
     Enhanced error logging with detailed context.
     """
-    # Only log if it's a registration-related message or an actual error
-    if not ('Registration' in error_type or error_type.endswith('Error')):
-        return
+    try:
+        # Base log data
+        log_data = {
+            'timestamp': datetime.utcnow().isoformat(),
+            'level': level,
+            'message': error_message,
+            'error_type': error_type,
+            'environment': os.getenv('DJANGO_ENV', 'development'),
+            'process_id': os.getpid(),
+            'thread_id': threading.get_ident(),
+        }
 
-    # Get request ID or create one
-    request_id = getattr(request, '_logging_id', None) if request else None
-    
-    # Get user information
-    user_info = {}
-    if request and hasattr(request, 'user'):
-        user = request.user
-        if user.is_authenticated:
-            user_info = {
-                'user_id': user.id,
-                'username': user.username,
-                'email': user.email,
-                'is_staff': user.is_staff,
-                'is_superuser': user.is_superuser
-            }
-        else:
-            user_info = {'user': 'anonymous'}
+        # Add request information
+        if request:
+            log_data['request'] = get_request_info(request)
 
-    # Format the log message with colors based on error_type
-    if error_type == "RegistrationDebug":
-        color = COLORS['CYAN']
-        prefix = "🔍"
-    elif error_type == "RegistrationError":
-        color = COLORS['RED']
-        prefix = "❌"
-    elif "Registration" in error_type:
-        color = COLORS['YELLOW']
-        prefix = "⚠️"
-    else:
-        color = COLORS['RED']
-        prefix = "❌"
+        # Add error information if available
+        if error:
+            log_data['error'] = get_error_context(error)
 
-    # Format the message
-    if request_id:
-        formatted_message = f"{color}{prefix} [{request_id}] {error_message}"
-    else:
-        formatted_message = f"{color}{prefix} {error_message}"
+        # Add any extra context
+        if extra_context:
+            log_data['context'] = extra_context
 
-    # Add user info to context
-    if extra_context is None:
-        extra_context = {}
-    extra_context['user'] = user_info
+        # Add code location
+        frame = sys._getframe(1)
+        log_data['code_location'] = {
+            'file': frame.f_code.co_filename,
+            'function': frame.f_code.co_name,
+            'line': frame.f_lineno
+        }
 
-    # Add context if available, but filter and format it first
-    if extra_context:
-        formatted_context = format_context(extra_context)
-        if formatted_context:
-            context_str = json.dumps(formatted_context, cls=CustomJSONEncoder)
-            formatted_message += f"\n  {context_str}"
+        # Convert to JSON string
+        log_message = json.dumps(log_data, cls=CustomJSONEncoder)
 
-    formatted_message += f"{COLORS['ENDC']}"
-    logger.error(formatted_message)
+        # Log at appropriate level
+        log_method = getattr(logger, level.lower(), logger.error)
+        log_method(log_message)
+
+    except Exception as e:
+        # Fallback logging if something goes wrong
+        logger.error(f"Error in logging: {str(e)}")
+        logger.error(f"Original message: {error_message}")
+        logger.error(f"Original context: {extra_context}")
 
 def log_upload_error(
     request: HttpRequest,
