@@ -28,4 +28,4 @@ class Command(BaseCommand):
         except Team.DoesNotExist:
             self.stdout.write(self.style.ERROR('Team with ID 1 does not exist'))
         except Exception as e:
-            self.stdout.write(self.style.ERROR(f'An error occurred: {str(e)}')) 
+            self.stdout.write(self.style.ERROR(f'An error occurred: {str(e)}'))
