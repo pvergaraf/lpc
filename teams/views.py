@@ -30,6 +30,7 @@ from django.utils.html import strip_tags
 from django.contrib.sites.shortcuts import get_current_site
 from django.contrib.auth import views as auth_views
 from .utils.team_utils import get_current_team
+import logging
 
 User = get_user_model()
 
@@ -103,127 +104,45 @@ def is_admin(user):
 
 @login_required
 def dashboard(request):
-    # Add cache control headers
-    response = HttpResponse()
-    response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    response['Pragma'] = 'no-cache'
-    response['Expires'] = '0'
-    
-    if not request.user.is_authenticated:
-        log_error(
-            request=request,
-            error_message="Unauthenticated access attempt to dashboard",
-            error_type="AuthenticationError",
-            extra_context={
-                "user_email": getattr(request.user, 'email', 'anonymous'),
-                "path": request.path
-            }
-        )
-        return redirect('teams:login')
-
-    # Log initial request state
-    log_error(
-        request=request,
-        error_message="Dashboard initial state",
-        error_type="DebugInfo",
-        extra_context={
-            "user_email": request.user.email,
-            "user_id": request.user.id,
-            "session_id": request.session.session_key,
-            "session_data": {k: v for k, v in request.session.items()},
-            "has_profile": hasattr(request.user, 'profile'),
-            "profile_id": getattr(request.user.profile, 'id', None) if hasattr(request.user, 'profile') else None
-        }
-    )
-
-    # Attach request to user for session access
-    request.user.request = request
+    logger = logging.getLogger('django')
+    logger.info(f"Dashboard access - User: {request.user.email}, Session team: {request.session.get('current_team')}")
     
     try:
-        # Get team memberships first
+        # Get team memberships
         team_memberships = TeamMember.objects.filter(
             user=request.user,
             is_active=True
         ).select_related('team')
         
-        current_team = get_current_team(request.user)
-        current_season = get_current_season(current_team)
+        # Get current team
+        current_team = None
+        current_team_id = request.session.get('current_team')
         
-        log_error(
-            request=request,
-            error_message="Season data check",
-            error_type="DebugInfo",
-            extra_context={
-                "user_email": request.user.email,
-                "user_id": request.user.id,
-                "team_id": getattr(current_team, 'id', None),
-                "has_season": current_season is not None,
-                "season_id": getattr(current_season, 'id', None),
-                "season_name": getattr(current_season, 'name', None),
-                "season_is_active": getattr(current_season, 'is_active', None),
-                "season_dates": {
-                    "start": str(getattr(current_season, 'start_date', None)),
-                    "end": str(getattr(current_season, 'end_date', None))
-                } if current_season else None
-            }
-        )
+        if current_team_id:
+            try:
+                current_team = Team.objects.get(
+                    id=current_team_id,
+                    teammember__user=request.user,
+                    teammember__is_active=True
+                )
+                logger.info(f"Found current team: {current_team.name} (ID: {current_team.id})")
+            except Team.DoesNotExist:
+                logger.warning(f"Team {current_team_id} not found or user not a member")
+                current_team = None
         
-        log_error(
-            request=request,
-            error_message="Team memberships query result",
-            error_type="DebugInfo",
-            extra_context={
-                "user_email": request.user.email,
-                "user_id": request.user.id,
-                "memberships_count": team_memberships.count(),
-                "memberships": [
-                    {
-                        "id": tm.id,
-                        "team_id": tm.team.id,
-                        "team_name": tm.team.name,
-                        "is_active": tm.is_active,
-                        "role": tm.role
-                    }
-                    for tm in team_memberships
-                ]
-            }
-        )
-        
-        log_error(
-            request=request,
-            error_message="Current team resolution",
-            error_type="DebugInfo",
-            extra_context={
-                "user_email": request.user.email,
-                "user_id": request.user.id,
-                "session_team_id": request.session.get('current_team'),
-                "resolved_team_id": getattr(current_team, 'id', None),
-                "resolved_team_name": getattr(current_team, 'name', None)
-            }
-        )
-    
-        # Get the filter parameter
-        show_active_only = request.GET.get('active_only', 'false').lower() == 'true'
+        if not current_team and team_memberships.exists():
+            current_team = team_memberships.first().team
+            request.session['current_team'] = current_team.id
+            logger.info(f"Set default team: {current_team.name} (ID: {current_team.id})")
         
         if not current_team:
-            log_error(
-                request=request,
-                error_message="No current team available",
-                error_type="TeamAccess",
-                extra_context={
-                    "user_email": request.user.email,
-                    "user_id": request.user.id,
-                    "session_data": {k: v for k, v in request.session.items()},
-                    "available_teams": [tm.team.id for tm in team_memberships]
-                }
-            )
+            logger.warning(f"No current team available for user {request.user.email}")
             messages.warning(request, "You are not a member of any team. Please join or create a team.")
             return redirect('teams:team_list')
-
+        
+        # Get current team member
         try:
-            # Get the user's team membership
-            team_member = TeamMember.objects.select_related(
-                'team',
+            current_team_member = TeamMember.objects.select_related(
                 'teammemberprofile',
                 'teammemberprofile__position'
             ).get(
@@ -231,202 +150,44 @@ def dashboard(request):
                 user=request.user,
                 is_active=True
             )
-            
-            log_error(
-                request=request,
-                error_message="Team member details loaded",
-                error_type="DebugInfo",
-                extra_context={
-                    "user_email": request.user.email,
-                    "user_id": request.user.id,
-                    "team_id": current_team.id,
-                    "team_name": current_team.name,
-                    "role": team_member.role,
-                    "is_admin": team_member.is_team_admin,
-                    "membership_id": team_member.id,
-                    "has_profile": hasattr(team_member, 'teammemberprofile'),
-                    "profile_id": getattr(team_member.teammemberprofile, 'id', None) if hasattr(team_member, 'teammemberprofile') else None,
-                    "condition": team_member.teammemberprofile.condition if hasattr(team_member, 'teammemberprofile') else None,
-                    "raw_sql": str(TeamMember.objects.select_related(
-                        'team',
-                        'teammemberprofile',
-                        'teammemberprofile__position'
-                    ).filter(
-                        team=current_team,
-                        user=request.user,
-                        is_active=True
-                    ).query)
-                }
-            )
-        except TeamMember.DoesNotExist as e:
-            log_error(
-                request=request,
-                error_message="Invalid team membership access attempt",
-                error_type="TeamAccessError",
-                extra_context={
-                    "user_email": request.user.email,
-                    "user_id": request.user.id,
-                    "team_id": current_team.id,
-                    "team_name": current_team.name,
-                    "error": str(e),
-                    "traceback": traceback.format_exc()
-                }
-            )
+            logger.info(f"Found team member profile for user in team {current_team.name}")
+        except TeamMember.DoesNotExist:
+            logger.error(f"TeamMember not found for user {request.user.email} in team {current_team.id}")
             messages.error(request, "There was an error accessing your team membership.")
             return redirect('teams:team_list')
         
-        try:
-            is_team_admin = is_user_team_admin(request.user, current_team)
-            today = timezone.now().date()
-
-            # Get pending payments for the current user
-            pending_payments = PlayerPayment.objects.filter(
-                player__user=request.user,
-                player__team=current_team,
-                payment__season=current_season,
-                amount__gt=0,  # Only show payments with amount > 0
-                admin_verified=False  # Exclude verified payments
-            ).select_related('payment').annotate(
-                total_players=models.Count(
-                    'payment__player_payments',
-                    filter=models.Q(payment__player_payments__amount__gt=0)
-                ),
-                verified_players=models.Count(
-                    'payment__player_payments',
-                    filter=models.Q(payment__player_payments__amount__gt=0, payment__player_payments__admin_verified=True)
-                ),
-                verification_percentage=models.Case(
-                    When(total_players__gt=0,
-                         then=models.ExpressionWrapper(
-                             100.0 * models.F('verified_players') / models.F('total_players'),
-                             output_field=models.FloatField()
-                         )),
-                    default=Value(0.0),
-                    output_field=models.FloatField(),
-                )
-            )
-
-            # Log payment status
-            log_error(
-                request=request,
-                error_message="Payment status check",
-                error_type="PaymentActivity",
-                extra_context={
-                    "user_email": request.user.email,
-                    "user_id": request.user.id,
-                    "team_id": current_team.id,
-                    "season_id": current_season.id if current_season else None,
-                    "pending_payments_count": pending_payments.count(),
-                    "total_pending_amount": sum(p.amount for p in pending_payments)
-                }
-            )
-
-            # Get team memberships for the teams list
-            team_memberships = TeamMember.objects.filter(
-                user=request.user,
-                is_active=True
-            ).select_related('team')
-
-            # Get team members for the current team
-            team_members_query = TeamMember.objects.select_related(
-                'user',
-                'user__profile',
-                'teammemberprofile',
-                'teammemberprofile__position'
-            ).filter(
-                team=current_team
-            ).filter(
-                models.Q(is_active=True) | 
-                models.Q(is_active=False, invitation_token__isnull=False)
-            ).prefetch_related(
-                'teammemberprofile'
-            ).order_by(
-                'teammemberprofile__player_number'
-            ).distinct()
-
-            # Apply active filter if requested
-            if show_active_only:
-                team_members_query = team_members_query.filter(teammemberprofile__active_player=True)
-            
-            # Force a fresh query by adding a timestamp
-            team_members = team_members_query.extra(
-                select={'_timestamp': "'%s'" % timezone.now().isoformat()}
-            )
-
-            # Get upcoming birthdays
-            upcoming_birthdays = current_team.get_upcoming_birthdays() if current_team else None
-
-            # Get upcoming matches
-            upcoming_matches = None
-            if current_season:
-                upcoming_matches = Match.objects.filter(
-                    season=current_season,
-                    match_date__gte=timezone.now().date()
-                ).order_by('match_date', 'match_time')
-
-            context = {
-                'team_memberships': team_memberships,
-                'current_team': current_team,
-                'current_team_member': team_member,
-                'current_season': current_season,
-                'is_team_admin': is_team_admin,
-                'pending_payments': pending_payments,
-                'team_members': team_members,
-                'show_active_only': show_active_only,
-                'today': today,
-                'upcoming_birthdays': upcoming_birthdays,
-                'upcoming_matches': upcoming_matches,
-            }
-
-            # Log successful dashboard render
-            log_error(
-                request=request,
-                error_message="Dashboard rendered successfully",
-                error_type="PageView",
-                extra_context={
-                    "user_email": request.user.email,
-                    "user_id": request.user.id,
-                    "team_id": current_team.id,
-                    "team_name": current_team.name,
-                    "is_admin": is_team_admin,
-                    "has_season": bool(current_season),
-                    "render_timestamp": timezone.now().isoformat()
-                }
-            )
-
-            return render(request, 'teams/dashboard.html', context)
-        except Exception as e:
-            log_error(
-                request=request,
-                error_message="Error in dashboard view execution",
-                error_type="SystemError",
-                extra_context={
-                    "user_email": request.user.email,
-                    "user_id": request.user.id,
-                    "team_id": current_team.id if current_team else None,
-                    "error": str(e),
-                    "error_type": type(e).__name__,
-                    "traceback": traceback.format_exc(),
-                    "session_data": {k: v for k, v in request.session.items()},
-                }
-            )
-            raise
-
+        # Get current season
+        current_season = Season.objects.filter(
+            team=current_team,
+            is_active=True
+        ).first()
+        
+        # Get team members
+        team_members = TeamMember.objects.select_related(
+            'user',
+            'teammemberprofile',
+            'teammemberprofile__position'
+        ).filter(
+            team=current_team,
+            is_active=True
+        ).order_by('teammemberprofile__player_number')
+        
+        context = {
+            'team_memberships': team_memberships,
+            'current_team': current_team,
+            'current_season': current_season,
+            'team_members': team_members,
+            'is_team_admin': current_team_member.is_team_admin or current_team_member.role == TeamMember.Role.MANAGER
+        }
+        
+        logger.info("Successfully prepared dashboard context")
+        return render(request, 'teams/dashboard.html', context)
+        
     except Exception as e:
-        log_error(
-            request=request,
-            error_message="Critical error in dashboard view",
-            error_type="SystemError",
-            extra_context={
-                "user_email": request.user.email,
-                "user_id": request.user.id,
-                "error": str(e),
-                "error_type": type(e).__name__,
-                "traceback": traceback.format_exc(),
-                "session_data": {k: v for k, v in request.session.items()},
-            }
-        )
-        raise
+        logger.error(f"Error in dashboard view: {str(e)}")
+        logger.error(traceback.format_exc())
+        messages.error(request, "An error occurred while loading the dashboard.")
+        return redirect('teams:team_list')
 
 @login_required
 def switch_team(request, team_id):
