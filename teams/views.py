@@ -1331,13 +1331,21 @@ def add_team_member(request, team_id):
                     user = form.save()
                     
                     # Create the team member
-                    TeamMember.objects.create(
+                    team_member = TeamMember.objects.create(
                         user=user,
                         team=team,
                         role=form.cleaned_data['role'],
                         is_team_admin=form.cleaned_data['is_team_admin'],
                         is_active=True,
                         invitation_accepted=True
+                    )
+
+                    # Create the team member profile
+                    TeamMemberProfile.objects.create(
+                        team_member=team_member,
+                        level=1,
+                        condition='NORMAL',
+                        active_player=True
                     )
                     
                     messages.success(request, f'{user.get_full_name()} has been added to the team.')
