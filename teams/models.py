@@ -10,6 +10,7 @@ from django.utils import timezone
 from .utils.logging_utils import log_error
 import traceback
 import logging
+from django.core.exceptions import ValidationError
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -181,7 +182,7 @@ class TeamMember(models.Model):
         MANAGER = 'MANAGER', 'Manager'
     
     team = models.ForeignKey('Team', on_delete=models.CASCADE)
-    user = models.ForeignKey('teams.User', on_delete=models.CASCADE, null=True, blank=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     email = models.EmailField(null=True, blank=True)  # For storing email before user registration
     role = models.CharField(max_length=10, choices=Role.choices, default=Role.PLAYER)
     is_team_admin = models.BooleanField(default=False)
@@ -457,3 +458,15 @@ class PlayerMatchStats(models.Model):
             'yellow_cards': stats.aggregate(total_yellows=models.Sum('yellow_cards'))['total_yellows'] or 0,
             'red_cards': stats.aggregate(total_reds=models.Sum('red_cards'))['total_reds'] or 0
         }
+
+@receiver(post_save, sender=TeamMember)
+def create_team_member_profile(sender, instance, created, **kwargs):
+    """Create a TeamMemberProfile when a TeamMember is created."""
+    if created and not hasattr(instance, 'teammemberprofile'):
+        TeamMemberProfile.objects.create(
+            team_member=instance,
+            level=1,
+            condition='NORMAL',
+            active_player=True if instance.role == TeamMember.Role.PLAYER else False,
+            is_official=instance.is_official if hasattr(instance, 'is_official') else False
+        )
