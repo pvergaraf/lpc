@@ -204,9 +204,15 @@ class TeamMember(models.Model):
         is_new = self.pk is None
         super().save(*args, **kwargs)
         
-        # Only create TeamMemberProfile automatically for new invitations (not existing users)
-        if is_new and not hasattr(self, 'teammemberprofile') and not self.user:
-            TeamMemberProfile.objects.create(team_member=self)
+        # Create TeamMemberProfile for any new team member that doesn't have one
+        if is_new and not hasattr(self, 'teammemberprofile'):
+            TeamMemberProfile.objects.create(
+                team_member=self,
+                level=1,
+                condition='NORMAL',
+                active_player=True if self.role == self.Role.PLAYER else False,
+                is_official=self.is_official
+            )
 
 class Team(models.Model):
     name = models.CharField(max_length=100)
