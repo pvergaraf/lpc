@@ -201,18 +201,33 @@ class TeamMember(models.Model):
         return f"{self.email} (Invited) - {self.team.name}"
 
     def save(self, *args, **kwargs):
+        logger = logging.getLogger('django')
         is_new = self.pk is None
-        super().save(*args, **kwargs)
         
-        # Create TeamMemberProfile for any new team member that doesn't have one
-        if is_new and not hasattr(self, 'teammemberprofile'):
-            TeamMemberProfile.objects.create(
-                team_member=self,
-                level=1,
-                condition='NORMAL',
-                active_player=True if self.role == self.Role.PLAYER else False,
-                is_official=self.is_official
-            )
+        try:
+            logger.info(f"Saving TeamMember: is_new={is_new}, user={self.user}, team={self.team}, role={self.role}")
+            super().save(*args, **kwargs)
+            
+            # Create TeamMemberProfile for any new team member that doesn't have one
+            if is_new and not hasattr(self, 'teammemberprofile'):
+                logger.info(f"Creating new TeamMemberProfile for TeamMember {self.pk}")
+                try:
+                    profile = TeamMemberProfile.objects.create(
+                        team_member=self,
+                        level=1,
+                        condition='NORMAL',
+                        active_player=True if self.role == self.Role.PLAYER else False,
+                        is_official=self.is_official
+                    )
+                    logger.info(f"Successfully created TeamMemberProfile {profile.pk} for TeamMember {self.pk}")
+                except Exception as e:
+                    logger.error(f"Error creating TeamMemberProfile for TeamMember {self.pk}: {str(e)}")
+                    logger.error(traceback.format_exc())
+                    raise
+        except Exception as e:
+            logger.error(f"Error saving TeamMember: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise
 
 class Team(models.Model):
     name = models.CharField(max_length=100)
@@ -468,11 +483,27 @@ class PlayerMatchStats(models.Model):
 @receiver(post_save, sender=TeamMember)
 def create_team_member_profile(sender, instance, created, **kwargs):
     """Create a TeamMemberProfile when a TeamMember is created."""
-    if created and not hasattr(instance, 'teammemberprofile'):
-        TeamMemberProfile.objects.create(
-            team_member=instance,
-            level=1,
-            condition='NORMAL',
-            active_player=True if instance.role == TeamMember.Role.PLAYER else False,
-            is_official=instance.is_official if hasattr(instance, 'is_official') else False
-        )
+    logger = logging.getLogger('django')
+    
+    try:
+        logger.info(f"Signal handler: TeamMember post_save for {instance.pk}, created={created}")
+        
+        if created and not hasattr(instance, 'teammemberprofile'):
+            logger.info(f"Signal handler: Creating TeamMemberProfile for new TeamMember {instance.pk}")
+            try:
+                profile = TeamMemberProfile.objects.create(
+                    team_member=instance,
+                    level=1,
+                    condition='NORMAL',
+                    active_player=True if instance.role == TeamMember.Role.PLAYER else False,
+                    is_official=instance.is_official if hasattr(instance, 'is_official') else False
+                )
+                logger.info(f"Signal handler: Successfully created TeamMemberProfile {profile.pk}")
+            except Exception as e:
+                logger.error(f"Signal handler: Error creating TeamMemberProfile: {str(e)}")
+                logger.error(traceback.format_exc())
+                raise
+    except Exception as e:
+        logger.error(f"Signal handler: Unexpected error: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise
