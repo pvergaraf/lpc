@@ -16,7 +16,7 @@
                     {{ form|crispy }}
                     <div class="d-grid gap-2">
                         <button type="submit" class="btn btn-primary">Add Member</button>
-                        <a href="{% url 'teams:team_members' team.id %}" class="btn btn-secondary">Cancel</a>
+                        <a href="{% url 'teams:team_members' team_id=team.id %}" class="btn btn-secondary">Cancel</a>
                     </div>
                 </form>
             </div>

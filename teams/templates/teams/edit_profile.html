@@ -1,6 +1,7 @@
 {% extends 'teams/base.html' %}
 {% load crispy_forms_tags %}
 {% load static %}
+{% load teams_tags %}
 
 {% block title %}Edit Profile{% endblock %}
 
@@ -20,11 +21,17 @@
                         <div class="mb-4">
                             <label class="form-label">Current Profile Picture</label>
                             <div class="text-center">
-                                {% if user.profile.profile_picture %}
-                                    <img src="{{ user.profile.profile_picture.url }}" alt="Current profile picture" class="img-thumbnail mb-2" style="max-width: 200px;">
-                                {% else %}
-                                    <img src="{% static 'teams/images/default-profile.png' %}" alt="Default profile picture" class="img-thumbnail mb-2" style="max-width: 200px;">
-                                {% endif %}
+                                {% with team_member=user.teammember_set.all|filter_by_team:team|first %}
+                                    {% if team_member and team_member.teammemberprofile %}
+                                        {% if team_member.teammemberprofile.profile_picture %}
+                                            <img src="{{ team_member.teammemberprofile.profile_picture.url }}" alt="Current profile picture" class="img-thumbnail mb-2" style="max-width: 200px;">
+                                        {% else %}
+                                            <img src="{% static 'teams/images/castolo.png' %}" alt="Default profile picture" class="img-thumbnail mb-2" style="max-width: 200px;">
+                                        {% endif %}
+                                    {% else %}
+                                        <img src="{% static 'teams/images/castolo.png' %}" alt="Default profile picture" class="img-thumbnail mb-2" style="max-width: 200px;">
+                                    {% endif %}
+                                {% endwith %}
                             </div>
                         </div>
 

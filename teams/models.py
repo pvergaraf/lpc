@@ -91,6 +91,7 @@ class Position(models.Model):
         }.get(self.type, '#808080')  # Gray as default
 
 class Profile(models.Model):
+    """Global user profile with data shared across all teams"""
     COUNTRIES = [
         ('CL', 'Chile'),  # Chile first
         ('AR', 'Argentina'),
@@ -123,6 +124,30 @@ class Profile(models.Model):
     ]
 
     user = models.OneToOneField(User, on_delete=models.CASCADE)
+    date_of_birth = models.DateField(null=True, blank=True)
+    rut = models.CharField(max_length=12, blank=True, null=True, help_text="Chilean ID number (RUT)")
+    country = models.CharField(
+        max_length=2,
+        choices=COUNTRIES,
+        default='CL',
+        help_text="Player's country"
+    )
+
+    def __str__(self):
+        return f"{self.user.get_full_name()}'s Profile"
+
+class TeamMemberProfile(models.Model):
+    """Team-specific profile data"""
+    CONDITION_CHOICES = [
+        ('TOP', 'Top Condition'),
+        ('GOOD', 'Good Condition'),
+        ('NORMAL', 'Normal Condition'),
+        ('BAD', 'Bad Condition'),
+        ('AWFUL', 'Awful Condition'),
+        ('INJURED', 'Injured'),
+    ]
+
+    team_member = models.OneToOneField('TeamMember', on_delete=models.CASCADE)
     profile_picture = models.ImageField(
         upload_to='profile_pics/',
         default='profile_pics/castolo.png',
@@ -131,339 +156,56 @@ class Profile(models.Model):
     description = models.CharField(max_length=20, blank=True, help_text="A short description (max 20 characters)")
     player_number = models.IntegerField(null=True, blank=True)
     position = models.ForeignKey(Position, on_delete=models.SET_NULL, null=True, blank=True)
-    date_of_birth = models.DateField(null=True, blank=True)
     level = models.IntegerField(
         validators=[MinValueValidator(1), MaxValueValidator(99)],
         default=1
     )
     is_official = models.BooleanField(default=False, help_text="Indicates if the player is officially registered")
     active_player = models.BooleanField(default=True, help_text="Indicates if the player is currently active")
-    rut = models.CharField(max_length=12, blank=True, null=True, help_text="Chilean ID number (RUT)")
-    country = models.CharField(
-        max_length=2,
-        choices=COUNTRIES,
-        default='CL',
-        help_text="Player's country"
-    )
     condition = models.CharField(
         max_length=10,
         choices=CONDITION_CHOICES,
-        default='NORMAL',
-        help_text="Player's current condition"
+        default='NORMAL'
     )
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._original_state = self._get_current_state()
-        self._modified_fields = set()
-
-    def _get_current_state(self):
-        return {
-            'player_number': self.player_number,
-            'position_id': self.position_id if self.position else None,
-            'is_official': self.is_official,
-            'level': self.level,
-            'rut': self.rut,
-            'country': self.country,
-            'description': self.description,
-        }
-
-    def save(self, *args, **kwargs):
-        # Check if this is a new instance
-        is_new = self.pk is None
-        
-        # Track which fields have been modified
-        if not is_new:
-            current_state = self._get_current_state()
-            self._modified_fields = {
-                field for field, value in current_state.items()
-                if value != self._original_state.get(field)
-            }
-        
-        # Log save attempt
-        log_error(
-            None,
-            error_message="Profile save attempt",
-            error_type="ProfileDebug",
-            extra_context={
-                "profile_id": self.pk,
-                "is_new": is_new,
-                "user_id": self.user.id if self.user else None,
-                "modified_fields": list(getattr(self, '_modified_fields', set())),
-                "current_state": {
-                    "player_number": self.player_number,
-                    "position": str(self.position) if self.position else None,
-                    "is_official": self.is_official,
-                    "level": self.level,
-                    "rut": self.rut,
-                    "country": self.country,
-                    "description": self.description
-                }
-            }
-        )
-        
-        if not is_new:
-            # Get the old instance from the database
-            try:
-                old_instance = Profile.objects.get(pk=self.pk)
-                if (old_instance.profile_picture and 
-                    old_instance.profile_picture != self.profile_picture and 
-                    old_instance.profile_picture.name != 'profile_pics/castolo.png'):
-                    # Delete the old picture only if it's not the default
-                    old_instance.profile_picture.delete(save=False)
-                
-                # Log changes
-                log_error(
-                    None,
-                    error_message="Profile changes detected",
-                    error_type="ProfileDebug",
-                    extra_context={
-                        "profile_id": self.pk,
-                        "old_state": {
-                            "player_number": old_instance.player_number,
-                            "position": str(old_instance.position) if old_instance.position else None,
-                            "is_official": old_instance.is_official,
-                            "level": old_instance.level,
-                            "rut": old_instance.rut,
-                            "country": old_instance.country,
-                            "description": old_instance.description
-                        }
-                    }
-                )
-            except Profile.DoesNotExist:
-                pass
-        
-        # Call the actual save method
-        super().save(*args, **kwargs)
-        
-        # Update original state after save
-        self._original_state = self._get_current_state()
-        
-        # Log after save
-        log_error(
-            None,
-            error_message="Profile saved",
-            error_type="ProfileDebug",
-            extra_context={
-                "profile_id": self.pk,
-                "saved_state": {
-                    "player_number": self.player_number,
-                    "position": str(self.position) if self.position else None,
-                    "is_official": self.is_official,
-                    "level": self.level,
-                    "rut": self.rut,
-                    "country": self.country,
-                    "description": self.description
-                }
-            }
-        )
 
     def __str__(self):
-        return f"{self.user.email}'s profile"
+        return f"{self.team_member.user.get_full_name()}'s Profile in {self.team_member.team.name}"
 
-@receiver(pre_save, sender=Profile)
-def log_profile_changes(sender, instance, **kwargs):
-    try:
-        if instance.pk:
-            old_instance = Profile.objects.get(pk=instance.pk)
-            changes = {}
-            for field in ['player_number', 'position', 'is_official', 'level', 'rut', 'country', 'description']:
-                old_value = getattr(old_instance, field)
-                new_value = getattr(instance, field)
-                if old_value != new_value:
-                    changes[field] = {
-                        'old': str(old_value),
-                        'new': str(new_value)
-                    }
-            if changes:
-                log_error(
-                    None,
-                    error_message="Profile field changes",
-                    error_type="ProfileDebug",
-                    extra_context={
-                        "profile_id": instance.pk,
-                        "changes": changes
-                    }
-                )
-    except Profile.DoesNotExist:
-        pass
+    class Meta:
+        unique_together = [('team_member', 'player_number')]  # Ensure numbers are unique within a team
 
-@receiver(post_save, sender=User)
-def create_user_profile(sender, instance, created, raw=False, **kwargs):
-    if raw:  # Skip during fixtures/migrations
-        return
-        
-    log_error(
-        None,
-        error_message="create_user_profile signal triggered",
-        error_type="SignalDebug",
-        extra_context={
-            "user_id": instance.id,
-            "created": created,
-            "has_profile": hasattr(instance, 'profile'),
-            "signal_order": "1st signal",
-            "signal_handler": "create_user_profile",
-            "sender": str(sender)
-        }
-    )
+class TeamMember(models.Model):
+    """Represents a user's membership in a team with team-specific data"""
+    class Role(models.TextChoices):
+        PLAYER = 'PLAYER', 'Player'
+        MANAGER = 'MANAGER', 'Manager'
     
-    if created:
-        try:
-            # Force refresh the instance from database
-            instance.refresh_from_db()
-            
-            profile = Profile.objects.create(user=instance)
-            log_error(
-                None,
-                error_message="Profile created from first signal",
-                error_type="SignalDebug",
-                extra_context={
-                    "profile_id": profile.pk,
-                    "user_id": instance.id,
-                    "profile_state": {
-                        "player_number": profile.player_number,
-                        "position": str(profile.position) if profile.position else None,
-                        "is_official": profile.is_official,
-                        "level": profile.level,
-                        "rut": profile.rut,
-                        "country": profile.country,
-                        "description": profile.description
-                    }
-                }
-            )
-        except Exception as e:
-            log_error(
-                None,
-                error_message=f"Error creating profile from first signal: {str(e)}",
-                error_type="SignalError",
-                extra_context={
-                    "user_id": instance.id,
-                    "error": str(e),
-                    "traceback": traceback.format_exc()
-                }
-            )
+    team = models.ForeignKey('Team', on_delete=models.CASCADE)
+    user = models.ForeignKey('teams.User', on_delete=models.CASCADE, null=True, blank=True)
+    email = models.EmailField(null=True, blank=True)  # For storing email before user registration
+    role = models.CharField(max_length=10, choices=Role.choices, default=Role.PLAYER)
+    is_team_admin = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+    invitation_token = models.CharField(max_length=64, null=True, blank=True, unique=True)
+    invitation_accepted = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    # New fields for storing invitation settings
+    is_official = models.BooleanField(default=False, help_text="Whether this member is an official player")
+    active_player = models.BooleanField(default=True, help_text="Whether this member is an active player")
 
-@receiver(post_save, sender=User)
-def save_user_profile(sender, instance, created, raw=False, **kwargs):
-    if raw:  # Skip during fixtures/migrations
-        return
+    def __str__(self):
+        if self.user:
+            return f"{self.user.get_full_name()} - {self.team.name}"
+        return f"{self.email} (Invited) - {self.team.name}"
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
         
-    log_error(
-        None,
-        error_message="save_user_profile signal triggered",
-        error_type="SignalDebug",
-        extra_context={
-            "user_id": instance.id,
-            "created": created,
-            "has_profile": hasattr(instance, 'profile'),
-            "signal_order": "2nd signal",
-            "signal_handler": "save_user_profile",
-            "sender": str(sender)
-        }
-    )
-    
-    try:
-        # Force refresh the instance from database
-        instance.refresh_from_db()
-        
-        if not hasattr(instance, 'profile'):
-            log_error(
-                None,
-                error_message="No profile found in second signal",
-                error_type="SignalDebug",
-                extra_context={
-                    "user_id": instance.id,
-                    "will_create": True
-                }
-            )
-            profile = Profile.objects.create(user=instance)
-            log_error(
-                None,
-                error_message="Profile created in second signal",
-                error_type="SignalDebug",
-                extra_context={
-                    "profile_id": profile.pk,
-                    "user_id": instance.id
-                }
-            )
-        else:
-            # Only save if profile exists and has been modified
-            profile = instance.profile
-            # Force refresh the profile from database
-            profile.refresh_from_db()
-            
-            if hasattr(profile, '_modified_fields'):
-                log_error(
-                    None,
-                    error_message="Profile save from second signal",
-                    error_type="SignalDebug",
-                    extra_context={
-                        "profile_id": profile.pk,
-                        "user_id": instance.id,
-                        "modified_fields": getattr(profile, '_modified_fields', []),
-                        "current_state": {
-                            "player_number": profile.player_number,
-                            "position": str(profile.position) if profile.position else None,
-                            "is_official": profile.is_official,
-                            "level": profile.level,
-                            "rut": profile.rut,
-                            "country": profile.country,
-                            "description": profile.description
-                        }
-                    }
-                )
-                profile.save()
-            else:
-                log_error(
-                    None,
-                    error_message="Profile not modified, skipping save in second signal",
-                    error_type="SignalDebug",
-                    extra_context={
-                        "profile_id": profile.pk,
-                        "user_id": instance.id,
-                        "current_state": {
-                            "player_number": profile.player_number,
-                            "position": str(profile.position) if profile.position else None,
-                            "is_official": profile.is_official,
-                            "level": profile.level,
-                            "rut": profile.rut,
-                            "country": profile.country,
-                            "description": profile.description
-                        }
-                    }
-                )
-    except Exception as e:
-        log_error(
-            None,
-            error_message=f"Error in second signal: {str(e)}",
-            error_type="SignalError",
-            extra_context={
-                "user_id": instance.id,
-                "error": str(e),
-                "traceback": traceback.format_exc()
-            }
-        )
-
-# Add signal connection verification
-def verify_signal_connections():
-    log_error(
-        None,
-        error_message="Verifying signal connections",
-        error_type="SignalDebug",
-        extra_context={
-            "create_user_profile_connected": any(
-                r[1] == create_user_profile 
-                for r in post_save.receivers
-            ),
-            "save_user_profile_connected": any(
-                r[1] == save_user_profile 
-                for r in post_save.receivers
-            )
-        }
-    )
-
-# Call verification on module load
-verify_signal_connections()
+        # Only create TeamMemberProfile automatically for new invitations (not existing users)
+        if is_new and not hasattr(self, 'teammemberprofile') and not self.user:
+            TeamMemberProfile.objects.create(team_member=self)
 
 class Team(models.Model):
     name = models.CharField(max_length=100)
@@ -633,33 +375,6 @@ class Match(models.Model):
         if not self.played:
             return "vs"
         return f"{self.home_score} - {self.away_score}"
-
-class TeamMember(models.Model):
-    class Role(models.TextChoices):
-        PLAYER = 'PLAYER', 'Player'
-        MANAGER = 'MANAGER', 'Manager'
-    
-    team = models.ForeignKey(Team, on_delete=models.CASCADE)
-    user = models.ForeignKey('teams.User', on_delete=models.CASCADE, null=True, blank=True)
-    email = models.EmailField(null=True, blank=True)  # For storing email before user registration
-    role = models.CharField(max_length=10, choices=Role.choices, default=Role.PLAYER)
-    is_team_admin = models.BooleanField(default=False)
-    is_active = models.BooleanField(default=True)
-    invitation_token = models.CharField(max_length=64, null=True, blank=True, unique=True)
-    invitation_accepted = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        unique_together = [
-            ('team', 'user'),  # A user can only be a member of a team once
-            ('team', 'email'),  # An email can only be invited to a team once
-        ]
-
-    def __str__(self):
-        if self.user:
-            return f"{self.user.get_full_name()} - {self.team.name} ({self.get_role_display()})"
-        return f"Pending Invitation ({self.email}) - {self.team.name}"
 
 class Payment(models.Model):
     season = models.ForeignKey(Season, on_delete=models.CASCADE, related_name='payments')

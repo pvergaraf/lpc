@@ -100,58 +100,53 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Payment toggle functionality
     document.querySelectorAll('.toggle-payment-btn').forEach(button => {
-        button.addEventListener('click', function() {
+        button.addEventListener('click', async function() {
             const paymentId = this.dataset.paymentId;
             const isAdmin = this.dataset.isAdmin === 'true';
-            const row = this.closest('tr');
-            const table = this.closest('table');
-            const currentStatus = button.textContent.trim() === 'Mark as Unpaid';
+            const currentStatus = this.textContent.trim() === 'Mark as Unpaid';
             
-            // Get team and season IDs from URL
-            const pathParts = window.location.pathname.split('/');
-            const teamId = pathParts[2];
-            const seasonId = pathParts[4];
+            // Get team and season IDs from template context
+            const teamId = {{ team.id }};  // Get from template context
+            const seasonId = {{ season.id }};  // Get from template context
             
-            // Construct the URL using the correct URL pattern with domain prefix
-            const url = `${window.location.protocol}//${window.location.host}/team/${teamId}/season/${seasonId}/payments/${paymentId}/player/${paymentId}/toggle/`;
-            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            try {
+                const response = await fetch(`/teams/${teamId}/season/${seasonId}/payments/${paymentId}/player/${paymentId}/toggle/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                        'X-Admin-Action': isAdmin.toString()
+                    },
+                    body: JSON.stringify({
+                        is_paid: !currentStatus,
+                        send_email: !currentStatus
+                    })
+                });
 
-            fetch(url, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': csrfToken,
-                    'X-Admin-Action': 'false',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    is_paid: !currentStatus,
-                    send_email: !currentStatus
-                })
-            })
-            .then(response => {
-                if (response.ok) {
-                    return response.json();
-                } else {
+                if (!response.ok) {
                     throw new Error('Server error');
                 }
-            })
-            .then(data => {
+
+                const data = await response.json();
                 if (data.status === 'success') {
-                    showAlert('success', currentStatus ? 'Payment marked as unpaid' : 'Payment marked as paid');
-                } else {
-                    showAlert('warning', data.message || 'Failed to update payment status');
+                    // Update button text and style
+                    if (data.is_paid) {
+                        button.innerHTML = '<i class="fas fa-times me-1"></i> Mark as Unpaid';
+                        button.classList.remove('btn-success');
+                        button.classList.add('btn-outline-success');
+                    } else {
+                        button.innerHTML = '<i class="fas fa-check me-1"></i> Mark as Paid';
+                        button.classList.remove('btn-outline-success');
+                        button.classList.add('btn-success');
+                    }
+                    
+                    // Refresh the page to update all payment statuses
+                    location.reload();
                 }
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
-            })
-            .catch(error => {
+            } catch (error) {
                 console.error('Error:', error);
-                showAlert('warning', 'There was an issue updating the payment status. The page will refresh to show the current status.');
-                setTimeout(() => {
-                    window.location.reload();
-                }, 2000);
-            });
+                alert('An error occurred while updating the payment status. Please try again.');
+            }
         });
     });
 });

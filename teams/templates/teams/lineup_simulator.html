@@ -338,14 +338,14 @@
             <div class="bench w-100">
                 {% for player in players %}
                     <div class="player-card" draggable="true" data-player-id="{{ player.id }}">
-                        <img src="{% if player.user.profile.profile_picture %}{{ player.user.profile.profile_picture.url }}{% else %}{% static 'teams/images/default-profile.png' %}{% endif %}" alt="{{ player.user.get_full_name }}" class="player-photo">
+                        <img src="{% if player.teammemberprofile.profile_picture %}{{ player.teammemberprofile.profile_picture.url }}{% else %}{% static 'teams/images/default-profile.png' %}{% endif %}" alt="{{ player.user.get_full_name }}" class="player-photo">
                         <div class="player-name">{{ player.user.last_name }}</div>
                         <div class="player-info">
-                            <div class="player-position" style="--position-color: {{ player.user.profile.position.color }}">{{ player.user.profile.position.code }}</div>
+                            <div class="player-position" style="--position-color: {{ player.teammemberprofile.position.color }}">{{ player.teammemberprofile.position.code }}</div>
                             <div class="player-condition">
                                 {% if player.condition_symbol %}
-                                    <span class="condition-arrow condition-{{ player.user.profile.condition|lower }}">
-                                        <svg><use href="#condition-{{ player.user.profile.condition|lower }}"/></svg>
+                                    <span class="condition-arrow condition-{{ player.teammemberprofile.condition|lower }}">
+                                        <svg><use href="#condition-{{ player.teammemberprofile.condition|lower }}"/></svg>
                                     </span>
                                 {% else %}
                                     •

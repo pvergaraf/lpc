@@ -20,10 +20,10 @@
                         <div class="mb-4">
                             <label class="form-label">Current Profile Picture</label>
                             <div class="text-center">
-                                {% if member.profile.profile_picture %}
-                                    <img src="{{ member.profile.profile_picture.url }}" alt="Current profile picture" class="img-thumbnail mb-2" style="max-width: 200px;">
+                                {% if team_member.teammemberprofile.profile_picture %}
+                                    <img src="{{ team_member.teammemberprofile.profile_picture.url }}" alt="Current profile picture" class="img-thumbnail mb-2" style="max-width: 200px;">
                                 {% else %}
-                                    <img src="{% static 'teams/images/default-profile.png' %}" alt="Default profile picture" class="img-thumbnail mb-2" style="max-width: 200px;">
+                                    <img src="{% static 'teams/images/castolo.png' %}" alt="Default profile picture" class="img-thumbnail mb-2" style="max-width: 200px;">
                                 {% endif %}
                             </div>
                         </div>
@@ -31,7 +31,16 @@
                         {{ form|crispy }}
                         
                         <div class="d-flex justify-content-between mt-4">
-                            <a href="{% url 'teams:dashboard' %}" class="btn btn-secondary">Cancel</a>
+                            <div>
+                                <a href="{% url 'teams:dashboard' %}" class="btn btn-secondary">Cancel</a>
+                                {% if member.user != user %}
+                                <a href="{% url 'teams:delete_member' team_id=team.id user_id=member.id %}" 
+                                   class="btn btn-danger"
+                                   onclick="return confirm('Are you sure you want to remove this member from the team? This action cannot be undone.')">
+                                    Delete Member
+                                </a>
+                                {% endif %}
+                            </div>
                             <button type="submit" class="btn btn-primary">Save Changes</button>
                         </div>
                     </form>

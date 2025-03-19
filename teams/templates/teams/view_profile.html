@@ -55,7 +55,7 @@
                         <h5>Common Teams</h5>
                         <div class="list-group">
                             {% for team in common_teams %}
-                                <a href="{% url 'teams:team_members' team.id %}" class="list-group-item list-group-item-action">
+                                <a href="{% url 'teams:team_members' team_id=team.id %}" class="list-group-item list-group-item-action">
                                     {{ team.name }}
                                 </a>
                             {% endfor %}

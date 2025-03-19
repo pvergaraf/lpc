@@ -1,8 +1,9 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm, PasswordResetForm
 from django.contrib.auth import get_user_model
-from .models import Team, TeamMember, Position, Profile, Season, Match, Payment, PlayerPayment
+from .models import Team, TeamMember, Position, Profile, Season, Match, Payment, PlayerPayment, TeamMemberProfile
 from .utils.logging_utils import log_error
+from .utils.team_utils import get_current_team
 
 class UserRegistrationForm(UserCreationForm):
     first_name = forms.CharField(max_length=30, required=True)
@@ -237,58 +238,47 @@ class UserProfileForm(forms.ModelForm):
     first_name = forms.CharField(max_length=30, required=True)
     last_name = forms.CharField(max_length=30, required=True)
     email = forms.EmailField(required=True)
-    player_number = forms.IntegerField(min_value=1, max_value=99, required=True)
-    position = forms.ModelChoiceField(queryset=Position.objects.all(), required=True)
+    date_of_birth = forms.DateField(required=False, widget=forms.DateInput(attrs={'type': 'date'}))
+    rut = forms.CharField(max_length=12, required=False)
+    country = forms.ChoiceField(choices=Profile.COUNTRIES, required=False)
+    player_number = forms.IntegerField(required=False, min_value=0, max_value=99)
+    position = forms.ModelChoiceField(queryset=Position.objects.all(), required=False)
     level = forms.IntegerField(
-        min_value=1, 
-        max_value=99, 
-        required=True,
+        min_value=1,
+        max_value=99,
+        required=False,
         help_text="Player level (1-99)"
     )
-    rut = forms.CharField(
-        max_length=12,
-        required=True,
-        help_text="Chilean ID number (RUT)"
-    )
-    profile_picture = forms.ImageField(
-        required=False,
-        help_text="Upload a profile picture (optional)"
-    )
-    country = forms.ChoiceField(
-        choices=Profile.COUNTRIES,
-        required=True,
-        help_text="Select your country"
-    )
-    date_of_birth = forms.DateField(
-        widget=forms.DateInput(attrs={'type': 'date'}),
-        required=True,
-        help_text="Your date of birth"
-    )
-    description = forms.CharField(
-        max_length=20,
-        required=False,
-        help_text="A short description (max 20 characters)"
-    )
+    description = forms.CharField(widget=forms.Textarea(attrs={'rows': 3}), required=False)
+    profile_picture = forms.ImageField(required=False)
 
     class Meta:
         model = get_user_model()
-        fields = ('first_name', 'last_name', 'email', 'player_number', 'position', 'level', 'rut', 'profile_picture', 'country', 'date_of_birth', 'description')
+        fields = ['first_name', 'last_name', 'email', 'date_of_birth', 'rut', 'country',
+                 'player_number', 'position', 'level', 'description', 'profile_picture']
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, team=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.team = team
         if self.instance:
             try:
+                # Get shared profile data
                 profile = self.instance.profile
-                self.fields['player_number'].initial = profile.player_number
-                self.fields['position'].initial = profile.position
-                self.fields['level'].initial = profile.level
                 self.fields['rut'].initial = profile.rut
                 self.fields['country'].initial = profile.country
                 self.fields['date_of_birth'].initial = profile.date_of_birth
-                self.fields['description'].initial = profile.description
-                if profile.profile_picture:
-                    self.fields['profile_picture'].initial = profile.profile_picture
-            except Profile.DoesNotExist:
+                
+                # Get team-specific profile data
+                if self.team:
+                    team_member = self.instance.teammember_set.get(team=self.team)
+                    team_profile = team_member.teammemberprofile
+                    self.fields['player_number'].initial = team_profile.player_number
+                    self.fields['position'].initial = team_profile.position
+                    self.fields['level'].initial = team_profile.level
+                    self.fields['description'].initial = team_profile.description
+                    if team_profile.profile_picture:
+                        self.fields['profile_picture'].initial = team_profile.profile_picture
+            except (Profile.DoesNotExist, TeamMember.DoesNotExist, TeamMemberProfile.DoesNotExist):
                 pass
 
         for field in self.fields.values():
@@ -301,23 +291,50 @@ class UserProfileForm(forms.ModelForm):
         user = super().save(commit=False)
         if commit:
             user.save()
+            
+            # Update shared profile data
             profile = Profile.objects.get_or_create(user=user)[0]
-            profile.player_number = self.cleaned_data['player_number']
-            profile.position = self.cleaned_data['position']
-            profile.level = self.cleaned_data['level']
             profile.rut = self.cleaned_data['rut']
             profile.country = self.cleaned_data['country']
             profile.date_of_birth = self.cleaned_data['date_of_birth']
-            profile.description = self.cleaned_data['description']
-            if self.cleaned_data.get('profile_picture'):
-                profile.profile_picture = self.cleaned_data['profile_picture']
             profile.save()
+            
+            # Update team-specific profile data
+            if self.team:
+                team_member = TeamMember.objects.get(user=user, team=self.team)
+                team_profile = TeamMemberProfile.objects.get_or_create(team_member=team_member)[0]
+                team_profile.player_number = self.cleaned_data['player_number']
+                team_profile.position = self.cleaned_data['position']
+                team_profile.level = self.cleaned_data['level']
+                team_profile.description = self.cleaned_data['description']
+                if self.cleaned_data.get('profile_picture'):
+                    team_profile.profile_picture = self.cleaned_data['profile_picture']
+                team_profile.save()
         return user
 
 class AdminMemberProfileForm(forms.ModelForm):
     first_name = forms.CharField(max_length=30, required=True)
     last_name = forms.CharField(max_length=30, required=True)
     email = forms.EmailField(required=True)
+    
+    # Shared profile fields
+    rut = forms.CharField(
+        max_length=12,
+        required=True,
+        help_text="Chilean ID number (RUT)"
+    )
+    country = forms.ChoiceField(
+        choices=Profile.COUNTRIES,
+        required=True,
+        help_text="Select your country"
+    )
+    date_of_birth = forms.DateField(
+        widget=forms.DateInput(attrs={'type': 'date'}),
+        required=True,
+        help_text="Player's date of birth"
+    )
+    
+    # Team-specific fields
     player_number = forms.IntegerField(min_value=1, max_value=99, required=True)
     position = forms.ModelChoiceField(queryset=Position.objects.all(), required=True)
     level = forms.IntegerField(
@@ -335,24 +352,9 @@ class AdminMemberProfileForm(forms.ModelForm):
         initial=True,
         help_text="Check if the player is currently active"
     )
-    rut = forms.CharField(
-        max_length=12,
-        required=True,
-        help_text="Chilean ID number (RUT)"
-    )
     profile_picture = forms.ImageField(
         required=False,
         help_text="Upload a profile picture (optional)"
-    )
-    country = forms.ChoiceField(
-        choices=Profile.COUNTRIES,
-        required=True,
-        help_text="Select your country"
-    )
-    date_of_birth = forms.DateField(
-        widget=forms.DateInput(attrs={'type': 'date'}),
-        required=True,
-        help_text="Player's date of birth"
     )
     description = forms.CharField(
         max_length=20,
@@ -362,25 +364,32 @@ class AdminMemberProfileForm(forms.ModelForm):
 
     class Meta:
         model = get_user_model()
-        fields = ('first_name', 'last_name', 'email', 'player_number', 'position', 'level', 'is_official', 'active_player', 'rut', 'profile_picture', 'country', 'date_of_birth', 'description')
+        fields = ('first_name', 'last_name', 'email', 'rut', 'country', 'date_of_birth',
+                 'player_number', 'position', 'level', 'is_official', 'active_player',
+                 'profile_picture', 'description')
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, team=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.team = team
         if self.instance:
             try:
+                # Get shared profile data
                 profile = self.instance.profile
-                self.fields['player_number'].initial = profile.player_number
-                self.fields['position'].initial = profile.position
-                self.fields['level'].initial = profile.level
-                self.fields['is_official'].initial = profile.is_official
-                self.fields['active_player'].initial = profile.active_player
                 self.fields['rut'].initial = profile.rut
                 self.fields['country'].initial = profile.country
                 self.fields['date_of_birth'].initial = profile.date_of_birth
-                self.fields['description'].initial = profile.description
-                if profile.profile_picture:
-                    self.fields['profile_picture'].initial = profile.profile_picture
-            except Profile.DoesNotExist:
+                
+                # Get team-specific profile data
+                team_profile = self.instance.teammember_set.get(team=self.team).teammemberprofile
+                self.fields['player_number'].initial = team_profile.player_number
+                self.fields['position'].initial = team_profile.position
+                self.fields['level'].initial = team_profile.level
+                self.fields['is_official'].initial = team_profile.is_official
+                self.fields['active_player'].initial = team_profile.active_player
+                self.fields['description'].initial = team_profile.description
+                if team_profile.profile_picture:
+                    self.fields['profile_picture'].initial = team_profile.profile_picture
+            except (Profile.DoesNotExist, TeamMember.DoesNotExist, TeamMemberProfile.DoesNotExist):
                 pass
 
         for field in self.fields.values():
@@ -396,19 +405,26 @@ class AdminMemberProfileForm(forms.ModelForm):
         user = super().save(commit=False)
         if commit:
             user.save()
+            
+            # Update shared profile data
             profile = Profile.objects.get_or_create(user=user)[0]
-            profile.player_number = self.cleaned_data['player_number']
-            profile.position = self.cleaned_data['position']
-            profile.level = self.cleaned_data['level']
-            profile.is_official = self.cleaned_data['is_official']
-            profile.active_player = self.cleaned_data['active_player']
             profile.rut = self.cleaned_data['rut']
             profile.country = self.cleaned_data['country']
             profile.date_of_birth = self.cleaned_data['date_of_birth']
-            profile.description = self.cleaned_data['description']
-            if self.cleaned_data.get('profile_picture'):
-                profile.profile_picture = self.cleaned_data['profile_picture']
             profile.save()
+            
+            # Update team-specific profile data
+            team_member = TeamMember.objects.get(user=user, team=self.team)
+            team_profile = TeamMemberProfile.objects.get_or_create(team_member=team_member)[0]
+            team_profile.player_number = self.cleaned_data['player_number']
+            team_profile.position = self.cleaned_data['position']
+            team_profile.level = self.cleaned_data['level']
+            team_profile.is_official = self.cleaned_data['is_official']
+            team_profile.active_player = self.cleaned_data['active_player']
+            team_profile.description = self.cleaned_data['description']
+            if self.cleaned_data.get('profile_picture'):
+                team_profile.profile_picture = self.cleaned_data['profile_picture']
+            team_profile.save()
         return user
 
 class SeasonForm(forms.ModelForm):

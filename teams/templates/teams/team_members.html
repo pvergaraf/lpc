@@ -307,22 +307,22 @@
                         {% for member in active_members %}
                             <tr>
                                 <td class="fw-bold fs-5">
-                                    {% if member.user.profile and member.user.profile.player_number %}
-                                        {% if member.user and member.user.profile and member.user.profile.country %}
+                                    {% if member.teammemberprofile.player_number %}
+                                        {% if member.user.profile.country %}
                                             {{ member.user.profile.country|country_flag }}
                                         {% endif %}
-                                        {{ member.user.profile.player_number }}
+                                        {{ member.teammemberprofile.player_number }}
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if member.user and member.user.profile and member.user.profile.position %}
+                                    {% if member.teammemberprofile.position %}
                                         <div class="d-flex align-items-center">
-                                            <div class="position-badge" style="--position-color: {{ member.user.profile.position.color }}">
-                                                {{ member.user.profile.position.code }}
+                                            <div class="position-badge" style="--position-color: {{ member.teammemberprofile.position.color }}">
+                                                {{ member.teammemberprofile.position.code }}
                                             </div>
-                                            {% if member.user and member.user.profile and member.user.profile.condition %}
-                                                <span class="condition-arrow condition-{{ member.user.profile.condition|lower }}">
-                                                    <svg><use href="#condition-{{ member.user.profile.condition|lower }}"/></svg>
+                                            {% if member.teammemberprofile.condition %}
+                                                <span class="condition-arrow condition-{{ member.teammemberprofile.condition|lower }}">
+                                                    <svg><use href="#condition-{{ member.teammemberprofile.condition|lower }}"/></svg>
                                                 </span>
                                             {% endif %}
                                         </div>
@@ -330,38 +330,37 @@
                                 </td>
                                 <td>
                                     <div class="d-flex align-items-center gap-2">
-                                        {% if member.user.profile and member.user.profile.profile_picture %}
-                                            <img src="{{ member.user.profile.profile_picture.url }}" 
+                                        {% if member.teammemberprofile.profile_picture %}
+                                            <img src="{{ member.teammemberprofile.profile_picture.url }}" 
                                                  alt="Profile Picture" 
-                                                 class="rounded-circle {% if not member.user.profile.active_player %}inactive-photo{% endif %}"
+                                                 class="rounded-circle {% if not member.teammemberprofile.active_player %}inactive-photo{% endif %}"
                                                  style="width: 32px; height: 32px; object-fit: cover;">
                                         {% else %}
                                             <img src="{% static 'teams/images/default-profile.png' %}" 
                                                  alt="Default Profile Picture" 
-                                                 class="rounded-circle {% if not member.user.profile.active_player %}inactive-photo{% endif %}"
+                                                 class="rounded-circle {% if not member.teammemberprofile.active_player %}inactive-photo{% endif %}"
                                                  style="width: 32px; height: 32px; object-fit: cover;">
                                         {% endif %}
-                                        <div>
-                                            <div class="d-flex align-items-center gap-2">
-                                                <a href="{% url 'teams:player_card' team_id=team.id user_id=member.user.id %}" 
-                                                   class="text-decoration-none text-dark">
-                                                    {{ member.user.get_full_name }}
-                                                </a>
-                                            </div>
-                                            <div class="d-flex gap-1">
-                                                <span class="badge {% if member.role == 'MANAGER' %}badge-primary{% else %}badge-secondary{% endif %}">
-                                                    {{ member.get_role_display }}
-                                                </span>
-                                                {% if not member.user.profile.active_player and not member.user.profile.is_official %}
-                                                    <span class="badge badge-secondary">Inactive</span>
-                                                {% elif not member.user.profile.is_official %}
-                                                    <span class="badge badge-secondary">Galleta</span>
-                                                {% endif %}
-                                            </div>
+                                        
+                                        <div class="d-flex align-items-center gap-2">
+                                            <a href="{% url 'teams:player_card' team_id=team.id user_id=member.user.id %}" 
+                                               class="text-decoration-none text-dark">
+                                                {{ member.user.get_full_name }}
+                                            </a>
+                                        </div>
+                                        <div class="d-flex gap-1">
+                                            <span class="badge {% if member.role == 'MANAGER' %}badge-primary{% else %}badge-secondary{% endif %}">
+                                                {{ member.get_role_display }}
+                                            </span>
+                                            {% if not member.teammemberprofile.active_player and not member.teammemberprofile.is_official %}
+                                                <span class="badge badge-secondary">Inactive</span>
+                                            {% elif not member.teammemberprofile.is_official %}
+                                                <span class="badge badge-secondary">Galleta</span>
+                                            {% endif %}
                                         </div>
                                     </div>
                                 </td>
-                                {% if user_is_admin and member.user != user %}
+                                {% if user_is_admin %}
                                 <td>
                                     <a href="{% url 'teams:edit_member' team_id=team.id user_id=member.user.id %}" 
                                        class="btn btn-sm btn-outline-primary">
@@ -395,4 +394,6 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
+
+{% include "teams/condition_icons.html" %}
 {% endblock %} 

@@ -6,9 +6,9 @@ from django.contrib import messages
 from django.core.mail import send_mail
 from django.urls import reverse, reverse_lazy
 from django.utils.crypto import get_random_string
-from django.http import HttpResponseForbidden, JsonResponse
+from django.http import HttpResponseForbidden, JsonResponse, HttpResponse
 from django.db import transaction
-from .models import Team, TeamMember, Season, Match, Profile, Payment, PlayerPayment, PlayerMatchStats
+from .models import Team, TeamMember, Season, Match, Profile, Payment, PlayerPayment, PlayerMatchStats, TeamMemberProfile
 from .forms import (
     UserRegistrationForm, TeamMemberInviteForm, TeamForm, 
     EmailAuthenticationForm, AddTeamMemberForm, UserProfileForm,
@@ -29,6 +29,7 @@ from django.core.exceptions import PermissionDenied
 from django.utils.html import strip_tags
 from django.contrib.sites.shortcuts import get_current_site
 from django.contrib.auth import views as auth_views
+from .utils.team_utils import get_current_team
 
 User = get_user_model()
 
@@ -102,6 +103,12 @@ def is_admin(user):
 
 @login_required
 def dashboard(request):
+    # Add cache control headers
+    response = HttpResponse()
+    response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response['Pragma'] = 'no-cache'
+    response['Expires'] = '0'
+    
     if not request.user.is_authenticated:
         log_error(
             request=request,
@@ -215,7 +222,11 @@ def dashboard(request):
 
         try:
             # Get the user's team membership
-            team_member = TeamMember.objects.select_related('team').get(
+            team_member = TeamMember.objects.select_related(
+                'team',
+                'teammemberprofile',
+                'teammemberprofile__position'
+            ).get(
                 team=current_team,
                 user=request.user,
                 is_active=True
@@ -232,7 +243,19 @@ def dashboard(request):
                     "team_name": current_team.name,
                     "role": team_member.role,
                     "is_admin": team_member.is_team_admin,
-                    "membership_id": team_member.id
+                    "membership_id": team_member.id,
+                    "has_profile": hasattr(team_member, 'teammemberprofile'),
+                    "profile_id": getattr(team_member.teammemberprofile, 'id', None) if hasattr(team_member, 'teammemberprofile') else None,
+                    "condition": team_member.teammemberprofile.condition if hasattr(team_member, 'teammemberprofile') else None,
+                    "raw_sql": str(TeamMember.objects.select_related(
+                        'team',
+                        'teammemberprofile',
+                        'teammemberprofile__position'
+                    ).filter(
+                        team=current_team,
+                        user=request.user,
+                        is_active=True
+                    ).query)
                 }
             )
         except TeamMember.DoesNotExist as e:
@@ -305,84 +328,54 @@ def dashboard(request):
             ).select_related('team')
 
             # Get team members for the current team
-            team_members_query = TeamMember.objects.filter(
+            team_members_query = TeamMember.objects.select_related(
+                'user',
+                'user__profile',
+                'teammemberprofile',
+                'teammemberprofile__position'
+            ).filter(
                 team=current_team
             ).filter(
                 models.Q(is_active=True) | 
                 models.Q(is_active=False, invitation_token__isnull=False)
-            )
-            
+            ).prefetch_related(
+                'teammemberprofile'
+            ).order_by(
+                'teammemberprofile__player_number'
+            ).distinct()
+
             # Apply active filter if requested
             if show_active_only:
-                team_members_query = team_members_query.filter(user__profile__active_player=True)
+                team_members_query = team_members_query.filter(teammemberprofile__active_player=True)
             
-            team_members = team_members_query.select_related(
-                'user', 
-                'user__profile', 
-                'user__profile__position'
-            ).annotate(
-                position_order=Case(
-                    When(user__profile__position__type='GK', then=Value(1)),
-                    When(user__profile__position__type='DEF', then=Value(2)),
-                    When(user__profile__position__type='MID', then=Value(3)),
-                    When(user__profile__position__type='ATT', then=Value(4)),
-                    default=Value(5),
-                    output_field=IntegerField(),
-                )
-            ).order_by(
-                'position_order',
-                'user__profile__player_number'
+            # Force a fresh query by adding a timestamp
+            team_members = team_members_query.extra(
+                select={'_timestamp': "'%s'" % timezone.now().isoformat()}
             )
 
-            # Log team composition
-            log_error(
-                request=request,
-                error_message="Team composition loaded",
-                error_type="TeamActivity",
-                extra_context={
-                    "user_email": request.user.email,
-                    "user_id": request.user.id,
-                    "team_id": current_team.id,
-                    "team_name": current_team.name,
-                    "active_members_count": team_members.count(),
-                    "pending_invitations_count": team_members.filter(is_active=False, invitation_token__isnull=False).count(),
-                    "total_teams": team_memberships.count()
-                }
-            )
+            # Get upcoming birthdays
+            upcoming_birthdays = current_team.get_upcoming_birthdays() if current_team else None
 
-            # Get upcoming matches if there's a current season
+            # Get upcoming matches
             upcoming_matches = None
             if current_season:
                 upcoming_matches = Match.objects.filter(
                     season=current_season,
-                    match_date__gte=today
+                    match_date__gte=timezone.now().date()
                 ).order_by('match_date', 'match_time')
-                
-                # Log upcoming matches
-                log_error(
-                    request=request,
-                    error_message="Upcoming matches loaded",
-                    error_type="MatchActivity",
-                    extra_context={
-                        "user_email": request.user.email,
-                        "user_id": request.user.id,
-                        "team_id": current_team.id,
-                        "season_id": current_season.id,
-                        "upcoming_matches_count": upcoming_matches.count(),
-                        "next_match_date": upcoming_matches.first().match_date.isoformat() if upcoming_matches.exists() else None
-                    }
-                )
 
             context = {
+                'team_memberships': team_memberships,
                 'current_team': current_team,
+                'current_team_member': team_member,
                 'current_season': current_season,
                 'is_team_admin': is_team_admin,
                 'pending_payments': pending_payments,
-                'today': today.isoformat(),
-                'team_memberships': team_memberships,
                 'team_members': team_members,
+                'show_active_only': show_active_only,
+                'today': today,
+                'upcoming_birthdays': upcoming_birthdays,
                 'upcoming_matches': upcoming_matches,
-                'upcoming_birthdays': current_team.get_upcoming_birthdays() if current_team else None,
             }
 
             # Log successful dashboard render
@@ -528,14 +521,17 @@ class CustomLogoutView(LogoutView):
 def team_members(request, team_id):
     log_error(
         request=request,
-        error_message="Team members page access",
-        error_type="UserActivity",
+        error_message="Team members page access - ENTRY POINT",
+        error_type="ViewDebug",
         extra_context={
             "user_email": request.user.email,
             "user_id": request.user.id,
             "team_id": team_id,
             "path": request.path,
-            "method": request.method
+            "method": request.method,
+            "session_id": request.session.session_key,
+            "current_team_in_session": request.session.get('current_team'),
+            "all_session_data": dict(request.session)
         }
     )
     
@@ -546,33 +542,35 @@ def team_members(request, team_id):
         # Get the filter parameter
         show_active_only = request.GET.get('active_only', 'false').lower() == 'true'
         
-        # Get active members
-        active_members_query = TeamMember.objects.filter(
+        # Get active members with fresh data
+        active_members_query = TeamMember.objects.select_related(
+            'user',
+            'teammemberprofile',
+            'teammemberprofile__position'
+        ).filter(
             team=team,
             is_active=True
-        )
+        ).order_by(
+            'teammemberprofile__player_number'
+        ).distinct()
         
         # Apply active filter if requested
         if show_active_only:
-            active_members_query = active_members_query.filter(user__profile__active_player=True)
+            active_members_query = active_members_query.filter(teammemberprofile__active_player=True)
         
-        active_members = active_members_query.select_related(
-            'user', 
-            'user__profile',
-            'user__profile__position'
+        # Force a fresh query by adding a timestamp
+        active_members = active_members_query.extra(
+            select={'_timestamp': "'%s'" % timezone.now().isoformat()}
         ).annotate(
             position_order=Case(
-                When(user__profile__position__type='GK', then=Value(1)),
-                When(user__profile__position__type='DEF', then=Value(2)),
-                When(user__profile__position__type='MID', then=Value(3)),
-                When(user__profile__position__type='ATT', then=Value(4)),
+                When(teammemberprofile__position__type='GK', then=Value(1)),
+                When(teammemberprofile__position__type='DEF', then=Value(2)),
+                When(teammemberprofile__position__type='MID', then=Value(3)),
+                When(teammemberprofile__position__type='ATT', then=Value(4)),
                 default=Value(5),
                 output_field=IntegerField(),
             )
-        ).order_by(
-            'position_order',
-            'user__profile__player_number'
-        )
+        ).order_by('position_order', 'teammemberprofile__player_number')
         
         # Get pending invitations
         pending_invitations = TeamMember.objects.filter(
@@ -584,26 +582,17 @@ def team_members(request, team_id):
         
         log_error(
             request=request,
-            error_message="Team members loaded",
-            error_type="UserActivity",
+            error_message="Team members loaded successfully",
+            error_type="ViewDebug",
             extra_context={
-                "user_email": request.user.email,
-                "user_id": request.user.id,
-                "team_id": team.id,
-                "team_name": team.name,
                 "active_members_count": active_members.count(),
                 "pending_invitations_count": pending_invitations.count(),
-                "user_role": team_member.role,
-                "user_is_admin": team_member.is_team_admin,
-                "show_active_only": show_active_only,
-                "members_by_position": {
-                    "GK": active_members.filter(user__profile__position__type='GK').count(),
-                    "DEF": active_members.filter(user__profile__position__type='DEF').count(),
-                    "MID": active_members.filter(user__profile__position__type='MID').count(),
-                    "ATT": active_members.filter(user__profile__position__type='ATT').count(),
-                }
+                "show_active_only": show_active_only
             }
         )
+        
+        # Get current season for the team
+        current_season = Season.objects.filter(team=team, is_active=True).first()
         
         context = {
             'team': team,
@@ -611,21 +600,39 @@ def team_members(request, team_id):
             'pending_invitations': pending_invitations,
             'user': request.user,
             'user_is_admin': team_member.is_team_admin or team_member.role == TeamMember.Role.MANAGER,
-            'show_active_only': show_active_only
+            'show_active_only': show_active_only,
+            'current_team': team,  # Add this for navbar
+            'current_season': current_season,  # Add this for navbar
+            'is_team_admin': team_member.is_team_admin or team_member.role == TeamMember.Role.MANAGER  # Add this for navbar
         }
+        
+        log_error(
+            request=request,
+            error_message="About to render template",
+            error_type="ViewDebug",
+            extra_context={
+                "template": "teams/team_members.html",
+                "context_keys": list(context.keys()),
+                "is_team_admin": context['is_team_admin'],
+                "current_team_id": context['current_team'].id,
+                "has_current_season": current_season is not None
+            }
+        )
+        
         return render(request, 'teams/team_members.html', context)
         
     except (Team.DoesNotExist, TeamMember.DoesNotExist) as e:
         log_error(
             request=request,
-            error_message="Team members access denied",
+            error_message="Team members access denied - Object not found",
             error_type="AuthorizationError",
             extra_context={
                 "user_email": request.user.email,
                 "user_id": request.user.id,
                 "team_id": team_id,
                 "error": str(e),
-                "error_type": type(e).__name__
+                "error_type": type(e).__name__,
+                "exception_class": e.__class__.__name__
             }
         )
         messages.error(request, "You don't have access to this team.")
@@ -633,7 +640,7 @@ def team_members(request, team_id):
     except Exception as e:
         log_error(
             request=request,
-            error_message=f"Failed to load team members: {str(e)}",
+            error_message="Unexpected error in team members view",
             error_type="SystemError",
             extra_context={
                 "user_email": request.user.email,
@@ -641,7 +648,8 @@ def team_members(request, team_id):
                 "team_id": team_id,
                 "error": str(e),
                 "error_type": type(e).__name__,
-                "traceback": traceback.format_exc()
+                "traceback": traceback.format_exc(),
+                "exception_class": e.__class__.__name__
             }
         )
         messages.error(request, "An error occurred while loading team members.")
@@ -664,31 +672,120 @@ def invite_member(request, team_id):
             is_official = form.cleaned_data['is_official']
             active_player = form.cleaned_data['active_player']
             
-            # Generate invitation token
-            token = secrets.token_urlsafe(32)
-            
-            # Create inactive team member
-            team_member = TeamMember.objects.create(
-                team=team,
-                email=email,
-                role=role,
-                is_team_admin=is_team_admin,
-                is_active=False,
-                invitation_token=token
+            # Log the invitation data
+            log_error(
+                request=request,
+                error_message="Creating new invitation",
+                error_type="InvitationDebug",
+                extra_context={
+                    "email": email,
+                    "team_id": team.id,
+                    "is_official": is_official,
+                    "active_player": active_player,
+                    "current_session_id": request.session.session_key,
+                    "session_data": dict(request.session)
+                }
             )
             
-            # Store is_official and active_player status in session for later use
-            request.session[f'invite_{token}_is_official'] = is_official
-            request.session[f'invite_{token}_active_player'] = active_player
+            # Check if user already exists
+            existing_user = User.objects.filter(email=email).first()
             
-            # Send invitation email
-            invitation_url = request.build_absolute_uri(
-                reverse('teams:register') + f'?token={token}'
-            )
-            send_invitation_email(email, team, invitation_url, role, is_team_admin, is_official)
-            
-            messages.success(request, f'Invitation sent to {email}')
-            return redirect('teams:team_members', team_id=team.id)
+            try:
+                with transaction.atomic():
+                    token = secrets.token_urlsafe(32)
+                    
+                    # Log token generation
+                    log_error(
+                        request=request,
+                        error_message="Generated invitation token",
+                        error_type="InvitationDebug",
+                        extra_context={
+                            "token": token,
+                            "email": email
+                        }
+                    )
+                    
+                    # Check if there's an existing inactive membership
+                    existing_member = TeamMember.objects.filter(
+                        team=team,
+                        email=email
+                    ).first()
+                    
+                    if existing_member:
+                        if existing_member.is_active:
+                            messages.error(request, f'{email} is already a member of this team.')
+                            return redirect('teams:team_members', team_id=team.id)
+                        else:
+                            # Update existing inactive membership
+                            existing_member.role = role
+                            existing_member.is_team_admin = is_team_admin
+                            existing_member.invitation_token = token
+                            existing_member.user = existing_user  # Link to existing user if any
+                            existing_member.is_official = is_official
+                            existing_member.active_player = active_player
+                            existing_member.save()
+                            team_member = existing_member
+                    else:
+                        # Create new inactive team member
+                        team_member = TeamMember.objects.create(
+                            team=team,
+                            email=email,
+                            role=role,
+                            is_team_admin=is_team_admin,
+                            is_active=False,
+                            invitation_token=token,
+                            user=existing_user,  # Link to existing user if any
+                            is_official=is_official,
+                            active_player=active_player
+                        )
+                    
+                    # Log member creation
+                    log_error(
+                        request=request,
+                        error_message="Created team member",
+                        error_type="InvitationDebug",
+                        extra_context={
+                            "token": token,
+                            "email": email,
+                            "member_data": {
+                                "id": team_member.id,
+                                "is_official": team_member.is_official,
+                                "active_player": team_member.active_player
+                            }
+                        }
+                    )
+                    
+                    # Send invitation email
+                    current_site = get_current_site(request)
+                    if existing_user:
+                        # Send invitation for existing user
+                        invitation_url = request.build_absolute_uri(
+                            reverse('teams:accept_invitation') + f'?token={token}'
+                        )
+                        send_invitation_email(email, team, invitation_url, role, is_team_admin, is_official)
+                        messages.success(request, f'Invitation sent to existing user {email}')
+                    else:
+                        # Send registration invitation for new user
+                        invitation_url = request.build_absolute_uri(
+                            reverse('teams:register') + f'?token={token}'
+                        )
+                        send_invitation_email(email, team, invitation_url, role, is_team_admin, is_official)
+                        messages.success(request, f'Registration invitation sent to {email}')
+                    
+                    return redirect('teams:team_members', team_id=team.id)
+                    
+            except Exception as e:
+                log_error(
+                    request=request,
+                    error_message=f"Failed to create invitation: {str(e)}",
+                    error_type="InvitationError",
+                    extra_context={
+                        "email": email,
+                        "team_id": team.id,
+                        "error": str(e)
+                    }
+                )
+                messages.error(request, f'Error creating invitation: {str(e)}')
     else:
         form = TeamMemberInviteForm(team)
     
@@ -696,6 +793,41 @@ def invite_member(request, team_id):
         'form': form,
         'team': team
     })
+
+def send_existing_user_notification(email, team, dashboard_url, role='Player', is_team_admin=False, is_official=False):
+    """Send a notification email to an existing user when added to a new team."""
+    subject = f'You have been added to {team.name}'
+    context = {
+        'team': team,
+        'dashboard_url': dashboard_url,
+        'role': role,
+        'is_team_admin': is_team_admin,
+        'is_official': is_official
+    }
+    html_message = render_to_string('teams/email/team_addition.html', context)
+    plain_message = f'You have been added to {team.name}. Visit your dashboard to complete your team profile: {dashboard_url}'
+    
+    try:
+        send_mail(
+            subject=subject,
+            message=plain_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
+            html_message=html_message,
+            fail_silently=False,
+        )
+    except Exception as e:
+        log_error(
+            None,
+            error_message=f"Failed to send team addition email: {str(e)}",
+            error_type="EmailError",
+            extra_context={
+                "email": email,
+                "team": team.name,
+                "error": str(e)
+            }
+        )
+        raise
 
 @login_required
 def toggle_team_admin(request, team_id, member_id):
@@ -960,6 +1092,19 @@ def remove_pending_invitation(request, team_id, member_id):
 
 def register(request):
     token = request.GET.get('token')
+    
+    # Log initial state
+    log_error(
+        request=request,
+        error_message="Registration process started",
+        error_type="RegistrationDebug",
+        extra_context={
+            "token": token,
+            "session_id": request.session.session_key,
+            "all_session_keys": list(request.session.keys())
+        }
+    )
+    
     try:
         team_member = TeamMember.objects.get(invitation_token=token, is_active=False)
     except TeamMember.DoesNotExist:
@@ -986,209 +1131,107 @@ def register(request):
             
         log_error(
             request=request,
-            error_message="Registration POST request received",
+            error_message="Processing registration POST request",
             error_type="RegistrationDebug",
             extra_context={
-                "post_data": dict(safe_post_data),
-                "files": bool(request.FILES),
+                "token": token,
                 "team_member_data": {
                     "email": team_member.email,
                     "team": team_member.team.name,
-                    "role": team_member.role
+                    "role": team_member.role,
+                    "is_official": team_member.is_official,
+                    "active_player": team_member.active_player
                 }
             }
         )
         
         form = UserRegistrationForm(request.POST, request.FILES, email=team_member.email)
         if form.is_valid():
-            # Remove sensitive data from cleaned_data logs
-            safe_cleaned_data = form.cleaned_data.copy()
-            if 'password1' in safe_cleaned_data:
-                safe_cleaned_data['password1'] = '***'
-            if 'password2' in safe_cleaned_data:
-                safe_cleaned_data['password2'] = '***'
-                
-            log_error(
-                request=request,
-                error_message="Form validation successful",
-                error_type="RegistrationDebug",
-                extra_context={"cleaned_data": safe_cleaned_data}
-            )
             try:
                 with transaction.atomic():
-                    # Try to get existing user or create new one
-                    user = User.objects.filter(email=team_member.email).first()
-                    if user:
-                        # Update existing user
-                        user.first_name = form.cleaned_data['first_name']
-                        user.last_name = form.cleaned_data['last_name']
-                        user.date_of_birth = form.cleaned_data['date_of_birth']
-                        user.save()
-                        log_error(
-                            request=request,
-                            error_message="Updated existing user",
-                            error_type="RegistrationDebug",
-                            extra_context={
-                                "user_id": user.id,
-                                "email": user.email
-                            }
-                        )
-                    else:
-                        # Create new user
-                        user = form.save()
-                        log_error(
-                            request=request,
-                            error_message="Created new user",
-                            error_type="RegistrationDebug",
-                            extra_context={
-                                "user_id": user.id,
-                                "email": user.email
-                            }
-                        )
-
-                    # Get the is_official status from session
-                    is_official = request.session.get(f'invite_{token}_is_official', False)
-                    active_player = request.session.get(f'invite_{token}_active_player', True)
+                    # Create the user first
+                    user = form.save()
                     
-                    # Check if profile exists
-                    profile_exists = hasattr(user, 'profile')
-                    log_error(
-                        request=request,
-                        error_message="Profile check",
-                        error_type="RegistrationDebug",
-                        extra_context={
-                            "profile_exists": profile_exists,
-                            "user_id": user.id
-                        }
-                    )
-                    
-                    # Create or update profile
-                    profile = Profile.objects.get_or_create(user=user)[0]
-                    
-                    # Log profile state before update
-                    log_error(
-                        request=request,
-                        error_message="Profile state before update",
-                        error_type="RegistrationDebug",
-                        extra_context={
-                            "profile_id": profile.id,
-                            "initial_state": {
-                                "player_number": profile.player_number,
-                                "position": str(profile.position) if profile.position else None,
-                                "is_official": profile.is_official,
-                                "active_player": profile.active_player,
-                                "level": profile.level,
-                                "rut": profile.rut,
-                                "country": profile.country,
-                                "description": profile.description
-                            }
-                        }
-                    )
-                    
-                    # Save all profile fields
-                    profile_fields = {
-                        'player_number': form.cleaned_data['player_number'],
-                        'position': form.cleaned_data['position'],
-                        'is_official': is_official,
-                        'active_player': active_player,
-                        'date_of_birth': form.cleaned_data['date_of_birth'],
-                        'level': form.cleaned_data['level'],
-                        'rut': form.cleaned_data['rut'],
-                        'country': form.cleaned_data['country'],
-                        'description': form.cleaned_data['description']
-                    }
-                    
-                    # Log profile data before save
-                    log_error(
-                        request=request,
-                        error_message="Profile data before save",
-                        error_type="RegistrationDebug",
-                        extra_context={"profile_data": profile_fields}
-                    )
-                    
-                    # Update all fields at once
-                    for field, value in profile_fields.items():
-                        setattr(profile, field, value)
-                        # Log each field update
-                        log_error(
-                            request=request,
-                            error_message=f"Setting profile field: {field}",
-                            error_type="RegistrationDebug",
-                            extra_context={
-                                "field": field,
-                                "value": str(value),
-                                "profile_id": profile.id
-                            }
-                        )
-                    
-                    # Save the profile
-                    profile.save()
-                    
-                    # Force refresh from database
-                    profile.refresh_from_db()
-                    
-                    # Verify profile was saved correctly
-                    saved_profile = Profile.objects.get(user=user)
-                    log_error(
-                        request=request,
-                        error_message="Profile data after save",
-                        error_type="RegistrationDebug",
-                        extra_context={
-                            "saved_profile_data": {
-                                "player_number": saved_profile.player_number,
-                                "position": str(saved_profile.position),
-                                "is_official": saved_profile.is_official,
-                                "date_of_birth": str(saved_profile.date_of_birth),
-                                "level": saved_profile.level,
-                                "rut": saved_profile.rut,
-                                "country": saved_profile.country,
-                                "description": saved_profile.description
-                            }
-                        }
-                    )
-
-                    # Update team member
+                    # Update the team member with the new user
                     team_member.user = user
                     team_member.is_active = True
                     team_member.invitation_accepted = True
+                    team_member.invitation_token = None
                     team_member.save()
                     
+                    # Log profile creation attempt
                     log_error(
                         request=request,
-                        error_message="Team member updated",
+                        error_message="About to create/update profile",
                         error_type="RegistrationDebug",
                         extra_context={
-                            "team_member_data": {
-                                "id": team_member.id,
-                                "user_id": team_member.user_id,
-                                "team": team_member.team.name,
-                                "is_active": team_member.is_active,
-                                "invitation_accepted": team_member.invitation_accepted
-                            }
+                            "token": token,
+                            "is_official": team_member.is_official,
+                            "active_player": team_member.active_player,
+                            "existing_profile": hasattr(team_member, 'teammemberprofile')
                         }
                     )
-
-                    # Clean up the session
-                    request.session.pop(f'invite_{token}_is_official', None)
-
+                    
+                    # Create or update the profile
+                    profile_data = {
+                        'team_member': team_member,
+                        'is_official': team_member.is_official,
+                        'active_player': team_member.active_player,
+                        'level': form.cleaned_data['level'],
+                        'condition': 'NORMAL',
+                        'player_number': form.cleaned_data['player_number'],
+                        'position': form.cleaned_data['position']
+                    }
+                    
+                    # Get or create the profile
+                    profile, created = TeamMemberProfile.objects.get_or_create(
+                        team_member=team_member,
+                        defaults=profile_data
+                    )
+                    
+                    # If profile already existed, update it
+                    if not created:
+                        for key, value in profile_data.items():
+                            setattr(profile, key, value)
+                        profile.save()
+                    
+                    # Create or update the user profile
+                    user_profile, _ = Profile.objects.get_or_create(user=user)
+                    user_profile.rut = form.cleaned_data['rut']
+                    user_profile.country = form.cleaned_data['country']
+                    user_profile.date_of_birth = form.cleaned_data['date_of_birth']
+                    user_profile.save()
+                    
+                    # Log profile creation/update result
+                    log_error(
+                        request=request,
+                        error_message="Profile creation/update result",
+                        error_type="RegistrationDebug",
+                        extra_context={
+                            "token": token,
+                            "profile_id": profile.id,
+                            "was_created": created,
+                            "final_is_official": profile.is_official,
+                            "final_active_player": profile.active_player,
+                            "user_profile_id": user_profile.id
+                        }
+                    )
+                    
                     # Log in the user
                     auth_login(request, user)
+                    
                     messages.success(request, f'Registration successful! You are now a member of {team_member.team.name}.')
                     return redirect('teams:dashboard')
-
+                    
             except Exception as e:
                 log_error(
                     request=request,
                     error_message=f"Registration failed: {str(e)}",
                     error_type="RegistrationError",
                     extra_context={
-                        "team_id": team_member.team.id,
-                        "email": team_member.email,
-                        "role": team_member.role,
-                        "is_team_admin": team_member.is_team_admin,
-                        "form_data": form.cleaned_data,
+                        "token": token,
                         "error": str(e),
-                        "error_type": type(e).__name__
+                        "traceback": traceback.format_exc()
                     }
                 )
                 messages.error(request, 'An error occurred during registration. Please try again.')
@@ -1205,23 +1248,14 @@ def register(request):
             if settings.DEBUG:
                 messages.error(request, 'Please correct the errors below.')
     else:
-        # Pre-fill data if user exists
-        user = User.objects.filter(email=team_member.email).first()
-        initial_data = {'email': team_member.email}
-        if user:
-            initial_data.update({
-                'first_name': user.first_name,
-                'last_name': user.last_name,
-            })
-        form = UserRegistrationForm(initial=initial_data, email=team_member.email)
-    
-    # Get the is_official status for the template
-    is_official = request.session.get(f'invite_{token}_is_official', False)
+        form = UserRegistrationForm(initial={'email': team_member.email}, email=team_member.email)
     
     return render(request, 'teams/register.html', {
         'form': form,
-        'is_official': is_official,
-        'team': team_member.team
+        'is_official': team_member.is_official,
+        'team': team_member.team,
+        'role': team_member.get_role_display(),
+        'email': team_member.email
     })
 
 @user_passes_test(is_admin)
@@ -1319,9 +1353,12 @@ def add_team_member(request, team_id):
     })
 
 @login_required
-def edit_profile(request):
+def edit_profile(request, team_id):
+    team = get_object_or_404(Team, id=team_id)
+    team_member = get_object_or_404(TeamMember, team=team, user=request.user, is_active=True)
+    
     if request.method == 'POST':
-        form = UserProfileForm(request.POST, request.FILES, instance=request.user)
+        form = UserProfileForm(request.POST, request.FILES, instance=request.user, team=team)
         if form.is_valid():
             try:
                 user = form.save(commit=False)
@@ -1332,78 +1369,66 @@ def edit_profile(request):
                     # Validate file size
                     file = form.cleaned_data['profile_picture']
                     if file.size > 2 * 1024 * 1024:  # 2MB limit
-                        log_upload_error(
-                            request=request,
-                            file=file,
-                            error_message="File size exceeds maximum limit of 2MB",
-                            upload_type="profile_picture",
-                            attempted_location="profile_pics/",
-                            validation_errors={
-                                "size_limit": "2MB",
-                                "actual_size": f"{file.size / (1024 * 1024):.2f}MB"
-                            }
-                        )
                         messages.error(request, 'Profile picture must be less than 2MB')
-                        return render(request, 'teams/edit_profile.html', {'form': form})
+                        return render(request, 'teams/edit_profile.html', {
+                            'form': form, 
+                            'team': team,
+                            'is_team_admin': team_member.is_team_admin or team_member.role == TeamMember.Role.MANAGER,
+                            'current_team': team,
+                            'current_season': Season.objects.filter(team=team, is_active=True).first()
+                        })
                     
                     # Validate file type using file extension
                     allowed_extensions = ['.jpg', '.jpeg', '.png']
                     file_extension = os.path.splitext(file.name)[1].lower()
                     if file_extension not in allowed_extensions:
-                        log_upload_error(
-                            request=request,
-                            file=file,
-                            error_message="Invalid file type",
-                            upload_type="profile_picture",
-                            attempted_location="profile_pics/",
-                            validation_errors={
-                                "allowed_extensions": allowed_extensions,
-                                "actual_extension": file_extension
-                            }
-                        )
                         messages.error(request, 'Profile picture must be JPEG or PNG')
-                        return render(request, 'teams/edit_profile.html', {'form': form})
-                    
-                    profile.profile_picture = file
+                        return render(request, 'teams/edit_profile.html', {
+                            'form': form, 
+                            'team': team,
+                            'is_team_admin': team_member.is_team_admin or team_member.role == TeamMember.Role.MANAGER,
+                            'current_team': team,
+                            'current_season': Season.objects.filter(team=team, is_active=True).first()
+                        })
                 
-                # Save user and profile
+                # Save user and shared profile data
                 user.save()
-                profile.player_number = form.cleaned_data['player_number']
-                profile.position = form.cleaned_data['position']
-                profile.level = form.cleaned_data['level']
                 profile.rut = form.cleaned_data['rut']
                 profile.country = form.cleaned_data['country']
                 profile.date_of_birth = form.cleaned_data['date_of_birth']
-                profile.description = form.cleaned_data['description']
                 profile.save()
+                
+                # Save team-specific profile data
+                team_profile = TeamMemberProfile.objects.get_or_create(team_member=team_member)[0]
+                team_profile.player_number = form.cleaned_data['player_number']
+                team_profile.position = form.cleaned_data['position']
+                team_profile.level = form.cleaned_data['level']
+                team_profile.description = form.cleaned_data['description']
+                if form.cleaned_data.get('profile_picture'):
+                    team_profile.profile_picture = form.cleaned_data['profile_picture']
+                team_profile.save()
                 
                 messages.success(request, 'Profile updated successfully')
                 return redirect('teams:dashboard')
             except Exception as e:
-                log_upload_error(
-                    request=request,
-                    file=form.cleaned_data.get('profile_picture'),
-                    error_message=str(e),
-                    upload_type="profile_picture",
-                    attempted_location="profile_pics/",
-                    validation_errors={"unexpected_error": str(e)}
-                )
                 messages.error(request, 'An error occurred while updating your profile')
-                return render(request, 'teams/edit_profile.html', {'form': form})
-        else:
-            if 'profile_picture' in form.errors:
-                log_upload_error(
-                    request=request,
-                    file=request.FILES.get('profile_picture'),
-                    error_message=form.errors['profile_picture'],
-                    upload_type="profile_picture",
-                    attempted_location="profile_pics/",
-                    validation_errors={"form_errors": form.errors['profile_picture']}
-                )
+                return render(request, 'teams/edit_profile.html', {
+                    'form': form, 
+                    'team': team,
+                    'is_team_admin': team_member.is_team_admin or team_member.role == TeamMember.Role.MANAGER,
+                    'current_team': team,
+                    'current_season': Season.objects.filter(team=team, is_active=True).first()
+                })
     else:
-        form = UserProfileForm(instance=request.user)
+        form = UserProfileForm(instance=request.user, team=team)
     
-    return render(request, 'teams/edit_profile.html', {'form': form})
+    return render(request, 'teams/edit_profile.html', {
+        'form': form, 
+        'team': team,
+        'is_team_admin': team_member.is_team_admin or team_member.role == TeamMember.Role.MANAGER,
+        'current_team': team,
+        'current_season': Season.objects.filter(team=team, is_active=True).first()
+    })
 
 @login_required
 def view_profile(request, user_id):
@@ -1612,7 +1637,7 @@ def match_edit(request, team_id, season_id, match_id):
 def edit_member(request, team_id, user_id):
     team = get_object_or_404(Team, id=team_id)
     member_to_edit = get_object_or_404(User, id=user_id)
-    team_member = get_object_or_404(TeamMember, team=team, user=member_to_edit)
+    team_member = get_object_or_404(TeamMember, team=team, user=member_to_edit, is_active=True)
     
     # Log access attempt
     log_error(
@@ -1632,7 +1657,7 @@ def edit_member(request, team_id, user_id):
     )
     
     # Check if the requesting user is a team admin
-    requester_member = get_object_or_404(TeamMember, team=team, user=request.user)
+    requester_member = get_object_or_404(TeamMember, team=team, user=request.user, is_active=True)
     if not requester_member.is_team_admin:
         log_error(
             request=request,
@@ -1648,7 +1673,7 @@ def edit_member(request, team_id, user_id):
         return HttpResponseForbidden("You don't have permission to edit member profiles.")
     
     if request.method == 'POST':
-        form = AdminMemberProfileForm(request.POST, request.FILES, instance=member_to_edit)
+        form = AdminMemberProfileForm(request.POST, request.FILES, instance=member_to_edit, team=team)
         if form.is_valid():
             try:
                 with transaction.atomic():
@@ -1676,16 +1701,10 @@ def edit_member(request, team_id, user_id):
                         }
                     )
                     
-                    user = form.save(commit=False)
-                    user.save()
-                    
-                    # Get or create profile
-                    profile = Profile.objects.get_or_create(user=user)[0]
-                    
-                    # Handle profile picture
+                    # Handle file validation before saving
                     if form.cleaned_data.get('profile_picture'):
-                        # Validate file size
                         file = form.cleaned_data['profile_picture']
+                        # Validate file size
                         if file.size > 2 * 1024 * 1024:  # 2MB limit
                             log_error(
                                 request=request,
@@ -1699,7 +1718,12 @@ def edit_member(request, team_id, user_id):
                                 }
                             )
                             messages.error(request, 'Profile picture must be less than 2MB')
-                            return render(request, 'teams/edit_member.html', {'form': form, 'team': team, 'member': member_to_edit})
+                            return render(request, 'teams/edit_member.html', {
+                                'form': form,
+                                'team': team,
+                                'member': member_to_edit,
+                                'team_member': team_member
+                            })
                         
                         # Validate file type
                         allowed_extensions = ['.jpg', '.jpeg', '.png']
@@ -1717,46 +1741,15 @@ def edit_member(request, team_id, user_id):
                                 }
                             )
                             messages.error(request, 'Profile picture must be JPEG or PNG')
-                            return render(request, 'teams/edit_member.html', {'form': form, 'team': team, 'member': member_to_edit})
-                        
-                        profile.profile_picture = file
-                        
-                        # Log successful file upload
-                        log_error(
-                            request=request,
-                            error_message="Profile picture uploaded successfully",
-                            error_type="FileOperation",
-                            extra_context={
-                                "user_email": request.user.email,
-                                "member_email": member_to_edit.email,
-                                "file_name": file.name,
-                                "file_size": file.size
-                            }
-                        )
-                    elif request.POST.get('profile_picture-clear'):
-                        profile.profile_picture = 'profile_pics/castolo.png'  # Reset to default
-                        log_error(
-                            request=request,
-                            error_message="Profile picture reset to default",
-                            error_type="FileOperation",
-                            extra_context={
-                                "user_email": request.user.email,
-                                "member_email": member_to_edit.email,
-                                "default_picture": 'profile_pics/castolo.png'
-                            }
-                        )
+                            return render(request, 'teams/edit_member.html', {
+                                'form': form,
+                                'team': team,
+                                'member': member_to_edit,
+                                'team_member': team_member
+                            })
                     
-                    # Save all profile fields
-                    profile.player_number = form.cleaned_data['player_number']
-                    profile.position = form.cleaned_data['position']
-                    profile.level = form.cleaned_data['level']
-                    profile.is_official = form.cleaned_data['is_official']
-                    profile.active_player = form.cleaned_data['active_player']
-                    profile.rut = form.cleaned_data['rut']
-                    profile.country = form.cleaned_data['country']
-                    profile.date_of_birth = form.cleaned_data['date_of_birth']
-                    profile.description = form.cleaned_data['description']
-                    profile.save()
+                    # Save the form
+                    form.save()
                     
                     # Log successful profile update
                     log_error(
@@ -1770,13 +1763,13 @@ def edit_member(request, team_id, user_id):
                             "member_id": member_to_edit.id,
                             "team_id": team.id,
                             "updated_fields": {
-                                "player_number": profile.player_number,
-                                "position": str(profile.position),
-                                "level": profile.level,
-                                "is_official": profile.is_official,
-                                "active_player": profile.active_player,
-                                "country": profile.country,
-                                "has_profile_picture": bool(profile.profile_picture)
+                                "player_number": form.cleaned_data['player_number'],
+                                "position": str(form.cleaned_data['position']),
+                                "level": form.cleaned_data['level'],
+                                "is_official": form.cleaned_data['is_official'],
+                                "active_player": form.cleaned_data['active_player'],
+                                "country": form.cleaned_data['country'],
+                                "has_profile_picture": bool(form.cleaned_data.get('profile_picture'))
                             }
                         }
                     )
@@ -1800,14 +1793,20 @@ def edit_member(request, team_id, user_id):
                     }
                 )
                 messages.error(request, 'An error occurred while updating the profile.')
-                return render(request, 'teams/edit_member.html', {'form': form, 'team': team, 'member': member_to_edit})
+                return render(request, 'teams/edit_member.html', {
+                    'form': form,
+                    'team': team,
+                    'member': member_to_edit,
+                    'team_member': team_member
+                })
     else:
-        form = AdminMemberProfileForm(instance=member_to_edit)
+        form = AdminMemberProfileForm(instance=member_to_edit, team=team)
     
     return render(request, 'teams/edit_member.html', {
         'form': form,
         'team': team,
-        'member': member_to_edit
+        'member': member_to_edit,
+        'team_member': team_member
     })
 
 @login_required
@@ -1855,11 +1854,11 @@ def payment_create(request, team_id, season_id):
                     payment.season = season
                     payment.save()
                     
-                    # Create player payments
+                    # Create player payments for official players
                     official_players = TeamMember.objects.filter(
                         team=team,
                         role=TeamMember.Role.PLAYER,
-                        user__profile__is_official=True,
+                        teammemberprofile__is_official=True,
                         is_active=True
                     )
                     
@@ -1976,15 +1975,9 @@ def toggle_player_payment(request, team_id, season_id, payment_id, player_paymen
             if not is_paid:
                 # Admin unmarking a payment (from paid to unpaid)
                 player_payment.mark_as_unpaid(is_admin=True)
-            elif player_payment.is_paid and not player_payment.admin_verified:
-                # Admin verifying a payment
-                player_payment.mark_as_paid(is_admin=True)
-            elif not player_payment.is_paid:
-                # Admin marking as paid
-                player_payment.mark_as_paid(is_admin=True)
             else:
-                # Admin unmarking a verified payment
-                player_payment.mark_as_unpaid(is_admin=True)
+                # Admin marking as paid (without automatic verification)
+                player_payment.mark_as_paid(is_admin=False)  # Changed from True to False
         # Handle player actions
         else:
             if player_payment.admin_verified:
@@ -2130,7 +2123,7 @@ def refresh_players(request, team_id, season_id, payment_id):
     official_players = TeamMember.objects.filter(
         team=team,
         role=TeamMember.Role.PLAYER,
-        user__profile__is_official=True,
+        teammemberprofile__is_official=True,
         is_active=True
     )
     
@@ -2156,7 +2149,7 @@ def refresh_players(request, team_id, season_id, payment_id):
     return redirect('teams:payment_edit', team_id=team.id, season_id=season.id, payment_id=payment.id)
 
 @login_required
-def update_condition(request):
+def update_condition(request, team_id):
     if request.method == 'POST':
         log_error(
             request=request,
@@ -2167,18 +2160,20 @@ def update_condition(request):
                 "user_id": request.user.id,
                 "path": request.path,
                 "method": request.method,
-                "condition": request.POST.get('condition')
+                "condition": request.POST.get('condition'),
+                "team_id": team_id
             }
         )
         
         try:
             condition = request.POST.get('condition')
-            if condition and hasattr(request.user, 'profile'):
-                profile = request.user.profile
-                if condition in dict(Profile.CONDITION_CHOICES):
-                    old_condition = profile.condition
-                    profile.condition = condition
-                    profile.save()
+            team = get_object_or_404(Team, id=team_id)
+            if condition:
+                team_member = TeamMember.objects.get(user=request.user, team=team, is_active=True)
+                if condition in dict(TeamMemberProfile.CONDITION_CHOICES):
+                    old_condition = team_member.teammemberprofile.condition
+                    team_member.teammemberprofile.condition = condition
+                    team_member.teammemberprofile.save()
                     
                     log_error(
                         request=request,
@@ -2189,7 +2184,8 @@ def update_condition(request):
                             "user_id": request.user.id,
                             "old_condition": old_condition,
                             "new_condition": condition,
-                            "profile_id": profile.id
+                            "team_member_id": team_member.id,
+                            "team_id": team_id
                         }
                     )
                 else:
@@ -2201,19 +2197,20 @@ def update_condition(request):
                             "user_email": request.user.email,
                             "user_id": request.user.id,
                             "invalid_condition": condition,
-                            "allowed_conditions": dict(Profile.CONDITION_CHOICES)
+                            "allowed_conditions": dict(TeamMemberProfile.CONDITION_CHOICES),
+                            "team_id": team_id
                         }
                     )
             else:
                 log_error(
                     request=request,
-                    error_message="Missing condition or profile",
+                    error_message="Missing condition",
                     error_type="ValidationError",
                     extra_context={
                         "user_email": request.user.email,
                         "user_id": request.user.id,
-                        "has_profile": hasattr(request.user, 'profile'),
-                        "condition_provided": bool(condition)
+                        "condition_provided": bool(condition),
+                        "team_id": team_id
                     }
                 )
         except Exception as e:
@@ -2226,7 +2223,8 @@ def update_condition(request):
                     "user_id": request.user.id,
                     "error": str(e),
                     "error_type": type(e).__name__,
-                    "traceback": traceback.format_exc()
+                    "traceback": traceback.format_exc(),
+                    "team_id": team_id
                 }
             )
     
@@ -2451,9 +2449,9 @@ def match_stats_edit(request, team_id, season_id, match_id):
         players = TeamMember.objects.filter(
             team=team,
             is_active=True,
-            user__profile__active_player=True,
+            teammemberprofile__active_player=True,
             role=TeamMember.Role.PLAYER
-        ).select_related('user', 'user__profile')
+        ).select_related('user', 'teammemberprofile')
         
         log_error(
             request=request,
@@ -2577,24 +2575,24 @@ def lineup_simulator(request, team_id):
     players = TeamMember.objects.filter(
         team=team,
         is_active=True,
-        user__profile__active_player=True,
+        teammemberprofile__active_player=True,
         role=TeamMember.Role.PLAYER
     ).select_related(
         'user',
-        'user__profile',
-        'user__profile__position'
+        'teammemberprofile',
+        'teammemberprofile__position'
     ).annotate(
         position_order=Case(
-            When(user__profile__position__type='GK', then=Value(1)),
-            When(user__profile__position__type='DEF', then=Value(2)),
-            When(user__profile__position__type='MID', then=Value(3)),
-            When(user__profile__position__type='ATT', then=Value(4)),
+            When(teammemberprofile__position__type='GK', then=Value(1)),
+            When(teammemberprofile__position__type='DEF', then=Value(2)),
+            When(teammemberprofile__position__type='MID', then=Value(3)),
+            When(teammemberprofile__position__type='ATT', then=Value(4)),
             default=Value(5),
             output_field=IntegerField(),
         )
     ).order_by(
         'position_order',
-        'user__profile__player_number'
+        'teammemberprofile__player_number'
     )
     
     context = {
@@ -2616,24 +2614,24 @@ def season_stats(request, team_id, season_id):
     players = TeamMember.objects.filter(
         team=team,
         is_active=True,
-        user__profile__active_player=True,
+        teammemberprofile__active_player=True,
         role=TeamMember.Role.PLAYER
     ).select_related(
         'user',
-        'user__profile',
-        'user__profile__position'
+        'teammemberprofile',
+        'teammemberprofile__position'
     ).annotate(
         position_order=Case(
-            When(user__profile__position__type='GK', then=Value(1)),
-            When(user__profile__position__type='DEF', then=Value(2)),
-            When(user__profile__position__type='MID', then=Value(3)),
-            When(user__profile__position__type='ATT', then=Value(4)),
+            When(teammemberprofile__position__type='GK', then=Value(1)),
+            When(teammemberprofile__position__type='DEF', then=Value(2)),
+            When(teammemberprofile__position__type='MID', then=Value(3)),
+            When(teammemberprofile__position__type='ATT', then=Value(4)),
             default=Value(5),
             output_field=IntegerField(),
         )
     ).order_by(
         'position_order',
-        'user__profile__player_number'
+        'teammemberprofile__player_number'
     )
     
     # Get stats for each player
@@ -2646,7 +2644,10 @@ def season_stats(request, team_id, season_id):
         'season': season,
         'players': players,
         'stats': stats_dict,
-        'is_admin': team_member.is_team_admin or team_member.role == TeamMember.Role.MANAGER
+        'is_admin': team_member.is_team_admin or team_member.role == TeamMember.Role.MANAGER,
+        'current_team': team,  # Add for navbar consistency
+        'current_season': season,  # Add for navbar consistency
+        'is_team_admin': team_member.is_team_admin or team_member.role == TeamMember.Role.MANAGER  # Add for navbar consistency
     }
     
     return render(request, 'teams/season_stats.html', context)
@@ -2841,7 +2842,6 @@ class CustomLoginView(auth_views.LoginView):
         attempted_username = self.request.POST.get('username', '')
         print("\033[93m>> Attempted login for user: " + attempted_username)  # Yellow text
         print(">> Form errors: " + str(dict(form.errors)))
-        print(">> Error codes: " + str([error.code for error in form.errors.get('__all__', [])]))
         print("\033[91m=== END OF FAILED LOGIN ===")  # Red text
         print("\033[95m" + "="*50 + "\033[0m\n")  # Magenta separator
         
@@ -2851,9 +2851,212 @@ class CustomLoginView(auth_views.LoginView):
             error_type="AuthenticationError",
             extra_context={
                 "errors": dict(form.errors),
-                "attempted_username": attempted_username,
-                "error_codes": [error.code for error in form.errors.get('__all__', [])]
+                "attempted_username": attempted_username
             }
         )
         return super().form_invalid(form)
+
+@login_required
+def delete_member(request, team_id, user_id):
+    team = get_object_or_404(Team, id=team_id)
+    member_to_delete = get_object_or_404(User, id=user_id)
+    team_member = get_object_or_404(TeamMember, team=team, user=member_to_delete)
+    
+    # Check if the requesting user is a team admin
+    requester_member = get_object_or_404(TeamMember, team=team, user=request.user, is_active=True)
+    if not requester_member.is_team_admin:
+        return HttpResponseForbidden("You don't have permission to delete team members.")
+    
+    # Don't allow admins to delete themselves
+    if member_to_delete == request.user:
+        messages.error(request, "You cannot delete yourself from the team.")
+        return redirect('teams:team_members', team_id=team.id)
+    
+    try:
+        with transaction.atomic():
+            # Delete all team-specific data
+            
+            # Delete the team member profile
+            TeamMemberProfile.objects.filter(team_member=team_member).delete()
+            
+            # Delete player payments for this team
+            PlayerPayment.objects.filter(
+                player=team_member,
+                payment__season__team=team
+            ).delete()
+            
+            # Delete player match stats for this team
+            PlayerMatchStats.objects.filter(
+                player=team_member,
+                match__season__team=team
+            ).delete()
+            
+            # Finally, delete the team member
+            team_member.delete()
+            
+            messages.success(request, f"{member_to_delete.get_full_name()} has been removed from the team.")
+    except Exception as e:
+        log_error(
+            request=request,
+            error_message=f"Failed to delete team member: {str(e)}",
+            error_type="DeletionError",
+            extra_context={
+                "team_id": team_id,
+                "user_id": user_id,
+                "error": str(e),
+                "traceback": traceback.format_exc()
+            }
+        )
+        messages.error(request, f"An error occurred while removing the member: {str(e)}")
+    
+    return redirect('teams:team_members', team_id=team.id)
+
+@login_required
+def accept_invitation(request):
+    token = request.GET.get('token')
+    
+    # Log initial state
+    log_error(
+        request=request,
+        error_message="Starting invitation acceptance process",
+        error_type="InvitationDebug",
+        extra_context={
+            "token": token,
+            "user_email": request.user.email,
+            "session_keys": list(request.session.keys()),
+            "relevant_session_data": {
+                k: v for k, v in request.session.items() 
+                if k.startswith('invite_')
+            }
+        }
+    )
+    
+    try:
+        team_member = TeamMember.objects.get(invitation_token=token, is_active=False)
+        
+        # Log team member state
+        log_error(
+            request=request,
+            error_message="Found team member for invitation",
+            error_type="InvitationDebug",
+            extra_context={
+                "team_member_id": team_member.id,
+                "team_id": team_member.team_id,
+                "email_match": team_member.email.lower() == request.user.email.lower(),
+                "current_state": {
+                    "is_active": team_member.is_active,
+                    "invitation_accepted": team_member.invitation_accepted,
+                    "has_profile": hasattr(team_member, 'teammemberprofile'),
+                    "is_official": team_member.is_official,
+                    "active_player": team_member.active_player
+                }
+            }
+        )
+        
+        try:
+            with transaction.atomic():
+                # Log pre-update state
+                log_error(
+                    request=request,
+                    error_message="Pre-update state",
+                    error_type="InvitationDebug",
+                    extra_context={
+                        "member_data": {
+                            "is_official": team_member.is_official,
+                            "active_player": team_member.active_player
+                        }
+                    }
+                )
+                
+                # Log profile creation attempt
+                log_error(
+                    request=request,
+                    error_message="Attempting to create team member profile",
+                    error_type="InvitationDebug",
+                    extra_context={
+                        "profile_data": {
+                            "team_member_id": team_member.id,
+                            "is_official": team_member.is_official,
+                            "active_player": team_member.active_player,
+                            "level": 1,
+                            "condition": 'NORMAL'
+                        }
+                    }
+                )
+                
+                # Create team member profile
+                profile = TeamMemberProfile.objects.create(
+                    team_member=team_member,
+                    is_official=team_member.is_official,
+                    active_player=team_member.active_player,
+                    level=1,
+                    condition='NORMAL'
+                )
+                
+                # Verify profile creation
+                log_error(
+                    request=request,
+                    error_message="Profile creation result",
+                    error_type="InvitationDebug",
+                    extra_context={
+                        "profile_id": profile.id,
+                        "profile_state": {
+                            "team_member_id": profile.team_member_id,
+                            "is_official": profile.is_official,
+                            "active_player": profile.active_player,
+                            "level": profile.level,
+                            "condition": profile.condition
+                        }
+                    }
+                )
+                
+                # Activate the membership
+                team_member.is_active = True
+                team_member.invitation_accepted = True
+                team_member.invitation_token = None
+                team_member.save()
+                
+                messages.success(request, f'You have successfully joined {team_member.team.name}!')
+                return redirect('teams:dashboard')
+                
+        except Exception as transaction_error:
+            log_error(
+                request=request,
+                error_message="Transaction failed during invitation acceptance",
+                error_type="InvitationError",
+                extra_context={
+                    "error": str(transaction_error),
+                    "error_type": type(transaction_error).__name__,
+                    "traceback": traceback.format_exc()
+                }
+            )
+            raise
+            
+    except TeamMember.DoesNotExist:
+        log_error(
+            request=request,
+            error_message="Invalid invitation token",
+            error_type="InvitationError",
+            extra_context={
+                "token": token,
+                "user_email": request.user.email
+            }
+        )
+        messages.error(request, "Invalid or expired invitation link.")
+        return redirect('teams:dashboard')
+    except Exception as e:
+        log_error(
+            request=request,
+            error_message="Unexpected error during invitation acceptance",
+            error_type="InvitationError",
+            extra_context={
+                "token": token,
+                "user_email": request.user.email,
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "traceback": traceback.format_exc()
+            }
+        )
+        messages.error(request, "An error occurred while accepting the invitation.")
+        return redirect('teams:dashboard')
 

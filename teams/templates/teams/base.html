@@ -45,7 +45,7 @@
                     </li>
                     {% if current_team %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'teams:team_members' current_team.id %}">Team Members</a>
+                        <a class="nav-link" href="{% url 'teams:team_members' team_id=current_team.id %}">Team Members</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'teams:lineup_simulator' team_id=current_team.id %}">
@@ -53,15 +53,17 @@
                         </a>
                     </li>
                     {% endif %}
-                    {% if is_team_admin and current_season %}
+                    {% if is_team_admin %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown">
                             <i class="fas fa-cog"></i> Admin
                         </a>
                         <ul class="dropdown-menu">
+                            {% if current_season %}
                             <li><a class="dropdown-item" href="{% url 'teams:payment_list' team_id=current_team.id season_id=current_season.id %}">
                                 <i class="fas fa-money-bill"></i> Manage Payments
                             </a></li>
+                            {% endif %}
                             <li><a class="dropdown-item" href="{% url 'teams:season_list' current_team.id %}">
                                 <i class="fas fa-calendar"></i> Manage Seasons
                             </a></li>

@@ -52,4 +52,8 @@ def get_item(dictionary, key):
     try:
         return dictionary.get(key)
     except (AttributeError, KeyError, TypeError):
-        return None 
+        return None
+
+@register.filter
+def filter_by_team(queryset, team):
+    return queryset.filter(team=team) 

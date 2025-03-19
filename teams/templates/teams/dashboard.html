@@ -587,533 +587,432 @@ body {
     <div class="row">
         <!-- Profile Card - First on mobile -->
         <div class="col-md-3 order-1">
-            <div class="fifa-card mb-4">
-                {% if request.user.profile and request.user.profile.player_number %}
-                    <div class="fifa-card-number">{{ request.user.profile.player_number }}</div>
-                {% endif %}
-                {% if request.user.profile and request.user.profile.position %}
-                    <div class="fifa-card-position">
-                        {{ request.user.profile.position.code }}
-                        {% with condition=request.user.profile.condition %}
-                            <span class="condition-arrow condition-{{ condition|lower }}">
-                                <svg><use href="#condition-{{ condition|lower }}"/></svg>
+            <!-- FIFA Card -->
+            {% if current_team_member %}
+                <div class="fifa-card mb-4">
+                    {% if current_team_member.teammemberprofile.player_number %}
+                        <div class="fifa-card-number">{{ current_team_member.teammemberprofile.player_number }}</div>
+                    {% else %}
+                        <div class="fifa-card-number">00</div>
+                    {% endif %}
+                    {% if current_team_member.teammemberprofile.position %}
+                        <div class="fifa-card-position">
+                            {{ current_team_member.teammemberprofile.position.code }}
+                            <span class="condition-arrow condition-{{ current_team_member.teammemberprofile.condition|default:'NORMAL'|lower }}">
+                                <svg><use href="#condition-{{ current_team_member.teammemberprofile.condition|default:'NORMAL'|lower }}"/></svg>
                             </span>
+                        </div>
+                    {% else %}
+                        <div class="fifa-card-position">
+                            XX
+                            <span class="condition-arrow condition-{{ current_team_member.teammemberprofile.condition|default:'NORMAL'|lower }}">
+                                <svg><use href="#condition-{{ current_team_member.teammemberprofile.condition|default:'NORMAL'|lower }}"/></svg>
+                            </span>
+                        </div>
+                    {% endif %}
+                    {% if request.user.profile.country %}
+                        <div class="fifa-card-country">
+                            {{ request.user.profile.country|country_flag }}
+                            {% if current_team and current_team.team_photo %}
+                                <img src="{{ current_team.team_photo.url }}" alt="{{ current_team.name }}" class="fifa-card-team-logo">
+                            {% else %}
+                                <img src="{{ MEDIA_URL }}team_photos/default.png" alt="Default team photo" class="fifa-card-team-logo">
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                    {% if current_team_member.teammemberprofile.profile_picture %}
+                        <img src="{{ current_team_member.teammemberprofile.profile_picture.url }}" alt="Profile Picture" class="fifa-card-image">
+                    {% else %}
+                        <img src="{% static 'teams/images/castolo.png' %}" alt="Default Profile Picture" class="fifa-card-image">
+                    {% endif %}
+                    <div class="fifa-card-name">
+                        {% with name_parts=request.user.get_full_name.split %} 
+                            {{ name_parts.0.0 }}. {{ name_parts|last }}
                         {% endwith %}
                     </div>
-                {% endif %}
-                {% if request.user.profile and request.user.profile.country %}
-                    <div class="fifa-card-country">
-                        {{ request.user.profile.country|country_flag }}
-                        {% if current_team and current_team.team_photo %}
-                            <img src="{{ current_team.team_photo.url }}" alt="{{ current_team.name }}" class="fifa-card-team-logo">
+                    <div class="fifa-card-details">
+                        {% if request.user.profile.rut %}
+                            <div>RUT: {{ request.user.profile.rut }}</div>
+                        {% endif %}
+                        <div>{{ request.user.email }}</div>
+                        {% if current_team_member.teammemberprofile.level %}
+                            <div>Level: {{ current_team_member.teammemberprofile.level|default:"1" }} {% if request.user.profile.date_of_birth %}• {{ request.user.profile.date_of_birth|calculate_age }}{% endif %}</div>
                         {% else %}
-                            <img src="{{ MEDIA_URL }}team_photos/default.png" alt="Default team photo" class="fifa-card-team-logo">
+                            <div>Level: 1 {% if request.user.profile.date_of_birth %}• {{ request.user.profile.date_of_birth|calculate_age }}{% endif %}</div>
+                        {% endif %}
+                        {% if current_team_member.teammemberprofile.description %}
+                            <div class="mt-1 text-muted fst-italic">"{{ current_team_member.teammemberprofile.description }}"</div>
+                        {% else %}
+                            <div class="mt-1 text-muted fst-italic">"Description"</div>
                         {% endif %}
                     </div>
-                {% endif %}
-                {% if request.user.profile and request.user.profile.profile_picture %}
-                    <img src="{{ request.user.profile.profile_picture.url }}" alt="Profile Picture" class="fifa-card-image">
-                {% else %}
-                    <img src="{% static 'teams/images/default-profile.png' %}" alt="Default Profile Picture" class="fifa-card-image">
-                {% endif %}
-                <div class="fifa-card-name">
-                    {% with name_parts=request.user.get_full_name.split %} 
-                        {{ name_parts.0.0 }}. {{ name_parts|last }}
-                    {% endwith %}
+                    <a href="{% url 'teams:edit_profile' team_id=current_team.id %}" class="text-decoration-underline text-dark mt-3 d-block text-start">Edit Profile</a>
                 </div>
-                <div class="fifa-card-details">
-                    {% if request.user.profile and request.user.profile.rut %}
-                        <div>RUT: {{ request.user.profile.rut }}</div>
-                    {% endif %}
-                    <div>{{ request.user.email }}</div>
-                    {% if request.user.profile and request.user.profile.level %}
-                        <div>Level: {{ request.user.profile.level }} {% if request.user.profile.date_of_birth %}• {{ request.user.profile.date_of_birth|calculate_age }}{% endif %}</div>
-                    {% endif %}
-                    {% if request.user.profile and request.user.profile.description %}
-                        <div class="mt-1 text-muted fst-italic">"{{ request.user.profile.description }}"</div>
-                    {% endif %}
+            {% else %}
+                <div class="fifa-card mb-4">
+                    <div class="fifa-card-name">
+                        {% with name_parts=request.user.get_full_name.split %} 
+                            {{ name_parts.0.0 }}. {{ name_parts|last }}
+                        {% endwith %}
+                    </div>
+                    <div class="fifa-card-details">
+                        {% if request.user.profile.rut %}
+                            <div>RUT: {{ request.user.profile.rut }}</div>
+                        {% endif %}
+                        <div>{{ request.user.email }}</div>
+                    </div>
+                    <a href="{% url 'teams:edit_profile' team_id=current_team.id %}" class="text-decoration-underline text-dark mt-3 d-block text-start">Set Up Profile</a>
                 </div>
-                <a href="{% url 'teams:edit_profile' %}" class="text-decoration-underline text-dark mt-3 d-block text-start">Edit Profile</a>
-            </div>
+            {% endif %}
             
             <!-- Teams List -->
             <div class="card mb-4">
                 <div class="card-header">
-                    <h5 class="card-title mb-0">My Teams</h5>
+                    <h5 class="card-title mb-0">Your Teams</h5>
                 </div>
-                <div class="card-body">
-                    {% if team_memberships %}
-                        <div class="list-group">
-                            {% for membership in team_memberships %}
-                                <a href="{% url 'teams:switch_team' membership.team.id %}" 
-                                   class="list-group-item list-group-item-action {% if membership.team.id == current_team %}active{% endif %} d-flex align-items-center">
-                                    {% if membership.team.team_photo %}
-                                        <img src="{{ membership.team.team_photo.url }}" 
-                                             alt="{{ membership.team.name }}" 
-                                             class="rounded-circle me-2"
-                                             style="width: 40px; height: 40px; object-fit: cover;">
-                                    {% else %}
-                                        <img src="{{ MEDIA_URL }}team_photos/default.png" 
-                                             alt="Default team photo" 
-                                             class="rounded-circle me-2"
-                                             style="width: 40px; height: 40px; object-fit: cover;">
-                                    {% endif %}
-                                    {{ membership.team.name }}
-                                </a>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <p class="text-muted">You are not a member of any teams.</p>
-                    {% endif %}
+                <div class="list-group list-group-flush">
+                    {% for membership in team_memberships %}
+                        <a href="{% url 'teams:switch_team' team_id=membership.team.id %}" 
+                           class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                            {{ membership.team.name }}
+                            {% if membership.team == current_team %}
+                                <span class="badge bg-primary rounded-pill">Current</span>
+                            {% endif %}
+                        </a>
+                    {% endfor %}
                 </div>
             </div>
         </div>
 
-        <!-- Main Content -->
+        <!-- Main Content - Second on mobile -->
         <div class="col-md-9 order-2">
-            {% if current_team %}
-                <!-- Condition Prompt -->
-                <div class="card mb-4">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0 d-flex align-items-center">
-                            What's your condition this week?
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <form method="post" action="{% url 'teams:update_condition' %}" class="condition-form">
-                            {% csrf_token %}
-                            <select name="condition" id="condition" onchange="this.form.submit()" class="form-select">
-                                {% for value, label in request.user.profile.CONDITION_CHOICES %}
-                                    <option value="{{ value }}" {% if request.user.profile.condition == value %}selected{% endif %}>
-                                        {{ label }}
-                                    </option>
-                                {% endfor %}
-                            </select>
-                        </form>
-                    </div>
-                </div>
+            <!-- Condition Prompt -->
+            <div class="condition-prompt mb-4">
+                <h5 class="mb-3">How are you feeling today?</h5>
+                <form method="post" action="{% url 'teams:update_condition' team_id=current_team.id %}" class="condition-form" id="conditionForm">
+                    {% csrf_token %}
+                    <select name="condition" class="form-select" onchange="this.form.submit()">
+                        {% if current_team_member %}
+                            <option value="TOP" {% if current_team_member.teammemberprofile.condition == 'TOP' %}selected{% endif %}>Top Condition</option>
+                            <option value="GOOD" {% if current_team_member.teammemberprofile.condition == 'GOOD' %}selected{% endif %}>Good Condition</option>
+                            <option value="NORMAL" {% if current_team_member.teammemberprofile.condition == 'NORMAL' %}selected{% endif %}>Normal Condition</option>
+                            <option value="BAD" {% if current_team_member.teammemberprofile.condition == 'BAD' %}selected{% endif %}>Bad Condition</option>
+                            <option value="AWFUL" {% if current_team_member.teammemberprofile.condition == 'AWFUL' %}selected{% endif %}>Awful Condition</option>
+                            <option value="INJURED" {% if current_team_member.teammemberprofile.condition == 'INJURED' %}selected{% endif %}>Injured</option>
+                        {% endif %}
+                    </select>
+                </form>
+            </div>
 
-                {% if upcoming_birthdays %}
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">Upcoming Birthdays</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="list-group">
-                            {% for birthday in upcoming_birthdays %}
-                            <div class="list-group-item">
-                                {% if birthday.is_today %}
-                                <p class="mb-0">
-                                    <span class="fw-bold">🎂 Today is {{ birthday.member.user.get_full_name }}'s birthday! 🎉</span>
-                                </p>
+            <!-- Upcoming Birthdays -->
+            {% if upcoming_birthdays %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Upcoming Birthdays</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        {% for birthday in upcoming_birthdays %}
+                        <div class="list-group-item">
+                            {% if birthday.is_today %}
+                            <p class="mb-0">
+                                <span class="fw-bold">🎂 Today is {{ birthday.member.user.get_full_name }}'s birthday! 🎉</span>
+                            </p>
+                            {% else %}
+                            <p class="mb-0">
+                                {{ birthday.member.user.get_full_name }} - 
+                                {% if birthday.days_until == 1 %}
+                                Tomorrow! 🎈
                                 {% else %}
-                                <p class="mb-0">
-                                    {{ birthday.member.user.get_full_name }} - 
-                                    {% if birthday.days_until == 1 %}
-                                    Tomorrow! 🎈
-                                    {% else %}
-                                    In {{ birthday.days_until }} days ({{ birthday.birthday|date:"M d" }}) 🎈
-                                    {% endif %}
-                                </p>
+                                In {{ birthday.days_until }} days ({{ birthday.birthday|date:"M d" }}) 🎈
                                 {% endif %}
-                            </div>
-                            {% endfor %}
+                            </p>
+                            {% endif %}
                         </div>
+                        {% endfor %}
                     </div>
                 </div>
-                {% endif %}
+            </div>
+            {% endif %}
 
-                <!-- Current Season -->
-                <div class="card mb-4">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        {% if current_season %}
-                            <h5 class="card-title mb-0 d-flex align-items-center">
-                                Current Season: {{ current_season.name }}
-                            </h5>
-                            <div class="btn-group-header">
-                                <a href="{% url 'teams:season_stats' team_id=current_team.id season_id=current_season.id %}" class="btn btn-outline-primary btn-sm">Season Stats</a>
-                                {% if is_team_admin %}
-                                    <a href="{% url 'teams:season_list' current_team.id %}" class="btn btn-primary btn-sm">Manage Seasons</a>
-                                {% endif %}
-                            </div>
-                        {% else %}
-                            <h5 class="card-title mb-0 d-flex align-items-center">
-                                No Active Season
-                            </h5>
-                            {% if is_team_admin %}
-                                <div class="btn-group-header">
-                                    <a href="{% url 'teams:season_list' current_team.id %}" class="btn btn-primary btn-sm">Manage Seasons</a>
-                                </div>
-                            {% endif %}
+            <!-- Current Season -->
+            {% if current_season %}
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Current Season: {{ current_season.name }}</h5>
+                    <div class="btn-group-header">
+                        <a href="{% url 'teams:season_stats' team_id=current_team.id season_id=current_season.id %}" class="btn btn-outline-primary btn-sm">Season Stats</a>
+                        {% if is_team_admin %}
+                        <a href="{% url 'teams:season_list' current_team.id %}" class="btn btn-dark btn-sm">Manage Seasons</a>
                         {% endif %}
                     </div>
                 </div>
+            </div>
+            {% endif %}
 
-                <!-- Upcoming Matches -->
-                {% if current_season %}
-                    <div class="card mb-4">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h5 class="card-title mb-0 d-flex align-items-center">
-                                Upcoming Matches
-                            </h5>
-                            <div class="btn-group-header">
-                                <a href="{% url 'teams:season_detail' team_id=current_team.id season_id=current_season.id %}" class="btn btn-outline-primary btn-sm">All Matches</a>
-                                {% if is_team_admin %}
-                                    <a href="{% url 'teams:match_create' team_id=current_team.id season_id=current_season.id %}" class="btn btn-primary btn-sm">Add Match</a>
-                                {% endif %}
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            {% if upcoming_matches %}
-                                <div class="row row-cols-1 row-cols-md-2 g-4">
-                                    {% for match in upcoming_matches %}
-                                        <div class="col">
-                                            <div class="card h-100 border-light shadow-sm">
-                                                <div class="card-body">
-                                                    <div class="d-flex justify-content-between align-items-start mb-3">
-                                                        <div>
-                                                            <h5 class="card-title mb-1">{{ match.opponent }}</h5>
-                                                            <h6 class="card-subtitle text-muted">Field #{{ match.field_number }}</h6>
-                                                        </div>
-                                                        <div class="text-end">
-                                                            <div class="d-flex flex-column align-items-end">
-                                                                <span class="badge badge-primary mb-1">{{ match.match_date|date:"M d, Y" }}</span>
-                                                                <small class="text-muted">
-                                                                    {{ match.match_time|time:"g:i A" }}
-                                                                    <span class="text-primary">({{ match.match_time|time:"g:i A"|arrival_time:45 }})</span>
-                                                                </small>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    {% if is_team_admin %}
-                                                        <div class="mt-3">
-                                                            <a href="{% url 'teams:match_edit' team_id=current_team.id season_id=current_season.id match_id=match.id %}" 
-                                                               class="btn btn-sm btn-outline-primary">
-                                                                <i class="fas fa-edit me-1"></i> Edit
-                                                            </a>
-                                                        </div>
-                                                    {% endif %}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    {% endfor %}
+            <!-- Upcoming Matches -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Upcoming Matches</h5>
+                    <div class="btn-group-header">
+                        <a href="{% url 'teams:season_detail' team_id=current_team.id season_id=current_season.id %}" class="btn btn-outline-primary btn-sm">All Matches</a>
+                        {% if is_team_admin %}
+                        <a href="{% url 'teams:match_create' team_id=current_team.id season_id=current_season.id %}" class="btn btn-dark btn-sm">Add Match</a>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if upcoming_matches %}
+                    <div class="list-group">
+                        {% for match in upcoming_matches %}
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1">
+                                        {% if match.is_home_game %}
+                                        {{ current_team.name }} vs {{ match.opponent }}
+                                        {% else %}
+                                        {{ match.opponent }} vs {{ current_team.name }}
+                                        {% endif %}
+                                    </h6>
+                                    <small class="text-muted">
+                                        {{ match.match_date|date:"l, M d, Y" }} at {{ match.match_time|time:"g:i A" }}
+                                        <br>
+                                        Field Number: {{ match.field_number }}
+                                    </small>
                                 </div>
-                            {% else %}
-                                <p class="text-muted">No upcoming matches scheduled.</p>
-                            {% endif %}
-                        </div>
-                    </div>
-                {% endif %}
-
-                <!-- Payments -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0 d-flex align-items-center">
-                            Payments
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        {% csrf_token %}
-                        {% if pending_payments %}
-                            <div class="row row-cols-1 row-cols-md-2 g-4">
-                                {% for payment in pending_payments %}
-                                    <div class="col">
-                                        <div class="card h-100">
-                                            <div class="card-body">
-                                                <div class="d-flex justify-content-between align-items-start mb-3">
-                                                    <div>
-                                                        <h5 class="card-title mb-1">{{ payment.payment.name }}</h5>
-                                                        <h6 class="card-subtitle">${{ payment.amount|currency_no_decimals }}</h6>
-                                                    </div>
-                                                    <div class="text-end">
-                                                        <div class="d-flex align-items-center mb-1">
-                                                            {% if payment.payment.due_date|date:"Y-m-d" < today %}
-                                                                <span class="badge badge-primary me-2">Overdue</span>
-                                                            {% endif %}
-                                                            <small class="text-muted">{{ payment.payment.due_date|date:"M d, Y" }}</small>
-                                                        </div>
-                                                        {% if payment.admin_verified %}
-                                                            <span class="badge badge-primary">Paid & Verified</span>
-                                                        {% elif payment.is_paid %}
-                                                            <span class="badge badge-primary">Pending Approval</span>
-                                                        {% else %}
-                                                            <span class="badge badge-secondary">Not Paid</span>
-                                                        {% endif %}
-                                                    </div>
-                                                </div>
-
-                                                <div class="mb-3">
-                                                    <label class="form-label small text-muted mb-1">Team Payment Progress</label>
-                                                    <div class="d-flex align-items-center">
-                                                        <div class="progress flex-grow-1" style="height: 8px;">
-                                                            <div class="progress-bar" 
-                                                                 role="progressbar" 
-                                                                 style="width: {{ payment.verification_percentage }}%;" 
-                                                                 aria-valuenow="{{ payment.verification_percentage }}" 
-                                                                 aria-valuemin="0" 
-                                                                 aria-valuemax="100">
-                                                            </div>
-                                                        </div>
-                                                        <small class="text-muted ms-2">{{ payment.verification_percentage|floatformat:0 }}%</small>
-                                                    </div>
-                                                </div>
-
-                                                {% if not payment.admin_verified %}
-                                                    <div class="d-flex gap-2">
-                                                        {% if not payment.is_paid %}
-                                                            <a href="https://slach.cl/lpcfc/{{ payment.amount|stringformat:'d' }}" 
-                                                               target="_blank" 
-                                                               class="btn btn-success btn-sm">
-                                                                <i class="fas fa-credit-card me-1"></i> Pay Now
-                                                            </a>
-                                                        {% endif %}
-                                                        <button type="button" 
-                                                                class="btn btn-sm {% if payment.is_paid %}btn-outline-primary{% else %}btn-primary{% endif %} toggle-payment-btn"
-                                                                data-payment-id="{{ payment.id }}"
-                                                                data-is-admin="{% if is_team_admin %}true{% else %}false{% endif %}">
-                                                            {% if payment.is_paid %}
-                                                                <i class="fas fa-times me-1"></i> Mark as Unpaid
-                                                            {% else %}
-                                                                <i class="fas fa-check me-1"></i> Mark as Paid
-                                                            {% endif %}
-                                                        </button>
-                                                    </div>
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                    </div>
-                                {% endfor %}
-                            </div>
-                        {% else %}
-                            <div class="text-center py-4">
-                                <i class="fas fa-check-circle text-success fa-3x mb-3"></i>
-                                <h5 class="text-success">Great! You have no pending payments</h5>
-                                <p class="text-muted mb-0">You're up to date with all your payments</p>
-                                {% if current_season %}
-                                <div class="mt-3">
-                                    <a href="{% url 'teams:user_payments' team_id=current_team.id season_id=current_season.id %}" class="btn btn-outline-primary btn-sm">
-                                        <i class="fas fa-history me-1"></i> View All Payments
+                                {% if is_team_admin %}
+                                <div class="d-flex gap-2">
+                                    <a href="{% url 'teams:match_edit' current_team.id current_season.id match.id %}" class="btn btn-outline-secondary btn-sm">
+                                        Edit
                                     </a>
                                 </div>
                                 {% endif %}
                             </div>
-                        {% endif %}
+                            {% if match.notes %}
+                            <div class="mt-2">
+                                <small class="text-muted">{{ match.notes }}</small>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
                     </div>
+                    {% else %}
+                    <p class="text-muted mb-0">No upcoming matches scheduled.</p>
+                    {% endif %}
                 </div>
+            </div>
 
-                <!-- Team Members -->
-                <div class="card">
-                    <div class="card-header">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h5 class="card-title mb-0">Team Members</h5>
-                                <small class="text-muted">{{ team_members|length }} active players</small>
-                            </div>
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="activeFilter" {% if show_active_only %}checked{% endif %}>
-                                <label class="form-check-label" for="activeFilter">Show Active Players Only</label>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        {% if is_team_admin %}
-                        <div class="mb-4">
-                            <a href="{% url 'teams:invite_member' team_id=current_team.id %}" class="btn btn-primary">Invite Member</a>
-                        </div>
-                        {% endif %}
+            <!-- Payments -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0 d-flex align-items-center">
+                        Payments
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% csrf_token %}
+                    {% if pending_payments %}
+                        <div class="row row-cols-1 row-cols-md-2 g-4">
+                            {% for payment in pending_payments %}
+                                <div class="col">
+                                    <div class="card h-100">
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                                <div>
+                                                    <h5 class="card-title mb-1">{{ payment.payment.name }}</h5>
+                                                    <h6 class="card-subtitle">${{ payment.amount|currency_no_decimals }}</h6>
+                                                </div>
+                                                <div class="text-end">
+                                                    <div class="d-flex align-items-center mb-1">
+                                                        {% if payment.payment.due_date|date:"Y-m-d" < today %}
+                                                            <span class="badge badge-primary me-2">Overdue</span>
+                                                        {% endif %}
+                                                        <small class="text-muted">{{ payment.payment.due_date|date:"M d, Y" }}</small>
+                                                    </div>
+                                                    {% if payment.admin_verified %}
+                                                        <span class="badge badge-primary">Paid & Verified</span>
+                                                    {% elif payment.is_paid %}
+                                                        <span class="badge badge-primary">Pending Approval</span>
+                                                    {% else %}
+                                                        <span class="badge badge-secondary">Not Paid</span>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
 
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 80px">#</th>
-                                        <th style="width: 120px">Position</th>
-                                        <th>Name</th>
-                                        {% if is_team_admin %}
-                                        <th style="width: 80px">Actions</th>
-                                        {% endif %}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for member in team_members %}
-                                        {% if member.is_active %}
-                                            <tr>
-                                                <td class="fw-bold fs-5">
-                                                    {% if member.user.profile and member.user.profile.player_number %}
-                                                        {% if member.user and member.user.profile and member.user.profile.country %}
-                                                            {{ member.user.profile.country|country_flag }}
-                                                        {% endif %}
-                                                        {{ member.user.profile.player_number }}
-                                                    {% endif %}
-                                                </td>
-                                                <td>
-                                                    {% if member.user and member.user.profile and member.user.profile.position %}
-                                                        <div class="d-flex align-items-center">
-                                                            <div class="position-badge" style="--position-color: {{ member.user.profile.position.color }}">
-                                                                {{ member.user.profile.position.code }}
-                                                            </div>
-                                                            {% if member.user and member.user.profile and member.user.profile.condition %}
-                                                                <span class="condition-arrow condition-{{ member.user.profile.condition|lower }}">
-                                                                    <svg><use href="#condition-{{ member.user.profile.condition|lower }}"/></svg>
-                                                                </span>
-                                                            {% endif %}
-                                                        </div>
-                                                    {% endif %}
-                                                </td>
-                                                <td>
-                                                    <div class="d-flex align-items-center gap-2">
-                                                        {% if member.user.profile and member.user.profile.profile_picture %}
-                                                            <img src="{{ member.user.profile.profile_picture.url }}" 
-                                                                 alt="Profile Picture" 
-                                                                 class="rounded-circle {% if not member.user.profile.active_player %}inactive-photo{% endif %}"
-                                                                 style="width: 32px; height: 32px; object-fit: cover;">
-                                                        {% else %}
-                                                            <img src="{% static 'teams/images/default-profile.png' %}" 
-                                                                 alt="Default Profile Picture" 
-                                                                 class="rounded-circle {% if not member.user.profile.active_player %}inactive-photo{% endif %}"
-                                                                 style="width: 32px; height: 32px; object-fit: cover;">
-                                                        {% endif %}
-                                                        <div>
-                                                            <div class="d-flex align-items-center gap-2">
-                                                                <a href="{% url 'teams:player_card' team_id=current_team.id user_id=member.user.id %}" 
-                                                                   class="text-decoration-none text-dark">
-                                                                    {{ member.user.get_full_name }}
-                                                                </a>
-                                                            </div>
-                                                            <div class="d-flex gap-1">
-                                                                <span class="badge {% if member.role == 'MANAGER' %}badge-primary{% else %}badge-secondary{% endif %}">
-                                                                    {{ member.get_role_display }}
-                                                                </span>
-                                                                {% if not member.user.profile.active_player and not member.user.profile.is_official %}
-                                                                    <span class="badge badge-secondary">Inactive</span>
-                                                                {% elif not member.user.profile.is_official %}
-                                                                    <span class="badge badge-secondary">Galleta</span>
-                                                                {% endif %}
-                                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label small text-muted mb-1">Team Payment Progress</label>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="progress flex-grow-1" style="height: 8px;">
+                                                        <div class="progress-bar" 
+                                                             role="progressbar" 
+                                                             style="width: {{ payment.verification_percentage }}%;" 
+                                                             aria-valuenow="{{ payment.verification_percentage }}" 
+                                                             aria-valuemin="0" 
+                                                             aria-valuemax="100">
                                                         </div>
                                                     </div>
-                                                </td>
-                                                {% if is_team_admin %}
-                                                <td>
-                                                    <a href="{% url 'teams:edit_member' team_id=current_team.id user_id=member.user.id %}" 
-                                                       class="btn btn-sm btn-outline-primary">
-                                                        <i class="fas fa-edit"></i>
-                                                    </a>
-                                                </td>
-                                                {% endif %}
-                                            </tr>
-                                        {% endif %}
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+                                                    <small class="text-muted ms-2">{{ payment.verification_percentage|floatformat:0 }}%</small>
+                                                </div>
+                                            </div>
+
+                                            {% if not payment.admin_verified %}
+                                                <div class="d-flex gap-2">
+                                                    {% if not payment.is_paid %}
+                                                        <a href="https://slach.cl/lpcfc/{{ payment.amount|stringformat:'d' }}" 
+                                                           target="_blank" 
+                                                           class="btn btn-success btn-sm">
+                                                            <i class="fas fa-credit-card me-1"></i> Pay Now
+                                                        </a>
+                                                    {% endif %}
+                                                    <button type="button" 
+                                                            class="btn btn-sm {% if payment.is_paid %}btn-outline-primary{% else %}btn-primary{% endif %} toggle-payment-btn"
+                                                            data-payment-id="{{ payment.id }}"
+                                                            data-is-admin="{% if is_team_admin %}true{% else %}false{% endif %}">
+                                                        {% if payment.is_paid %}
+                                                            <i class="fas fa-times me-1"></i> Mark as Unpaid
+                                                        {% else %}
+                                                            <i class="fas fa-check me-1"></i> Mark as Paid
+                                                        {% endif %}
+                                                    </button>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-check-circle text-success fa-3x mb-3"></i>
+                            <h5 class="text-success">Great! You have no pending payments</h5>
+                            <p class="text-muted mb-0">You're up to date with all your payments</p>
+                            {% if current_season %}
+                            <div class="mt-3">
+                                <a href="{% url 'teams:user_payments' team_id=current_team.id season_id=current_season.id %}" class="btn btn-outline-primary btn-sm">
+                                    <i class="fas fa-history me-1"></i> View All Payments
+                                </a>
+                            </div>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Team Members -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="card-title mb-0">Team Members</h5>
+                            <small class="text-muted">{{ team_members|length }} active players</small>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="activeFilter" {% if show_active_only %}checked{% endif %}>
+                            <label class="form-check-label" for="activeFilter">Show Active Players Only</label>
                         </div>
                     </div>
                 </div>
-            {% else %}
-                <div class="alert alert-info">
-                    Please join or create a team to get started.
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead>
+                                <tr>
+                                    <th style="width: 80px">#</th>
+                                    <th style="width: 120px">Position</th>
+                                    <th>Name</th>
+                                    {% if is_team_admin %}
+                                    <th style="width: 80px">Actions</th>
+                                    {% endif %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for member in team_members %}
+                                    {% if member.is_active %}
+                                        <tr>
+                                            <td class="fw-bold fs-5">
+                                                {% if member.teammemberprofile.player_number %}
+                                                    {% if member.user.profile.country %}
+                                                        {{ member.user.profile.country|country_flag }}
+                                                    {% endif %}
+                                                    {{ member.teammemberprofile.player_number }}
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if member.teammemberprofile.position %}
+                                                    <div class="d-flex align-items-center">
+                                                        <div class="position-badge" style="--position-color: {{ member.teammemberprofile.position.color }}">
+                                                            {{ member.teammemberprofile.position.code }}
+                                                        </div>
+                                                        {% if member.teammemberprofile.condition %}
+                                                            <span class="condition-arrow condition-{{ member.teammemberprofile.condition|lower }}">
+                                                                <svg><use href="#condition-{{ member.teammemberprofile.condition|lower }}"/></svg>
+                                                            </span>
+                                                        {% endif %}
+                                                    </div>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <div class="d-flex align-items-center gap-3">
+                                                    <div class="flex-shrink-0">
+                                                        {% if member.teammemberprofile.profile_picture %}
+                                                            <img src="{{ member.teammemberprofile.profile_picture.url }}" alt="{{ member.user.get_full_name }}" width="40" height="40" class="rounded-circle {% if not member.teammemberprofile.active_player %}inactive-photo{% endif %}">
+                                                        {% else %}
+                                                            <img src="{% static 'teams/images/castolo.png' %}" alt="Default profile" width="40" height="40" class="rounded-circle {% if not member.teammemberprofile.active_player %}inactive-photo{% endif %}">
+                                                        {% endif %}
+                                                    </div>
+                                                    <div>
+                                                        <div class="d-flex align-items-center gap-2">
+                                                            <a href="{% url 'teams:player_card' team_id=current_team.id user_id=member.user.id %}" 
+                                                               class="text-decoration-none text-dark">
+                                                                {{ member.user.get_full_name }}
+                                                            </a>
+                                                        </div>
+                                                        <div class="d-flex gap-1">
+                                                            <span class="badge {% if member.role == 'MANAGER' %}badge-primary{% else %}badge-secondary{% endif %}">
+                                                                {{ member.get_role_display }}
+                                                            </span>
+                                                            {% if not member.teammemberprofile.active_player and not member.teammemberprofile.is_official %}
+                                                                <span class="badge badge-secondary">Inactive</span>
+                                                            {% elif not member.teammemberprofile.is_official %}
+                                                                <span class="badge badge-secondary">Galleta</span>
+                                                            {% endif %}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            {% if is_team_admin and member.user != request.user %}
+                                                <td>
+                                                    <div class="d-flex gap-2">
+                                                        <a href="{% url 'teams:edit_member' team_id=current_team.id user_id=member.user.id %}" class="btn btn-sm btn-outline-primary">
+                                                            <i class="fas fa-pencil-alt"></i>
+                                                        </a>
+                                                    </div>
+                                                </td>
+                                            {% elif is_team_admin and member.user == request.user %}
+                                                <td>
+                                                    <div class="d-flex gap-2">
+                                                        <a href="{% url 'teams:edit_member' team_id=current_team.id user_id=member.user.id %}" class="btn btn-sm btn-outline-primary">
+                                                            <i class="fas fa-pencil-alt"></i>
+                                                        </a>
+                                                    </div>
+                                                </td>
+                                            {% endif %}
+                                        </tr>
+                                    {% endif %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            {% endif %}
+            </div>
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block extra_js %}
+{% include "teams/condition_icons.html" %}
+
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Payment toggle functionality
-    document.querySelectorAll('.toggle-payment-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const paymentId = this.dataset.paymentId;
-            const isAdmin = this.dataset.isAdmin === 'true';
-            const row = this.closest('tr');
-            const table = this.closest('table');
-            const currentStatus = button.textContent.trim() === 'Mark as Unpaid';
-            
-            // Debug logging
-            console.log('Payment Toggle Debug:');
-            console.log('Current Status (from button):', currentStatus);
-            console.log('Payment ID:', paymentId);
-            console.log('Is Admin:', isAdmin);
-            
-            // Get team and season IDs from table data attributes
-            const teamId = table.dataset.teamId;
-            const seasonId = table.dataset.seasonId;
-            
-            // Construct the URL using the correct URL pattern with domain prefix
-            const url = `${window.location.protocol}//${window.location.host}/team/${teamId}/season/${seasonId}/payments/${paymentId}/player/${paymentId}/toggle/`;
-            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-
-            // Log request details
-            console.log('Request Details:');
-            console.log('URL:', url);
-            console.log('Payload:', {
-                is_paid: !currentStatus,
-                send_email: !currentStatus
-            });
-
-            fetch(url, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': csrfToken,
-                    'X-Admin-Action': 'false',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    is_paid: !currentStatus,
-                    send_email: !currentStatus
-                })
-            })
-            .then(response => {
-                // Log response details
-                console.log('Response Status:', response.status);
-                console.log('Response OK:', response.ok);
-                
-                if (response.ok) {
-                    return response.json();
-                } else {
-                    throw new Error('Server error');
-                }
-            })
-            .then(data => {
-                // Log parsed response data
-                console.log('Response Data:', data);
-                
-                if (data.status === 'success') {
-                    showAlert('success', currentStatus ? 'Payment marked as unpaid' : 'Payment marked as paid');
-                } else {
-                    showAlert('warning', data.message || 'Failed to update payment status');
-                }
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
-            })
-            .catch(error => {
-                console.error('Fetch Error:', error);
-                showAlert('warning', 'There was an issue updating the payment status. The page will refresh to show the current status.');
-                setTimeout(() => {
-                    window.location.reload();
-                }, 2000);
-            });
-        });
-    });
-
-    // Helper function to show alerts
-    function showAlert(type, message) {
-        const alertDiv = document.createElement('div');
-        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
-        alertDiv.role = 'alert';
-        alertDiv.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        `;
-        
-        const container = document.querySelector('.container');
-        container.insertBefore(alertDiv, container.firstChild);
-    }
-
-    // Active filter handler
     const activeFilter = document.getElementById('activeFilter');
     if (activeFilter) {
         // Set initial state based on URL parameter
@@ -1171,54 +1070,55 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    document.querySelectorAll('.modal').forEach(modal => {
-        // Create backdrop if it doesn't exist
-        if (!modal.querySelector('.modal-backdrop')) {
-            const backdrop = document.createElement('div');
-            backdrop.className = 'modal-backdrop';
-            modal.insertBefore(backdrop, modal.firstChild);
-        }
+    document.querySelectorAll('.toggle-payment-btn').forEach(button => {
+        button.addEventListener('click', async function() {
+            const paymentId = this.dataset.paymentId;
+            const isAdmin = this.dataset.isAdmin === 'true';
+            const currentStatus = this.textContent.trim() === 'Mark as Unpaid';
+            
+            // Get team and season IDs from the current URL or data attributes
+            let teamId = {{ current_team.id }};  // Get from template context
+            let seasonId = {{ current_season.id }};  // Get from template context
+            
+            try {
+                const response = await fetch(`/teams/${teamId}/season/${seasonId}/payments/${paymentId}/player/${paymentId}/toggle/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                        'X-Admin-Action': isAdmin.toString()
+                    },
+                    body: JSON.stringify({
+                        is_paid: !currentStatus,
+                        send_email: !currentStatus
+                    })
+                });
 
-        const closeBtn = modal.querySelector('.btn-close');
-        const backdrop = modal.querySelector('.modal-backdrop');
-        
-        function closeModal() {
-            modal.classList.remove('show');
-            unlockScroll();
-        }
-
-        if (closeBtn) {
-            closeBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                closeModal();
-            });
-        }
-
-        if (backdrop) {
-            backdrop.addEventListener('click', function(e) {
-                if (e.target === backdrop) {
-                    closeModal();
+                if (!response.ok) {
+                    throw new Error('Server error');
                 }
-            });
-        }
 
-        modal.addEventListener('click', function(e) {
-            if (e.target === modal) {
-                closeModal();
+                const data = await response.json();
+                if (data.status === 'success') {
+                    // Update button text and style
+                    if (data.is_paid) {
+                        button.innerHTML = '<i class="fas fa-times me-1"></i> Mark as Unpaid';
+                        button.classList.remove('btn-success');
+                        button.classList.add('btn-outline-success');
+                    } else {
+                        button.innerHTML = '<i class="fas fa-check me-1"></i> Mark as Paid';
+                        button.classList.remove('btn-outline-success');
+                        button.classList.add('btn-success');
+                    }
+                    
+                    // Refresh the page to update all payment statuses
+                    location.reload();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred while updating the payment status. Please try again.');
             }
         });
     });
-
-    // Close on escape key
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            const openModal = document.querySelector('.modal.show');
-            if (openModal) {
-                openModal.classList.remove('show');
-                unlockScroll();
-            }
-        }
-    });
-});
 </script>
 {% endblock %} 

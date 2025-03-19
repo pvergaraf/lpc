@@ -205,110 +205,103 @@
 <div class="page-container">
     <div class="content-wrapper">
         <div class="fifa-card">
-            {% if player.profile and player.profile.player_number %}
-                <div class="fifa-card-number">{{ player.profile.player_number }}</div>
-            {% endif %}
-            {% if player.profile and player.profile.position %}
-                <div class="fifa-card-position">
-                    {{ player.profile.position.code }}
-                    {% if player.user and player.user.profile and player.user.profile.condition %}
-                        <span class="condition-arrow condition-{{ player.user.profile.condition|lower }}">
-                            <svg><use href="#condition-{{ player.user.profile.condition|lower }}"/></svg>
-                        </span>
-                    {% endif %}
-                </div>
-            {% endif %}
-            {% if player.profile and player.profile.country %}
-                <div class="fifa-card-country">
-                    {{ player.profile.country|country_flag }}
-                    {% if current_team and current_team.team_photo %}
-                        <img src="{{ current_team.team_photo.url }}" alt="{{ current_team.name }}" class="fifa-card-team-logo">
-                    {% else %}
-                        <img src="{{ MEDIA_URL }}team_photos/default.png" alt="Default team photo" class="fifa-card-team-logo">
-                    {% endif %}
-                </div>
-            {% endif %}
-            {% if player.profile and player.profile.profile_picture %}
-                <img src="{{ player.profile.profile_picture.url }}" alt="Profile Picture" class="fifa-card-image">
-            {% else %}
-                <img src="{% static 'teams/images/default-profile.png' %}" alt="Default Profile Picture" class="fifa-card-image">
-            {% endif %}
-            <div class="fifa-card-name">
-                {% with name_parts=player.get_full_name.split %} 
-                    {{ name_parts.0.0 }}. {{ name_parts|last }}
-                {% endwith %}
-            </div>
-            <div class="fifa-card-details">
-                {% if player.profile and player.profile.rut %}
-                    <div>RUT: {{ player.profile.rut }}</div>
+            {% with team_member=player.teammember_set.all|first %}
+                {% if team_member and team_member.team == current_team %}
+                    <div class="fifa-card mb-4">
+                        <div class="fifa-card-number">
+                            {% if team_member.teammemberprofile.player_number %}
+                                {{ team_member.teammemberprofile.player_number }}
+                            {% else %}
+                                00
+                            {% endif %}
+                        </div>
+                        <div class="fifa-card-position">
+                            {% if team_member.teammemberprofile.position %}
+                                {{ team_member.teammemberprofile.position.code }}
+                            {% else %}
+                                XX
+                            {% endif %}
+                            {% with condition=team_member.teammemberprofile.condition|default:'NORMAL' %}
+                                <span class="condition-arrow condition-{{ condition|lower }}">
+                                    <svg><use href="#condition-{{ condition|lower }}"/></svg>
+                                </span>
+                            {% endwith %}
+                        </div>
+                        {% if player.profile.country %}
+                            <div class="fifa-card-country">
+                                {{ player.profile.country|country_flag }}
+                                {% if current_team and current_team.team_photo %}
+                                    <img src="{{ current_team.team_photo.url }}" alt="{{ current_team.name }}" class="fifa-card-team-logo">
+                                {% else %}
+                                    <img src="{{ MEDIA_URL }}team_photos/default.png" alt="Default team photo" class="fifa-card-team-logo">
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                        {% if team_member.teammemberprofile.profile_picture %}
+                            <img src="{{ team_member.teammemberprofile.profile_picture.url }}" alt="Profile Picture" class="fifa-card-image">
+                        {% else %}
+                            <img src="{% static 'teams/images/castolo.png' %}" alt="Default Profile Picture" class="fifa-card-image">
+                        {% endif %}
+                        <div class="fifa-card-name">
+                            {% with name_parts=player.get_full_name.split %} 
+                                {{ name_parts.0.0 }}. {{ name_parts|last }}
+                            {% endwith %}
+                        </div>
+                        <div class="fifa-card-details">
+                            {% if player.profile.rut %}
+                                <div>RUT: {{ player.profile.rut }}</div>
+                            {% endif %}
+                            <div>{{ player.email }}</div>
+                            <div>Level: {{ team_member.teammemberprofile.level|default:"1" }} {% if player.profile.date_of_birth %}• {{ player.profile.date_of_birth|calculate_age }}{% endif %}</div>
+                            <div class="mt-1 text-muted fst-italic">
+                                {% if team_member.teammemberprofile.description %}
+                                    "{{ team_member.teammemberprofile.description }}"
+                                {% else %}
+                                    "Description"
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="fifa-card mb-4">
+                        <div class="fifa-card-name">
+                            {% with name_parts=player.get_full_name.split %} 
+                                {{ name_parts.0.0 }}. {{ name_parts|last }}
+                            {% endwith %}
+                        </div>
+                        <div class="fifa-card-details">
+                            {% if player.profile.rut %}
+                                <div>RUT: {{ player.profile.rut }}</div>
+                            {% endif %}
+                            <div>{{ player.email }}</div>
+                        </div>
+                    </div>
                 {% endif %}
-                <div>{{ player.email }}</div>
-                {% if player.profile and player.profile.level %}
-                    <div>Level: {{ player.profile.level }} {% if player.profile.date_of_birth %}• {{ player.profile.date_of_birth|calculate_age }}{% endif %}</div>
-                {% endif %}
-                {% if player.profile and player.profile.description %}
-                    <div class="mt-1 text-muted fst-italic">"{{ player.profile.description }}"</div>
-                {% endif %}
-            </div>
+            {% endwith %}
         </div>
-
         <div class="stats-container">
-            {% if current_season and season_stats %}
-            <div class="stats-section mb-5">
-                <h3 class="stats-header">{{ current_season.name }} Stats</h3>
-                <div class="stats-grid-large">
-                    <div class="stat-box">
-                        <div class="stat-value-large">{{ season_stats.matches_played }}</div>
-                        <div class="stat-label-large">Matches</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-value-large">{{ season_stats.goals }}</div>
-                        <div class="stat-label-large">Goals</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-value-large">{{ season_stats.assists }}</div>
-                        <div class="stat-label-large">Assists</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-value-large">{{ season_stats.yellow_cards }}</div>
-                        <div class="stat-label-large">Yellow Cards</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-value-large">{{ season_stats.red_cards }}</div>
-                        <div class="stat-label-large">Red Cards</div>
-                    </div>
+            <div class="stats-header">Season Stats</div>
+            <div class="stats-grid-large">
+                <div class="stat-box">
+                    <div class="stat-value-large">{{ season_stats.matches_played }}</div>
+                    <div class="stat-label-large">Matches</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value-large">{{ season_stats.goals }}</div>
+                    <div class="stat-label-large">Goals</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value-large">{{ season_stats.assists }}</div>
+                    <div class="stat-label-large">Assists</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value-large">{{ season_stats.yellow_cards }}</div>
+                    <div class="stat-label-large">Yellow Cards</div>
                 </div>
             </div>
-            {% endif %}
-
-            {% if all_time_stats %}
-            <div class="stats-section">
-                <h3 class="stats-header">All-Time Stats</h3>
-                <div class="stats-grid-large">
-                    <div class="stat-box">
-                        <div class="stat-value-large">{{ all_time_stats.matches_played }}</div>
-                        <div class="stat-label-large">Matches</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-value-large">{{ all_time_stats.goals }}</div>
-                        <div class="stat-label-large">Goals</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-value-large">{{ all_time_stats.assists }}</div>
-                        <div class="stat-label-large">Assists</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-value-large">{{ all_time_stats.yellow_cards }}</div>
-                        <div class="stat-label-large">Yellow Cards</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-value-large">{{ all_time_stats.red_cards }}</div>
-                        <div class="stat-label-large">Red Cards</div>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
         </div>
     </div>
 </div>
+
+{% include "teams/condition_icons.html" %}
 {% endblock %} 
