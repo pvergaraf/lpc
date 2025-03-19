@@ -13,10 +13,30 @@ class Command(BaseCommand):
                 self.stdout.write(f'Target team: {target_team.name}\n')
 
                 # Get all team members
-                team_members = TeamMember.objects.filter(team_id=1).select_related('teammemberprofile')
-                self.stdout.write(f'Found {team_members.count()} team members\n')
-
-                self.stdout.write('Member Status:')
+                team_members = TeamMember.objects.filter(team_id=1).select_related(
+                    'teammemberprofile', 'user', 'user__profile'
+                )
+                
+                # First show members with no email
+                self.stdout.write('\nMembers with no email:')
+                self.stdout.write('=' * 100)
+                self.stdout.write(f'{"ID":<6} {"Name":<30} {"Player Number":<15} {"Position":<15} {"Created At":<20}')
+                self.stdout.write('-' * 100)
+                
+                for member in team_members:
+                    if not member.email:
+                        profile = getattr(member, 'teammemberprofile', None)
+                        player_number = getattr(profile, 'player_number', 'N/A') if profile else 'N/A'
+                        position = getattr(profile.position, 'name', 'N/A') if profile and profile.position else 'N/A'
+                        name = member.user.get_full_name() if member.user else 'Unknown'
+                        created_at = member.created_at.strftime('%Y-%m-%d %H:%M') if member.created_at else 'N/A'
+                        
+                        self.stdout.write(
+                            f'{member.id:<6} {name:<30} {str(player_number):<15} {position:<15} {created_at:<20}'
+                        )
+                
+                # Then show general stats
+                self.stdout.write('\nGeneral Member Status:')
                 self.stdout.write('=' * 80)
                 self.stdout.write(f'{"Email":<30} {"is_official":<12} {"active_player":<15} {"Has Profile":<12}')
                 self.stdout.write('-' * 80)
