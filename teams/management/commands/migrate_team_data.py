@@ -1,9 +1,9 @@
 from django.core.management.base import BaseCommand
-from teams.models import Team, TeamMember, TeamMemberProfile
+from teams.models import Team, TeamMember
 from django.db import transaction
 
 class Command(BaseCommand):
-    help = 'Migrates all team members and profiles to team ID 1'
+    help = 'Migrates all team members to team ID 1'
 
     def handle(self, *args, **options):
         try:
@@ -12,16 +12,16 @@ class Command(BaseCommand):
                 target_team = Team.objects.get(id=1)
                 self.stdout.write(f'Target team: {target_team.name}')
 
-                # Get all team members
-                team_members = TeamMember.objects.all()
-                self.stdout.write(f'Found {team_members.count()} team members')
+                # Get all team members that are not in team 1
+                team_members = TeamMember.objects.exclude(team_id=1)
+                self.stdout.write(f'Found {team_members.count()} team members to move')
 
                 # Update each team member
                 for member in team_members:
-                    old_team = member.team
+                    old_team_id = member.team_id
                     member.team = target_team
                     member.save()
-                    self.stdout.write(f'Moved member {member.email} from team {old_team.name} to {target_team.name}')
+                    self.stdout.write(f'Moved member {member.email} from team {old_team_id} to team 1')
 
                 self.stdout.write(self.style.SUCCESS('Successfully migrated all team members to team ID 1'))
 
