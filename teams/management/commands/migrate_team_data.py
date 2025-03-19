@@ -23,9 +23,11 @@ class Command(BaseCommand):
 
                 null_is_official = 0
                 null_active_player = 0
+                null_email = 0
 
                 for member in team_members:
-                    email = member.email[:28] + '..' if len(member.email) > 30 else member.email
+                    email = member.email if member.email else "NO EMAIL"
+                    email = email[:28] + '..' if len(email) > 30 else email
                     is_official = getattr(member, 'is_official', None)
                     active_player = getattr(member, 'active_player', None)
                     has_profile = hasattr(member, 'teammemberprofile')
@@ -34,6 +36,8 @@ class Command(BaseCommand):
                         null_is_official += 1
                     if active_player is None:
                         null_active_player += 1
+                    if not member.email:
+                        null_email += 1
 
                     self.stdout.write(
                         f'{email:<30} {str(is_official):<12} {str(active_player):<15} {str(has_profile):<12}'
@@ -44,6 +48,7 @@ class Command(BaseCommand):
                 self.stdout.write(f'Total members: {team_members.count()}')
                 self.stdout.write(f'Members with null is_official: {null_is_official}')
                 self.stdout.write(f'Members with null active_player: {null_active_player}')
+                self.stdout.write(f'Members with null email: {null_email}')
 
         except Team.DoesNotExist:
             self.stdout.write(self.style.ERROR('Team with ID 1 does not exist'))
