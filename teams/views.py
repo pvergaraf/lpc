@@ -2066,43 +2066,25 @@ def player_card(request, team_id, user_id):
     )
     
     try:
+        # Get the team
         team = get_object_or_404(Team, id=team_id)
-        log_error(
-            request=request,
-            error_message="Team found",
-            error_type="ViewDebug",
-            extra_context={
-                "team_id": team.id,
-                "team_name": team.name
-            }
-        )
         
+        # Get the target user
         user = get_object_or_404(User, id=user_id)
-        log_error(
-            request=request,
-            error_message="User found",
-            error_type="ViewDebug",
-            extra_context={
-                "target_user_id": user.id,
-                "target_user_email": user.email,
-                "target_user_name": user.get_full_name()
-            }
-        )
         
         # Check if the requesting user is a member of the team
         requesting_user_membership = get_object_or_404(TeamMember, team=team, user=request.user, is_active=True)
         
         # Get the player's team membership
         team_member = get_object_or_404(TeamMember, team=team, user=user, is_active=True)
-        log_error(
-            request=request,
-            error_message="Team membership found",
-            error_type="ViewDebug",
-            extra_context={
-                "team_member_id": team_member.id,
-                "role": team_member.role,
-                "is_active": team_member.is_active,
-                "is_team_admin": team_member.is_team_admin
+        
+        # Get or create the team member profile
+        team_member_profile, created = TeamMemberProfile.objects.get_or_create(
+            team_member=team_member,
+            defaults={
+                'level': 1,
+                'condition': 'NORMAL',
+                'active_player': True
             }
         )
         
@@ -2110,8 +2092,24 @@ def player_card(request, team_id, user_id):
         current_season = get_current_season(team)
         
         # Get player stats
-        season_stats = PlayerMatchStats.get_player_totals(team_member, current_season) if current_season else None
-        all_time_stats = PlayerMatchStats.get_player_totals(team_member)
+        season_stats = None
+        all_time_stats = None
+        
+        try:
+            if current_season:
+                season_stats = PlayerMatchStats.get_player_totals(team_member, current_season)
+            all_time_stats = PlayerMatchStats.get_player_totals(team_member)
+        except Exception as stats_error:
+            log_error(
+                request=request,
+                error_message=f"Error getting player stats: {str(stats_error)}",
+                error_type="StatsError",
+                extra_context={
+                    "team_id": team_id,
+                    "user_id": user_id,
+                    "error": str(stats_error)
+                }
+            )
         
         context = {
             'member': team_member,
@@ -2120,6 +2118,7 @@ def player_card(request, team_id, user_id):
             'current_season': current_season,
             'season_stats': season_stats,
             'all_time_stats': all_time_stats,
+            'current_team': team,  # Add this for navbar
         }
         
         log_error(
@@ -2128,7 +2127,9 @@ def player_card(request, team_id, user_id):
             error_type="ViewDebug",
             extra_context={
                 "template": "teams/player_card.html",
-                "context_keys": list(context.keys())
+                "context_keys": list(context.keys()),
+                "has_season_stats": bool(season_stats),
+                "has_all_time_stats": bool(all_time_stats)
             }
         )
         
@@ -2139,21 +2140,21 @@ def player_card(request, team_id, user_id):
             request=request,
             error_message="Team not found",
             error_type="NotFoundError",
-            extra_context={
-                "requested_team_id": team_id
-            }
+            extra_context={"team_id": team_id}
         )
-        raise
+        messages.error(request, "Team not found.")
+        return redirect('teams:team_list')
+        
     except User.DoesNotExist:
         log_error(
             request=request,
             error_message="User not found",
             error_type="NotFoundError",
-            extra_context={
-                "requested_user_id": user_id
-            }
+            extra_context={"user_id": user_id}
         )
-        raise
+        messages.error(request, "User not found.")
+        return redirect('teams:team_list')
+        
     except TeamMember.DoesNotExist:
         log_error(
             request=request,
@@ -2164,7 +2165,9 @@ def player_card(request, team_id, user_id):
                 "user_id": user_id
             }
         )
-        raise
+        messages.error(request, "Player is not a member of this team.")
+        return redirect('teams:team_list')
+        
     except Exception as e:
         log_error(
             request=request,
@@ -2176,7 +2179,8 @@ def player_card(request, team_id, user_id):
                 "traceback": traceback.format_exc()
             }
         )
-        raise
+        messages.error(request, "An error occurred while loading the player card.")
+        return redirect('teams:team_list')
 
 @login_required
 def match_stats_edit(request, team_id, season_id, match_id):
