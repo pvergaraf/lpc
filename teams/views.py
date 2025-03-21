@@ -129,11 +129,16 @@ def dashboard(request):
         profile = TeamMemberProfile.objects.filter(team_member=membership).first()
         logger.info(f"Found profile: {profile}")
         
+        # Get current season
+        current_season = Season.objects.filter(team=team, is_active=True).first()
+        logger.info(f"Current season: {current_season}")
+        
         context = {
             'team': team,
             'membership': membership,
             'profile': profile,
             'current_team': team,  # Add this for template context
+            'current_season': current_season,  # Add the current season
             'is_team_admin': membership.is_team_admin or membership.role == TeamMember.Role.MANAGER  # Add this for template context
         }
         return render(request, 'teams/dashboard.html', context)
