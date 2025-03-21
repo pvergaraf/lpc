@@ -2127,9 +2127,9 @@ def player_card(request, team_id, user_id):
         all_time_stats = PlayerMatchStats.get_player_totals(team_member)
         
         context = {
-            'player': user,
-            'current_team': team,
-            'team_member': team_member,
+            'member': team_member,
+            'team': team,
+            'is_team_admin': team_member.is_team_admin,
             'current_season': current_season,
             'season_stats': season_stats,
             'all_time_stats': all_time_stats,

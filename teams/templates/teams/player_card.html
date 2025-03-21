@@ -2,23 +2,17 @@
 {% load static %}
 {% load teams_tags %}
 
-{% block title %}{{ player.get_full_name }} - FIFA Card{% endblock %}
+{% block title %}{{ member.user.get_full_name }} - {{ team.name }}{% endblock %}
 
 {% block content %}
 <style>
-.page-container {
-    min-height: 100vh;
-    background-color: #f8f9fa;
+.player-card-container {
     padding: 2rem;
-}
-
-.content-wrapper {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
+    align-items: center;
+    min-height: calc(100vh - 200px);
     gap: 2rem;
-    max-width: 1200px;
-    margin: 0 auto;
-    align-items: flex-start;
 }
 
 .fifa-card {
@@ -28,61 +22,11 @@
     position: relative;
     width: 100%;
     max-width: 300px;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
     transform: translateZ(0);
     -webkit-transform: translateZ(0);
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
-    flex-shrink: 0;
-}
-
-.stats-container {
-    flex-grow: 1;
-    background: white;
-    border-radius: 15px;
-    padding: 2rem;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-}
-
-.stats-header {
-    font-size: 1.5rem;
-    font-weight: bold;
-    margin-bottom: 1.5rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 2px solid #eee;
-}
-
-.stats-grid-large {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1.5rem;
-    margin-bottom: 2rem;
-}
-
-.stat-box {
-    background: #f8f9fa;
-    padding: 1.5rem;
-    border-radius: 10px;
-    text-align: center;
-    transition: transform 0.2s;
-}
-
-.stat-box:hover {
-    transform: translateY(-5px);
-}
-
-.stat-value-large {
-    font-size: 2rem;
-    font-weight: bold;
-    color: #333;
-    margin-bottom: 0.5rem;
-}
-
-.stat-label-large {
-    font-size: 0.9rem;
-    color: #666;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
 }
 
 .fifa-card-number {
@@ -112,7 +56,6 @@
     position: absolute;
     right: 20px;
     top: 20px;
-    border: 3px solid rgba(255,255,255,0.2);
 }
 
 .fifa-card-name {
@@ -140,7 +83,6 @@
     height: 32px;
     object-fit: cover;
     border-radius: 50%;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .fifa-card-details {
@@ -149,154 +91,213 @@
     color: #333;
 }
 
+.fifa-card-edit {
+    width: 100%;
+    margin-top: 15px;
+}
+
 .condition-arrow {
-    font-size: 1.5rem;
+    font-size: 1.2rem;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     background-color: #000000;
-    width: 30px;
-    height: 30px;
-    line-height: 30px;
+    width: 24px;
+    height: 24px;
+    line-height: 24px;
     text-align: center;
-    margin-left: 0;
-    border-radius: 4px;
+    margin-left: 4px;
 }
 
 .condition-arrow svg {
-    width: 20px;
-    height: 20px;
+    width: 16px;
+    height: 16px;
     fill: currentColor;
 }
 
-.condition-top { color: #00ff00; }
-.condition-good { color: #90ee90; }
-.condition-normal { color: #ffd700; }
-.condition-bad { color: #ffa500; }
-.condition-awful { color: #ff0000; }
-.condition-injured { color: #ff0000; }
-
-@media (max-width: 992px) {
-    .content-wrapper {
-        flex-direction: column;
-        align-items: center;
-    }
-    
-    .fifa-card {
-        margin-bottom: 2rem;
-    }
-    
-    .stats-grid-large {
-        grid-template-columns: repeat(2, 1fr);
-    }
+.condition-top {
+    color: #00ff00;
 }
 
-@media (max-width: 576px) {
-    .page-container {
-        padding: 1rem;
-    }
-    
-    .stats-grid-large {
-        grid-template-columns: 1fr;
-    }
+.condition-good {
+    color: #90ee90;
+}
+
+.condition-normal {
+    color: #ffd700;
+}
+
+.condition-bad {
+    color: #ffa500;
+}
+
+.condition-awful {
+    color: #ff0000;
+}
+
+.condition-injured {
+    color: #ff0000;
+}
+
+.stats-container {
+    width: 100%;
+    max-width: 600px;
+}
+
+.stats-card {
+    background: white;
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.stats-header {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #eee;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 15px;
+}
+
+.stat-item {
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #333;
+    line-height: 1;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: #666;
+    margin-top: 5px;
 }
 </style>
 
-<div class="page-container">
-    <div class="content-wrapper">
-        <div class="fifa-card">
-            {% with team_member=player.teammember_set.all|first %}
-                {% if team_member and team_member.team == current_team %}
-                    <div class="fifa-card mb-4">
-                        <div class="fifa-card-number">
-                            {% if team_member.teammemberprofile.player_number %}
-                                {{ team_member.teammemberprofile.player_number }}
-                            {% else %}
-                                00
-                            {% endif %}
-                        </div>
-                        <div class="fifa-card-position">
-                            {% if team_member.teammemberprofile.position %}
-                                {{ team_member.teammemberprofile.position.code }}
-                            {% else %}
-                                XX
-                            {% endif %}
-                            {% with condition=team_member.teammemberprofile.condition|default:'NORMAL' %}
-                                <span class="condition-arrow condition-{{ condition|lower }}">
-                                    <svg><use href="#condition-{{ condition|lower }}"/></svg>
-                                </span>
-                            {% endwith %}
-                        </div>
-                        {% if player.profile.country %}
-                            <div class="fifa-card-country">
-                                {{ player.profile.country|country_flag }}
-                                {% if current_team and current_team.team_photo %}
-                                    <img src="{{ current_team.team_photo.url }}" alt="{{ current_team.name }}" class="fifa-card-team-logo">
-                                {% else %}
-                                    <img src="{{ MEDIA_URL }}team_photos/default.png" alt="Default team photo" class="fifa-card-team-logo">
-                                {% endif %}
-                            </div>
-                        {% endif %}
-                        {% if team_member.teammemberprofile.profile_picture %}
-                            <img src="{{ team_member.teammemberprofile.profile_picture.url }}" alt="Profile Picture" class="fifa-card-image">
-                        {% else %}
-                            <img src="{% static 'teams/images/castolo.png' %}" alt="Default Profile Picture" class="fifa-card-image">
-                        {% endif %}
-                        <div class="fifa-card-name">
-                            {% with name_parts=player.get_full_name.split %} 
-                                {{ name_parts.0.0 }}. {{ name_parts|last }}
-                            {% endwith %}
-                        </div>
-                        <div class="fifa-card-details">
-                            {% if player.profile.rut %}
-                                <div>RUT: {{ player.profile.rut }}</div>
-                            {% endif %}
-                            <div>{{ player.email }}</div>
-                            <div>Level: {{ team_member.teammemberprofile.level|default:"1" }} {% if player.profile.date_of_birth %}• {{ player.profile.date_of_birth|calculate_age }}{% endif %}</div>
-                            <div class="mt-1 text-muted fst-italic">
-                                {% if team_member.teammemberprofile.description %}
-                                    "{{ team_member.teammemberprofile.description }}"
-                                {% else %}
-                                    "Description"
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
+<div class="player-card-container">
+    <div class="fifa-card">
+        {% if member.teammemberprofile.player_number %}
+            <div class="fifa-card-number">{{ member.teammemberprofile.player_number }}</div>
+        {% else %}
+            <div class="fifa-card-number">00</div>
+        {% endif %}
+        {% if member.teammemberprofile.position %}
+            <div class="fifa-card-position">
+                {{ member.teammemberprofile.position.code }}
+                <span class="condition-arrow condition-{{ member.teammemberprofile.condition|default:'NORMAL'|lower }}">
+                    <svg><use href="#condition-{{ member.teammemberprofile.condition|default:'NORMAL'|lower }}"/></svg>
+                </span>
+            </div>
+        {% else %}
+            <div class="fifa-card-position">
+                XX
+                <span class="condition-arrow condition-{{ member.teammemberprofile.condition|default:'NORMAL'|lower }}">
+                    <svg><use href="#condition-{{ member.teammemberprofile.condition|default:'NORMAL'|lower }}"/></svg>
+                </span>
+            </div>
+        {% endif %}
+        {% if member.user.profile.country %}
+            <div class="fifa-card-country">
+                {{ member.user.profile.country|country_flag }}
+                {% if team.team_photo %}
+                    <img src="{{ team.team_photo.url }}" alt="{{ team.name }}" class="fifa-card-team-logo">
                 {% else %}
-                    <div class="fifa-card mb-4">
-                        <div class="fifa-card-name">
-                            {% with name_parts=player.get_full_name.split %} 
-                                {{ name_parts.0.0 }}. {{ name_parts|last }}
-                            {% endwith %}
-                        </div>
-                        <div class="fifa-card-details">
-                            {% if player.profile.rut %}
-                                <div>RUT: {{ player.profile.rut }}</div>
-                            {% endif %}
-                            <div>{{ player.email }}</div>
-                        </div>
-                    </div>
+                    <img src="{{ MEDIA_URL }}team_photos/default.png" alt="Default team photo" class="fifa-card-team-logo">
                 {% endif %}
+            </div>
+        {% endif %}
+        {% if member.teammemberprofile.profile_picture %}
+            <img src="{{ member.teammemberprofile.profile_picture.url }}" alt="Profile Picture" class="fifa-card-image">
+        {% else %}
+            <img src="{% static 'teams/images/castolo.png' %}" alt="Default Profile Picture" class="fifa-card-image">
+        {% endif %}
+        <div class="fifa-card-name">
+            {% with name_parts=member.user.get_full_name.split %} 
+                {{ name_parts.0.0 }}. {{ name_parts|last }}
             {% endwith %}
         </div>
-        <div class="stats-container">
-            <div class="stats-header">Season Stats</div>
-            <div class="stats-grid-large">
-                <div class="stat-box">
-                    <div class="stat-value-large">{{ season_stats.matches_played }}</div>
-                    <div class="stat-label-large">Matches</div>
+        <div class="fifa-card-details">
+            {% if member.user.profile.rut %}
+                <div>RUT: {{ member.user.profile.rut }}</div>
+            {% endif %}
+            <div>{{ member.user.email }}</div>
+            {% if member.teammemberprofile.level %}
+                <div>Level: {{ member.teammemberprofile.level|default:"1" }} {% if member.user.profile.date_of_birth %}• {{ member.user.profile.date_of_birth|calculate_age }}{% endif %}</div>
+            {% else %}
+                <div>Level: 1 {% if member.user.profile.date_of_birth %}• {{ member.user.profile.date_of_birth|calculate_age }}{% endif %}</div>
+            {% endif %}
+            {% if member.teammemberprofile.description %}
+                <div class="mt-1 text-muted fst-italic">"{{ member.teammemberprofile.description }}"</div>
+            {% else %}
+                <div class="mt-1 text-muted fst-italic">"Description"</div>
+            {% endif %}
+        </div>
+        {% if is_team_admin %}
+            <a href="{% url 'teams:edit_member' team_id=team.id user_id=member.user.id %}" class="text-decoration-underline text-dark mt-3 d-block text-start">Edit Profile</a>
+        {% endif %}
+    </div>
+
+    <div class="stats-container">
+        {% if current_season %}
+            <div class="stats-card mb-4">
+                <div class="stats-header">Season Stats - {{ current_season.name }}</div>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value">{{ season_stats.matches_played }}</div>
+                        <div class="stat-label">MATCHES</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">{{ season_stats.goals }}</div>
+                        <div class="stat-label">GOALS</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">{{ season_stats.assists }}</div>
+                        <div class="stat-label">ASSISTS</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">{{ season_stats.yellow_cards }}</div>
+                        <div class="stat-label">YELLOW CARDS</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">{{ season_stats.red_cards }}</div>
+                        <div class="stat-label">RED CARDS</div>
+                    </div>
                 </div>
-                <div class="stat-box">
-                    <div class="stat-value-large">{{ season_stats.goals }}</div>
-                    <div class="stat-label-large">Goals</div>
+            </div>
+        {% endif %}
+
+        <div class="stats-card">
+            <div class="stats-header">All-Time Stats</div>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value">{{ all_time_stats.matches_played }}</div>
+                    <div class="stat-label">MATCHES</div>
                 </div>
-                <div class="stat-box">
-                    <div class="stat-value-large">{{ season_stats.assists }}</div>
-                    <div class="stat-label-large">Assists</div>
+                <div class="stat-item">
+                    <div class="stat-value">{{ all_time_stats.goals }}</div>
+                    <div class="stat-label">GOALS</div>
                 </div>
-                <div class="stat-box">
-                    <div class="stat-value-large">{{ season_stats.yellow_cards }}</div>
-                    <div class="stat-label-large">Yellow Cards</div>
+                <div class="stat-item">
+                    <div class="stat-value">{{ all_time_stats.assists }}</div>
+                    <div class="stat-label">ASSISTS</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">{{ all_time_stats.yellow_cards }}</div>
+                    <div class="stat-label">YELLOW CARDS</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">{{ all_time_stats.red_cards }}</div>
+                    <div class="stat-label">RED CARDS</div>
                 </div>
             </div>
         </div>
