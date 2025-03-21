@@ -154,8 +154,16 @@ def dashboard(request):
             'teammemberprofile',
             'teammemberprofile__position'
         ).annotate(
+            position_order=Case(
+                When(teammemberprofile__position__type='GK', then=Value(1)),
+                When(teammemberprofile__position__type='DEF', then=Value(2)),
+                When(teammemberprofile__position__type='MID', then=Value(3)),
+                When(teammemberprofile__position__type='ATT', then=Value(4)),
+                default=Value(5),
+                output_field=IntegerField(),
+            ),
             sort_number=Coalesce('teammemberprofile__player_number', Value(999))
-        ).order_by('sort_number')
+        ).order_by('position_order', 'sort_number')
         
         # Get all team memberships for the user
         team_memberships = TeamMember.objects.filter(
