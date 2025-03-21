@@ -735,73 +735,50 @@ body {
             </div>
             {% endif %}
 
-            <!-- Current Season -->
+            <!-- Current Season and Matches Section -->
             {% if current_season %}
-            <div class="card mb-4">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">Current Season: {{ current_season.name }}</h5>
-                    <div class="btn-group-header">
-                        <a href="{% url 'teams:season_stats' team_id=current_team.id season_id=current_season.id %}" class="btn btn-outline-primary btn-sm">Season Stats</a>
-                        {% if is_team_admin %}
-                        <a href="{% url 'teams:season_list' current_team.id %}" class="btn btn-dark btn-sm">Manage Seasons</a>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-            {% endif %}
-
-            <!-- Upcoming Matches -->
-            <div class="card mb-4">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">Upcoming Matches</h5>
-                    <div class="btn-group-header">
-                        <a href="{% url 'teams:season_detail' team_id=current_team.id season_id=current_season.id %}" class="btn btn-outline-primary btn-sm">All Matches</a>
-                        {% if is_team_admin %}
-                        <a href="{% url 'teams:match_create' team_id=current_team.id season_id=current_season.id %}" class="btn btn-dark btn-sm">Add Match</a>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="card-body">
-                    {% if upcoming_matches %}
-                    <div class="list-group">
-                        {% for match in upcoming_matches %}
-                        <div class="list-group-item">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="mb-1">
-                                        {% if match.is_home_game %}
-                                        {{ current_team.name }} vs {{ match.opponent }}
-                                        {% else %}
-                                        {{ match.opponent }} vs {{ current_team.name }}
-                                        {% endif %}
-                                    </h6>
-                                    <small class="text-muted">
-                                        {{ match.match_date|date:"l, M d, Y" }} at {{ match.match_time|time:"g:i A" }}
-                                        <br>
-                                        Field Number: {{ match.field_number }}
-                                    </small>
-                                </div>
-                                {% if is_team_admin %}
-                                <div class="d-flex gap-2">
-                                    <a href="{% url 'teams:match_edit' current_team.id current_season.id match.id %}" class="btn btn-outline-secondary btn-sm">
-                                        Edit
-                                    </a>
-                                </div>
-                                {% endif %}
-                            </div>
-                            {% if match.notes %}
-                            <div class="mt-2">
-                                <small class="text-muted">{{ match.notes }}</small>
-                            </div>
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">Current Season: {{ current_season.name }}</h5>
+                        <div class="btn-group-header">
+                            <a href="{% url 'teams:season_stats' team_id=current_team.id season_id=current_season.id %}" class="btn btn-outline-primary btn-sm">Season Stats</a>
+                            {% if is_team_admin %}
+                                <a href="{% url 'teams:season_list' current_team.id %}" class="btn btn-dark btn-sm">Manage Seasons</a>
                             {% endif %}
                         </div>
-                        {% endfor %}
                     </div>
-                    {% else %}
-                    <p class="text-muted mb-0">No upcoming matches scheduled.</p>
-                    {% endif %}
                 </div>
-            </div>
+
+                <!-- Upcoming Matches -->
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">Upcoming Matches</h5>
+                        <div class="btn-group-header">
+                            <a href="{% url 'teams:season_detail' team_id=current_team.id season_id=current_season.id %}" class="btn btn-outline-primary btn-sm">All Matches</a>
+                            {% if is_team_admin %}
+                                <a href="{% url 'teams:match_create' team_id=current_team.id season_id=current_season.id %}" class="btn btn-dark btn-sm">Add Match</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-0">No upcoming matches scheduled.</p>
+                    </div>
+                </div>
+            {% else %}
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">No Active Season</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-0">There is no active season for this team.</p>
+                        {% if is_team_admin %}
+                            <div class="mt-3">
+                                <a href="{% url 'teams:season_list' current_team.id %}" class="btn btn-primary">Manage Seasons</a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
 
             <!-- Payments -->
             <div class="card mb-4">

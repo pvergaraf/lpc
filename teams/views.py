@@ -20,7 +20,7 @@ from django.utils import timezone
 from django.conf import settings
 from django.template.loader import render_to_string
 from django.db.models import Case, When, Value, IntegerField
-from .utils.logging_utils import log_error, log_upload_error
+from .utils.logging_utils import log_error, log_upload_error, logger
 import os
 import traceback
 import secrets
@@ -133,14 +133,66 @@ def dashboard(request):
         current_season = Season.objects.filter(team=team, is_active=True).first()
         logger.info(f"Current season: {current_season}")
         
+        # Get upcoming birthdays
+        upcoming_birthdays = team.get_upcoming_birthdays()
+        
+        # Get team members for the team roster section
+        team_members = TeamMember.objects.filter(
+            team=team,
+            is_active=True
+        ).select_related(
+            'user',
+            'teammemberprofile',
+            'teammemberprofile__position'
+        ).order_by('teammemberprofile__player_number')
+        
+        # Get all team memberships for the user
+        team_memberships = TeamMember.objects.filter(
+            user=request.user,
+            is_active=True
+        ).select_related('team').order_by('team__name')
+        
+        # Get pending payments
+        pending_payments = None
+        if current_season:
+            pending_payments = PlayerPayment.objects.filter(
+                payment__season=current_season,
+                player=membership
+            ).select_related('payment').order_by('payment__due_date')
+        
         context = {
             'team': team,
             'membership': membership,
             'profile': profile,
-            'current_team': team,  # Add this for template context
-            'current_season': current_season,  # Add the current season
-            'is_team_admin': membership.is_team_admin or membership.role == TeamMember.Role.MANAGER  # Add this for template context
+            'current_team': team,
+            'current_season': current_season,
+            'is_team_admin': membership.is_team_admin or membership.role == TeamMember.Role.MANAGER,
+            'upcoming_birthdays': upcoming_birthdays if upcoming_birthdays else None,
+            'team_members': team_members,
+            'current_team_member': membership,
+            'pending_payments': pending_payments,
+            'today': timezone.now().date(),
+            'team_memberships': team_memberships  # Add team memberships to context
         }
+        
+        # Debug logging
+        log_error(
+            request=request,
+            error_message="Dashboard context debug",
+            error_type="ViewDebug",
+            extra_context={
+                "context_keys": list(context.keys()),
+                "has_team": bool(team),
+                "has_membership": bool(membership),
+                "has_profile": bool(profile),
+                "has_current_season": bool(current_season),
+                "has_upcoming_birthdays": bool(upcoming_birthdays),
+                "team_members_count": team_members.count() if team_members else 0,
+                "has_pending_payments": bool(pending_payments),
+                "is_team_admin": context['is_team_admin']
+            }
+        )
+        
         return render(request, 'teams/dashboard.html', context)
     except Exception as e:
         logger.error(f"Error in dashboard: {str(e)}", exc_info=True)
@@ -2474,10 +2526,21 @@ class CustomLoginView(auth_views.LoginView):
                     print(">> Remember me is True - Session will expire in 24 hours")
                     self.request.session.set_expiry(24 * 60 * 60)
                 
+                # Automatically select the first team for the user
+                first_team = TeamMember.objects.filter(
+                    user=self.request.user,
+                    is_active=True
+                ).order_by('team__id').first()
+                
+                if first_team:
+                    self.request.session['current_team'] = first_team.team_id
+                    print(f"\033[92m>> Automatically selected team: {first_team.team.name} (ID: {first_team.team_id})")
+                
                 print("\n\033[92m>> Final session state:")  # Green text
                 print(">> - Session expiry age: " + str(self.request.session.get_expiry_age()))
                 print(">> - Expires at browser close: " + str(self.request.session.get_expire_at_browser_close()))
                 print(">> - Session modified: " + str(self.request.session.modified))
+                print(">> - Selected team ID: " + str(self.request.session.get('current_team')))
                 print("\033[94m=== LOGIN PROCESS COMPLETED ===")  # Blue text
                 print("\033[95m" + "="*50 + "\033[0m\n")  # Magenta separator
                 
