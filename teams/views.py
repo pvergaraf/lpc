@@ -2090,23 +2090,10 @@ def player_card(request, team_id, user_id):
         )
         
         # Check if the requesting user is a member of the team
-        requesting_user_membership = get_object_or_404(TeamMember, team=team, user=request.user)
-        if not requesting_user_membership:
-            log_error(
-                request=request,
-                error_message="Permission denied - User not team member",
-                error_type="AuthorizationError",
-                extra_context={
-                    "user_email": request.user.email,
-                    "user_id": request.user.id,
-                    "team_id": team.id,
-                    "team_name": team.name
-                }
-            )
-            raise PermissionDenied
+        requesting_user_membership = get_object_or_404(TeamMember, team=team, user=request.user, is_active=True)
         
         # Get the player's team membership
-        team_member = get_object_or_404(TeamMember, team=team, user=user)
+        team_member = get_object_or_404(TeamMember, team=team, user=user, is_active=True)
         log_error(
             request=request,
             error_message="Team membership found",
@@ -2129,7 +2116,7 @@ def player_card(request, team_id, user_id):
         context = {
             'member': team_member,
             'team': team,
-            'is_team_admin': requesting_user_membership.is_team_admin,  # Use requesting user's admin status
+            'is_team_admin': requesting_user_membership.is_team_admin or requesting_user_membership.role == TeamMember.Role.MANAGER,
             'current_season': current_season,
             'season_stats': season_stats,
             'all_time_stats': all_time_stats,
