@@ -2518,6 +2518,13 @@ def send_payment_reminder(request, team_id, season_id, payment_id):
         return redirect('teams:payment_list', team_id=team_id, season_id=season_id)
 
 class CustomLoginView(auth_views.LoginView):
+    def get(self, request, *args, **kwargs):
+        """Store invitation token in session if present in URL."""
+        invitation_token = request.GET.get('invitation_token') or request.GET.get('token')
+        if invitation_token:
+            request.session['pending_invitation_token'] = invitation_token
+        return super().get(request, *args, **kwargs)
+
     def form_valid(self, form):
         """Security check complete. Log the user in."""
         print("\033[95m" + "="*50)  # Magenta separator
@@ -2545,7 +2552,13 @@ class CustomLoginView(auth_views.LoginView):
                     print(">> Remember me is True - Session will expire in 24 hours")
                     self.request.session.set_expiry(24 * 60 * 60)
                 
-                # Automatically select the first team for the user
+                # Check for pending invitation
+                invitation_token = self.request.session.pop('pending_invitation_token', None)
+                if invitation_token:
+                    print(f"\033[92m>> Found pending invitation token: {invitation_token}")
+                    return redirect(f'/accept-invitation/?token={invitation_token}')
+                
+                # If no invitation, proceed with normal login flow
                 first_team = TeamMember.objects.filter(
                     user=self.request.user,
                     is_active=True
@@ -2563,6 +2576,8 @@ class CustomLoginView(auth_views.LoginView):
                 print("\033[94m=== LOGIN PROCESS COMPLETED ===")  # Blue text
                 print("\033[95m" + "="*50 + "\033[0m\n")  # Magenta separator
                 
+                return response
+                
             except Exception as session_error:
                 print("\n\033[91m!!! ERROR SETTING SESSION EXPIRY !!!")  # Red text
                 print(">> Error type: " + type(session_error).__name__)
@@ -2573,19 +2588,11 @@ class CustomLoginView(auth_views.LoginView):
                 print(">> - Session modified: " + str(self.request.session.modified))
                 print("\033[95m" + "="*50 + "\033[0m\n")  # Magenta separator
                 raise
-            
-            return response
-            
+                
         except Exception as e:
             print("\n\033[91m!!! ERROR IN LOGIN PROCESS !!!")  # Red text
             print(">> Error type: " + type(e).__name__)
             print(">> Error message: " + str(e))
-            print("\n>> Current session state:")
-            print(">> - Session exists: " + str(hasattr(self.request, 'session')))
-            if hasattr(self.request, 'session'):
-                print(">> - Session ID: " + str(self.request.session.session_key))
-                print(">> - Session modified: " + str(self.request.session.modified))
-            print("\033[91m=== LOGIN PROCESS FAILED ===")  # Red text
             print("\033[95m" + "="*50 + "\033[0m\n")  # Magenta separator
             raise
 
