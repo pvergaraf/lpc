@@ -33,6 +33,7 @@ from .utils.team_utils import get_current_team
 import logging
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 def get_current_team(user):
     """Get the current team for a user from their session or active memberships."""
@@ -104,167 +105,62 @@ def is_admin(user):
 
 @login_required
 def dashboard(request):
-    logger = logging.getLogger('django')
-    logger.info(f"Dashboard access - User: {request.user.email}, Session team: {request.session.get('current_team')}")
-    
+    logger.info(f"Dashboard access for user {request.user.email}")
     try:
-        # Get team memberships
-        team_memberships = TeamMember.objects.filter(
-            user=request.user,
-            is_active=True
-        ).select_related('team')
+        current_team_id = request.session.get('current_team_id')
+        logger.info(f"Current team ID from session: {current_team_id}")
         
-        # Get current team
-        current_team = None
-        current_team_id = request.session.get('current_team')
-        
-        if current_team_id:
-            try:
-                current_team = Team.objects.get(
-                    id=current_team_id,
-                    teammember__user=request.user,
-                    teammember__is_active=True
-                )
-                logger.info(f"Found current team: {current_team.name} (ID: {current_team.id})")
-            except Team.DoesNotExist:
-                logger.warning(f"Team {current_team_id} not found or user not a member")
-                current_team = None
-        
-        if not current_team and team_memberships.exists():
-            current_team = team_memberships.first().team
-            request.session['current_team'] = current_team.id
-            logger.info(f"Set default team: {current_team.name} (ID: {current_team.id})")
-        
-        if not current_team:
-            logger.warning(f"No current team available for user {request.user.email}")
-            messages.warning(request, "You are not a member of any team. Please join or create a team.")
+        if not current_team_id:
+            logger.error("No current team ID in session")
+            messages.error(request, "Please select a team first.")
             return redirect('teams:team_list')
+            
+        team = Team.objects.get(id=current_team_id)
+        logger.info(f"Found team: {team.name}")
         
-        # Get current team member
-        try:
-            current_team_member = TeamMember.objects.select_related(
-                'teammemberprofile',
-                'teammemberprofile__position'
-            ).get(
-                team=current_team,
-                user=request.user,
-                is_active=True
-            )
-            logger.info(f"Found team member profile for user in team {current_team.name}")
-        except TeamMember.DoesNotExist:
-            logger.error(f"TeamMember not found for user {request.user.email} in team {current_team.id}")
-            messages.error(request, "There was an error accessing your team membership.")
+        membership = TeamMember.objects.filter(team=team, user=request.user).first()
+        logger.info(f"Found membership: {membership}")
+        
+        if not membership:
+            logger.error(f"No membership found for user {request.user.email} in team {team.name}")
+            messages.error(request, "You are not a member of this team.")
             return redirect('teams:team_list')
-        
-        # Get current season
-        current_season = Season.objects.filter(
-            team=current_team,
-            is_active=True
-        ).first()
-        
-        # Get team members
-        team_members = TeamMember.objects.select_related(
-            'user',
-            'teammemberprofile',
-            'teammemberprofile__position'
-        ).filter(
-            team=current_team,
-            is_active=True
-        ).order_by('teammemberprofile__player_number')
+            
+        profile = TeamMemberProfile.objects.filter(team_member=membership).first()
+        logger.info(f"Found profile: {profile}")
         
         context = {
-            'team_memberships': team_memberships,
-            'current_team': current_team,
-            'current_season': current_season,
-            'team_members': team_members,
-            'is_team_admin': current_team_member.is_team_admin or current_team_member.role == TeamMember.Role.MANAGER
+            'team': team,
+            'membership': membership,
+            'profile': profile,
         }
-        
-        logger.info("Successfully prepared dashboard context")
         return render(request, 'teams/dashboard.html', context)
-        
     except Exception as e:
-        logger.error(f"Error in dashboard view: {str(e)}")
-        logger.error(traceback.format_exc())
+        logger.error(f"Error in dashboard: {str(e)}", exc_info=True)
         messages.error(request, "An error occurred while loading the dashboard.")
         return redirect('teams:team_list')
 
 @login_required
 def switch_team(request, team_id):
-    log_error(
-        request=request,
-        error_message="Team switch initiated",
-        error_type="UserActivity",
-        extra_context={
-            "user_email": request.user.email,
-            "user_id": request.user.id,
-            "current_team_id": request.session.get('current_team'),
-            "target_team_id": team_id,
-            "path": request.path,
-            "method": request.method
-        }
-    )
-    
+    logger.info(f"Attempting to switch to team {team_id} for user {request.user.email}")
     try:
-        # Get the team membership and verify it's active
-        team_member = TeamMember.objects.select_related('team').get(
-            team_id=team_id,
-            user=request.user,
-            is_active=True
-        )
+        team = Team.objects.get(id=team_id)
+        logger.info(f"Found team: {team.name}")
         
-        # Update session with new team
-        request.session['current_team'] = team_id
+        membership = TeamMember.objects.filter(team=team, user=request.user).first()
+        logger.info(f"Found membership: {membership}")
         
-        # Clear any team-specific session data
-        keys_to_clear = [k for k in request.session.keys() if k.startswith('team_')]
-        for key in keys_to_clear:
-            del request.session[key]
+        if not membership:
+            logger.error(f"No membership found for user {request.user.email} in team {team.name}")
+            messages.error(request, "You are not a member of this team.")
+            return redirect('teams:team_list')
+            
+        request.session['current_team_id'] = team.id
+        logger.info(f"Set session team_id to {team.id}")
         
-        log_error(
-            request=request,
-            error_message="Team switch successful",
-            error_type="UserActivity",
-            extra_context={
-                "user_email": request.user.email,
-                "user_id": request.user.id,
-                "new_team_id": team_id,
-                "new_team_name": team_member.team.name,
-                "role": team_member.role,
-                "is_admin": team_member.is_team_admin
-            }
-        )
-        
-        messages.success(request, f'Switched to team: {team_member.team.name}')
         return redirect('teams:dashboard')
-        
-    except TeamMember.DoesNotExist:
-        log_error(
-            request=request,
-            error_message="Team switch failed - Invalid membership",
-            error_type="AuthorizationError",
-            extra_context={
-                "user_email": request.user.email,
-                "user_id": request.user.id,
-                "attempted_team_id": team_id
-            }
-        )
-        messages.error(request, "You are not a member of this team.")
-        return redirect('teams:team_list')
     except Exception as e:
-        log_error(
-            request=request,
-            error_message=f"Team switch failed: {str(e)}",
-            error_type="SystemError",
-            extra_context={
-                "user_email": request.user.email,
-                "user_id": request.user.id,
-                "attempted_team_id": team_id,
-                "error": str(e),
-                "error_type": type(e).__name__,
-                "traceback": traceback.format_exc()
-            }
-        )
+        logger.error(f"Error switching teams: {str(e)}", exc_info=True)
         messages.error(request, "An error occurred while switching teams.")
         return redirect('teams:team_list')
 
