@@ -1,4 +1,5 @@
 {% extends 'teams/base.html' %}
+{% load teams_tags %}
 
 {% block title %}{{ season.name }} - {{ team.name }}{% endblock %}
 
@@ -81,6 +82,8 @@
                             <small class="text-muted">
                                 {{ match.match_date|date:"l, M d, Y" }} at {{ match.match_time|time:"g:i A" }}
                                 <br>
+                                <span class="text-success">Arrival time: {{ match.match_time|time:"g:i A"|arrival_time:45 }}</span>
+                                <br>
                                 Field Number: {{ match.field_number }}
                             </small>
                         </div>
@@ -124,6 +127,8 @@
                             </h6>
                             <small class="text-muted">
                                 {{ match.match_date|date:"l, M d, Y" }} at {{ match.match_time|time:"g:i A" }}
+                                <br>
+                                <span class="text-success">Arrival time: {{ match.match_time|time:"g:i A"|arrival_time:45 }}</span>
                                 <br>
                                 Field Number: {{ match.field_number }}
                             </small>

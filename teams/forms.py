@@ -352,6 +352,10 @@ class AdminMemberProfileForm(forms.ModelForm):
         initial=True,
         help_text="Check if the player is currently active"
     )
+    is_team_admin = forms.BooleanField(
+        required=False,
+        help_text="Give this member admin privileges for the team"
+    )
     profile_picture = forms.ImageField(
         required=False,
         help_text="Upload a profile picture (optional)"
@@ -366,7 +370,7 @@ class AdminMemberProfileForm(forms.ModelForm):
         model = get_user_model()
         fields = ('first_name', 'last_name', 'email', 'rut', 'country', 'date_of_birth',
                  'player_number', 'position', 'level', 'is_official', 'active_player',
-                 'profile_picture', 'description')
+                 'is_team_admin', 'profile_picture', 'description')
 
     def __init__(self, *args, team=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -380,12 +384,14 @@ class AdminMemberProfileForm(forms.ModelForm):
                 self.fields['date_of_birth'].initial = profile.date_of_birth
                 
                 # Get team-specific profile data
-                team_profile = self.instance.teammember_set.get(team=self.team).teammemberprofile
+                team_member = self.instance.teammember_set.get(team=self.team)
+                team_profile = team_member.teammemberprofile
                 self.fields['player_number'].initial = team_profile.player_number
                 self.fields['position'].initial = team_profile.position
                 self.fields['level'].initial = team_profile.level
                 self.fields['is_official'].initial = team_profile.is_official
                 self.fields['active_player'].initial = team_profile.active_player
+                self.fields['is_team_admin'].initial = team_member.is_team_admin
                 self.fields['description'].initial = team_profile.description
                 if team_profile.profile_picture:
                     self.fields['profile_picture'].initial = team_profile.profile_picture
@@ -400,6 +406,7 @@ class AdminMemberProfileForm(forms.ModelForm):
         # Special handling for checkboxes
         self.fields['is_official'].widget.attrs['class'] = 'form-check-input'
         self.fields['active_player'].widget.attrs['class'] = 'form-check-input'
+        self.fields['is_team_admin'].widget.attrs['class'] = 'form-check-input'
 
     def save(self, commit=True):
         user = super().save(commit=False)
@@ -415,6 +422,9 @@ class AdminMemberProfileForm(forms.ModelForm):
             
             # Update team-specific profile data
             team_member = TeamMember.objects.get(user=user, team=self.team)
+            team_member.is_team_admin = self.cleaned_data['is_team_admin']
+            team_member.save()
+            
             team_profile = TeamMemberProfile.objects.get_or_create(team_member=team_member)[0]
             team_profile.player_number = self.cleaned_data['player_number']
             team_profile.position = self.cleaned_data['position']

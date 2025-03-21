@@ -754,14 +754,58 @@ body {
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5 class="card-title mb-0">Upcoming Matches</h5>
                         <div class="btn-group-header">
-                            <a href="{% url 'teams:season_detail' team_id=current_team.id season_id=current_season.id %}" class="btn btn-outline-primary btn-sm">All Matches</a>
-                            {% if is_team_admin %}
-                                <a href="{% url 'teams:match_create' team_id=current_team.id season_id=current_season.id %}" class="btn btn-dark btn-sm">Add Match</a>
+                            {% if current_season %}
+                                <a href="{% url 'teams:season_detail' team_id=current_team.id season_id=current_season.id %}" class="btn btn-outline-primary btn-sm">All Matches</a>
+                                {% if is_team_admin %}
+                                    <a href="{% url 'teams:match_create' team_id=current_team.id season_id=current_season.id %}" class="btn btn-dark btn-sm">Add Match</a>
+                                {% endif %}
                             {% endif %}
                         </div>
                     </div>
                     <div class="card-body">
-                        <p class="text-muted mb-0">No upcoming matches scheduled.</p>
+                        {% if upcoming_matches %}
+                            <div class="list-group">
+                                {% for match in upcoming_matches %}
+                                    <div class="list-group-item">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="mb-1">
+                                                    {% if match.is_home_game %}
+                                                        {{ team.name }} {{ match.score_display }} {{ match.opponent }}
+                                                    {% else %}
+                                                        {{ match.opponent }} {{ match.score_display }} {{ team.name }}
+                                                    {% endif %}
+                                                </h6>
+                                                <small class="text-muted">
+                                                    {{ match.match_date|date:"l, M d, Y" }} at {{ match.match_time|time:"g:i A" }}
+                                                    <br>
+                                                    <span class="text-success">Arrival time: {{ match.match_time|time:"g:i A"|arrival_time:45 }}</span>
+                                                    <br>
+                                                    Field Number: {{ match.field_number }}
+                                                </small>
+                                            </div>
+                                            {% if is_team_admin %}
+                                                <div class="d-flex gap-2">
+                                                    <a href="{% url 'teams:match_edit' team.id current_season.id match.id %}" class="btn btn-outline-secondary btn-sm">
+                                                        {% if match.played %}Edit{% else %}Record Result{% endif %}
+                                                    </a>
+                                                    <a href="{% url 'teams:match_stats_edit' team.id current_season.id match.id %}" class="btn btn-outline-primary btn-sm">
+                                                        Edit Stats
+                                                    </a>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        {% if match.notes %}
+                                            <div class="mt-2">
+                                                <small class="text-muted">{{ match.notes }}</small>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="text-muted mb-0">No upcoming matches scheduled.</p>
+                        {% endif %}
                     </div>
                 </div>
             {% else %}
@@ -916,7 +960,7 @@ body {
                                                 {% endif %}
                                             </td>
                                             <td>
-                                                {% if member.teammemberprofile.position %}
+                                                {% if member.teammemberprofile and member.teammemberprofile.position %}
                                                     <div class="d-flex align-items-center">
                                                         <div class="position-badge" style="--position-color: {{ member.teammemberprofile.position.color }}">
                                                             {{ member.teammemberprofile.position.code }}
@@ -932,48 +976,43 @@ body {
                                             <td>
                                                 <div class="d-flex align-items-center gap-3">
                                                     <div class="flex-shrink-0">
-                                                        {% if member.teammemberprofile.profile_picture %}
-                                                            <img src="{{ member.teammemberprofile.profile_picture.url }}" alt="{{ member.user.get_full_name }}" width="40" height="40" class="rounded-circle {% if not member.teammemberprofile.active_player %}inactive-photo{% endif %}">
+                                                        {% if member.teammemberprofile and member.teammemberprofile.profile_picture %}
+                                                            <img src="{{ member.teammemberprofile.profile_picture.url }}" 
+                                                                 alt="{{ member.user.get_full_name }}" 
+                                                                 width="40" height="40" 
+                                                                 class="rounded-circle {% if member.teammemberprofile and not member.teammemberprofile.active_player %}inactive-photo{% endif %}">
                                                         {% else %}
-                                                            <img src="{% static 'teams/images/castolo.png' %}" alt="Default profile" width="40" height="40" class="rounded-circle {% if not member.teammemberprofile.active_player %}inactive-photo{% endif %}">
+                                                            <img src="{% static 'teams/images/castolo.png' %}" 
+                                                                 alt="Default profile" 
+                                                                 width="40" height="40" 
+                                                                 class="rounded-circle {% if member.teammemberprofile and not member.teammemberprofile.active_player %}inactive-photo{% endif %}">
                                                         {% endif %}
                                                     </div>
-                                                    <div>
-                                                        <div class="d-flex align-items-center gap-2">
-                                                            <a href="{% url 'teams:player_card' team_id=current_team.id user_id=member.user.id %}" 
-                                                               class="text-decoration-none text-dark">
-                                                                {{ member.user.get_full_name }}
-                                                            </a>
-                                                        </div>
-                                                        <div class="d-flex gap-1">
-                                                            <span class="badge {% if member.role == 'MANAGER' %}badge-primary{% else %}badge-secondary{% endif %}">
-                                                                {{ member.get_role_display }}
-                                                            </span>
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        <a href="{% url 'teams:player_card' team_id=team.id user_id=member.user.id %}" 
+                                                           class="text-decoration-none text-dark">
+                                                            {{ member.user.get_full_name }}
+                                                        </a>
+                                                        <span class="badge {% if member.role == 'MANAGER' %}badge-primary{% else %}badge-secondary{% endif %}">
+                                                            {{ member.get_role_display }}
+                                                        </span>
+                                                        {% if member.teammemberprofile %}
                                                             {% if not member.teammemberprofile.active_player and not member.teammemberprofile.is_official %}
                                                                 <span class="badge badge-secondary">Inactive</span>
                                                             {% elif not member.teammemberprofile.is_official %}
                                                                 <span class="badge badge-secondary">Galleta</span>
                                                             {% endif %}
-                                                        </div>
+                                                        {% endif %}
                                                     </div>
                                                 </div>
                                             </td>
-                                            {% if is_team_admin and member.user != request.user %}
-                                                <td>
-                                                    <div class="d-flex gap-2">
-                                                        <a href="{% url 'teams:edit_member' team_id=current_team.id user_id=member.user.id %}" class="btn btn-sm btn-outline-primary">
-                                                            <i class="fas fa-pencil-alt"></i>
-                                                        </a>
-                                                    </div>
-                                                </td>
-                                            {% elif is_team_admin and member.user == request.user %}
-                                                <td>
-                                                    <div class="d-flex gap-2">
-                                                        <a href="{% url 'teams:edit_member' team_id=current_team.id user_id=member.user.id %}" class="btn btn-sm btn-outline-primary">
-                                                            <i class="fas fa-pencil-alt"></i>
-                                                        </a>
-                                                    </div>
-                                                </td>
+                                            {% if is_team_admin %}
+                                            <td>
+                                                <a href="{% url 'teams:edit_member' team_id=team.id user_id=member.user.id %}" 
+                                                   class="btn btn-sm btn-outline-primary">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                            </td>
                                             {% endif %}
                                         </tr>
                                     {% endif %}

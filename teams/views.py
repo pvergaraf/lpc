@@ -20,6 +20,7 @@ from django.utils import timezone
 from django.conf import settings
 from django.template.loader import render_to_string
 from django.db.models import Case, When, Value, IntegerField
+from django.db.models.functions import Coalesce
 from .utils.logging_utils import log_error, log_upload_error, logger
 import os
 import traceback
@@ -107,7 +108,7 @@ def is_admin(user):
 def dashboard(request):
     logger.info(f"Dashboard access for user {request.user.email}")
     try:
-        current_team_id = request.session.get('current_team')  # Changed from current_team_id to current_team
+        current_team_id = request.session.get('current_team')
         logger.info(f"Current team ID from session: {current_team_id}")
         
         if not current_team_id:
@@ -133,10 +134,18 @@ def dashboard(request):
         current_season = Season.objects.filter(team=team, is_active=True).first()
         logger.info(f"Current season: {current_season}")
         
+        # Get upcoming matches if there's a current season
+        upcoming_matches = None
+        if current_season:
+            upcoming_matches = Match.objects.filter(
+                season=current_season,
+                match_date__gte=timezone.now().date()
+            ).order_by('match_date', 'match_time')
+        
         # Get upcoming birthdays
         upcoming_birthdays = team.get_upcoming_birthdays()
         
-        # Get team members for the team roster section
+        # Get team members for the team roster section - modified to handle missing profiles
         team_members = TeamMember.objects.filter(
             team=team,
             is_active=True
@@ -144,7 +153,9 @@ def dashboard(request):
             'user',
             'teammemberprofile',
             'teammemberprofile__position'
-        ).order_by('teammemberprofile__player_number')
+        ).annotate(
+            sort_number=Coalesce('teammemberprofile__player_number', Value(999))
+        ).order_by('sort_number')
         
         # Get all team memberships for the user
         team_memberships = TeamMember.objects.filter(
@@ -191,7 +202,8 @@ def dashboard(request):
             'current_team_member': membership,
             'pending_payments': pending_payments,
             'today': timezone.now().date(),
-            'team_memberships': team_memberships  # Add team memberships to context
+            'team_memberships': team_memberships,  # Add team memberships to context
+            'upcoming_matches': upcoming_matches  # Add upcoming matches to context
         }
         
         # Debug logging
@@ -208,6 +220,7 @@ def dashboard(request):
                 "has_upcoming_birthdays": bool(upcoming_birthdays),
                 "team_members_count": team_members.count() if team_members else 0,
                 "has_pending_payments": bool(pending_payments),
+                "has_upcoming_matches": bool(upcoming_matches),
                 "is_team_admin": context['is_team_admin']
             }
         )
@@ -1362,9 +1375,35 @@ def match_edit(request, team_id, season_id, match_id):
     if request.method == 'POST':
         form = MatchForm(request.POST, instance=match, season=season)
         if form.is_valid():
-            form.save()
-            messages.success(request, f'Match against {match.opponent} has been updated.')
-            return redirect('teams:season_detail', team_id=team.id, season_id=season.id)
+            try:
+                match = form.save(commit=False)
+                match.season = season
+                match.save()
+                messages.success(request, f'Match against {match.opponent} has been updated.')
+                return redirect('teams:season_detail', team_id=team.id, season_id=season.id)
+            except Exception as e:
+                log_error(
+                    request=request,
+                    error_message=f"Failed to update match: {str(e)}",
+                    error_type="MatchUpdateError",
+                    extra_context={
+                        "team_id": team_id,
+                        "season_id": season_id,
+                        "match_id": match_id,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "traceback": traceback.format_exc()
+                    }
+                )
+                messages.error(request, 'An error occurred while updating the match.')
+                return render(request, 'teams/match_form.html', {
+                    'form': form,
+                    'team': team,
+                    'season': season,
+                    'match': match,
+                    'is_admin': True,
+                    'title': 'Edit Match'
+                })
     else:
         form = MatchForm(instance=match, season=season)
     
@@ -1373,6 +1412,7 @@ def match_edit(request, team_id, season_id, match_id):
         'team': team,
         'season': season,
         'match': match,
+        'is_admin': True,
         'title': 'Edit Match'
     })
 
@@ -2729,49 +2769,52 @@ def accept_invitation(request):
                     }
                 )
                 
-                # Log profile creation attempt
-                log_error(
-                    request=request,
-                    error_message="Attempting to create team member profile",
-                    error_type="InvitationDebug",
-                    extra_context={
-                        "profile_data": {
-                            "team_member_id": team_member.id,
-                            "is_official": team_member.is_official,
-                            "active_player": team_member.active_player,
-                            "level": 1,
-                            "condition": 'NORMAL'
+                # Only create profile if one doesn't exist
+                if not hasattr(team_member, 'teammemberprofile'):
+                    # Log profile creation attempt
+                    log_error(
+                        request=request,
+                        error_message="Attempting to create team member profile",
+                        error_type="InvitationDebug",
+                        extra_context={
+                            "profile_data": {
+                                "team_member_id": team_member.id,
+                                "is_official": team_member.is_official,
+                                "active_player": team_member.active_player,
+                                "level": 1,
+                                "condition": 'NORMAL'
+                            }
                         }
-                    }
-                )
-                
-                # Create team member profile
-                profile = TeamMemberProfile.objects.create(
-                    team_member=team_member,
-                    is_official=team_member.is_official,
-                    active_player=team_member.active_player,
-                    level=1,
-                    condition='NORMAL'
-                )
-                
-                # Verify profile creation
-                log_error(
-                    request=request,
-                    error_message="Profile creation result",
-                    error_type="InvitationDebug",
-                    extra_context={
-                        "profile_id": profile.id,
-                        "profile_state": {
-                            "team_member_id": profile.team_member_id,
-                            "is_official": profile.is_official,
-                            "active_player": profile.active_player,
-                            "level": profile.level,
-                            "condition": profile.condition
+                    )
+                    
+                    # Create team member profile
+                    profile = TeamMemberProfile.objects.create(
+                        team_member=team_member,
+                        is_official=team_member.is_official,
+                        active_player=team_member.active_player,
+                        level=1,
+                        condition='NORMAL'
+                    )
+                    
+                    # Verify profile creation
+                    log_error(
+                        request=request,
+                        error_message="Profile creation result",
+                        error_type="InvitationDebug",
+                        extra_context={
+                            "profile_id": profile.id,
+                            "profile_state": {
+                                "team_member_id": profile.team_member_id,
+                                "is_official": profile.is_official,
+                                "active_player": profile.active_player,
+                                "level": profile.level,
+                                "condition": profile.condition
+                            }
                         }
-                    }
-                )
+                    )
                 
                 # Activate the membership
+                team_member.user = request.user  # Set the user
                 team_member.is_active = True
                 team_member.invitation_accepted = True
                 team_member.invitation_token = None
@@ -2820,4 +2863,40 @@ def accept_invitation(request):
         )
         messages.error(request, "An error occurred while accepting the invitation.")
         return redirect('teams:dashboard')
+
+@login_required
+def match_delete(request, team_id, season_id, match_id):
+    team = get_object_or_404(Team, id=team_id)
+    season = get_object_or_404(Season, id=season_id, team=team)
+    match = get_object_or_404(Match, id=match_id, season=season)
+    team_member = get_object_or_404(TeamMember, team=team, user=request.user, is_active=True)
+    
+    # Check if user has permission to delete matches
+    if not (team_member.is_team_admin or team_member.role == TeamMember.Role.MANAGER):
+        return HttpResponseForbidden("You don't have permission to delete matches.")
+    
+    if request.method == 'POST':
+        try:
+            match.delete()
+            messages.success(request, f'Match against {match.opponent} has been deleted.')
+            return redirect('teams:season_detail', team_id=team.id, season_id=season.id)
+        except Exception as e:
+            log_error(
+                request=request,
+                error_message=f"Failed to delete match: {str(e)}",
+                error_type="MatchDeletionError",
+                extra_context={
+                    "team_id": team_id,
+                    "season_id": season_id,
+                    "match_id": match_id,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "traceback": traceback.format_exc()
+                }
+            )
+            messages.error(request, 'An error occurred while deleting the match.')
+            return redirect('teams:match_edit', team_id=team.id, season_id=season.id, match_id=match.id)
+    
+    # If not POST, redirect to match edit page
+    return redirect('teams:match_edit', team_id=team.id, season_id=season.id, match_id=match.id)
 

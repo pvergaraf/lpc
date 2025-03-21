@@ -56,4 +56,17 @@ def get_item(dictionary, key):
 
 @register.filter
 def filter_by_team(queryset, team):
-    return queryset.filter(team=team) 
+    return queryset.filter(team=team)
+
+@register.filter
+def add_minutes(time_str, minutes):
+    """Add or subtract minutes from a time string."""
+    try:
+        # Parse the time string
+        time_obj = datetime.strptime(time_str, "%H:%M")
+        # Add the minutes (can be negative for subtraction)
+        delta = timedelta(minutes=int(minutes))
+        new_time = (datetime.combine(datetime.today(), time_obj.time()) + delta).time()
+        return new_time
+    except (ValueError, TypeError):
+        return time_str 

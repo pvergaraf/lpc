@@ -70,6 +70,7 @@ urlpatterns = [
     path('teams/<int:team_id>/seasons/<int:season_id>/matches/create/', views.match_create, name='match_create'),
     path('teams/<int:team_id>/seasons/<int:season_id>/matches/<int:match_id>/edit/', views.match_edit, name='match_edit'),
     path('teams/<int:team_id>/seasons/<int:season_id>/matches/<int:match_id>/stats/', views.match_stats_edit, name='match_stats_edit'),
+    path('teams/<int:team_id>/seasons/<int:season_id>/matches/<int:match_id>/delete/', views.match_delete, name='match_delete'),
     path('teams/<int:team_id>/members/add/', views.add_team_member, name='add_team_member'),
     path('teams/<int:team_id>/members/<int:member_id>/remove/', views.remove_member, name='remove_member'),
     path('teams/<int:team_id>/members/<int:member_id>/toggle-admin/', views.toggle_team_admin, name='toggle_team_admin'),
