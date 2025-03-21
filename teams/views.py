@@ -107,7 +107,7 @@ def is_admin(user):
 def dashboard(request):
     logger.info(f"Dashboard access for user {request.user.email}")
     try:
-        current_team_id = request.session.get('current_team_id')
+        current_team_id = request.session.get('current_team')  # Changed from current_team_id to current_team
         logger.info(f"Current team ID from session: {current_team_id}")
         
         if not current_team_id:
@@ -133,6 +133,8 @@ def dashboard(request):
             'team': team,
             'membership': membership,
             'profile': profile,
+            'current_team': team,  # Add this for template context
+            'is_team_admin': membership.is_team_admin or membership.role == TeamMember.Role.MANAGER  # Add this for template context
         }
         return render(request, 'teams/dashboard.html', context)
     except Exception as e:
@@ -155,7 +157,7 @@ def switch_team(request, team_id):
             messages.error(request, "You are not a member of this team.")
             return redirect('teams:team_list')
             
-        request.session['current_team_id'] = team.id
+        request.session['current_team'] = team.id  # Changed from current_team_id to current_team
         logger.info(f"Set session team_id to {team.id}")
         
         return redirect('teams:dashboard')
