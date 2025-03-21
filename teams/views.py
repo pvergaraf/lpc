@@ -2090,7 +2090,7 @@ def player_card(request, team_id, user_id):
         )
         
         # Check if the requesting user is a member of the team
-        requesting_user_membership = TeamMember.objects.filter(team=team, user=request.user).exists()
+        requesting_user_membership = get_object_or_404(TeamMember, team=team, user=request.user)
         if not requesting_user_membership:
             log_error(
                 request=request,
@@ -2129,7 +2129,7 @@ def player_card(request, team_id, user_id):
         context = {
             'member': team_member,
             'team': team,
-            'is_team_admin': team_member.is_team_admin,
+            'is_team_admin': requesting_user_membership.is_team_admin,  # Use requesting user's admin status
             'current_season': current_season,
             'season_stats': season_stats,
             'all_time_stats': all_time_stats,
