@@ -152,13 +152,32 @@ def dashboard(request):
             is_active=True
         ).select_related('team').order_by('team__name')
         
-        # Get pending payments
+        # Get pending payments with amount > 0 and calculate verification percentage
         pending_payments = None
         if current_season:
             pending_payments = PlayerPayment.objects.filter(
                 payment__season=current_season,
-                player=membership
-            ).select_related('payment').order_by('payment__due_date')
+                player=membership,
+                amount__gt=0
+            ).select_related('payment').annotate(
+                total_players=models.Count(
+                    'payment__player_payments',
+                    filter=models.Q(payment__player_payments__amount__gt=0)
+                ),
+                verified_players=models.Count(
+                    'payment__player_payments',
+                    filter=models.Q(payment__player_payments__amount__gt=0, payment__player_payments__admin_verified=True)
+                ),
+                verification_percentage=models.Case(
+                    When(total_players__gt=0,
+                         then=models.ExpressionWrapper(
+                             100.0 * models.F('verified_players') / models.F('total_players'),
+                             output_field=models.FloatField()
+                         )),
+                    default=Value(0.0),
+                    output_field=models.FloatField(),
+                )
+            ).order_by('payment__due_date')
         
         context = {
             'team': team,
