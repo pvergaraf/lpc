@@ -164,11 +164,10 @@
     color: #fff;
     background: #000;
     padding: 2px 4px;
-    border-radius: 4px 4px 0 0;
+    border-radius: 4px;
     min-width: 28px;
     text-align: center;
     position: relative;
-    margin-bottom: 2px;
 }
 
 .player-position::after {
@@ -189,10 +188,29 @@
     padding: 2px 4px;
     border-radius: 4px;
     min-width: 28px;
-    height: 20px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+    text-align: center;
+    position: relative;
+}
+
+.condition-top {
+    background-color: #4CAF50;
+}
+
+.condition-good {
+    background-color: #8BC34A;
+}
+
+.condition-normal {
+    background-color: #FFC107;
+    color: #000;
+}
+
+.condition-bad {
+    background-color: #FF5722;
+}
+
+.condition-injured {
+    background-color: #F44336;
 }
 
 .player-condition svg {
@@ -241,6 +259,18 @@
 .formation-433 .position-spot.lw { left: 20%; top: 15%; }
 .formation-433 .position-spot.st { left: 50%; top: 15%; }
 .formation-433 .position-spot.rw { left: 80%; top: 15%; }
+
+.formation-433d .position-spot.gk { left: 50%; top: 90%; }
+.formation-433d .position-spot.lb { left: 15%; top: 75%; }
+.formation-433d .position-spot.cb1 { left: 35%; top: 75%; }
+.formation-433d .position-spot.cb2 { left: 65%; top: 75%; }
+.formation-433d .position-spot.rb { left: 85%; top: 75%; }
+.formation-433d .position-spot.cm1 { left: 30%; top: 40%; }
+.formation-433d .position-spot.cdm { left: 50%; top: 55%; }
+.formation-433d .position-spot.cm2 { left: 70%; top: 40%; }
+.formation-433d .position-spot.lw { left: 20%; top: 15%; }
+.formation-433d .position-spot.st { left: 50%; top: 15%; }
+.formation-433d .position-spot.rw { left: 80%; top: 15%; }
 
 .formation-352 .position-spot.gk { left: 50%; top: 90%; }
 .formation-352 .position-spot.cb1 { left: 30%; top: 75%; }
@@ -326,6 +356,7 @@
             <select class="form-select formation-select" style="width: auto;">
                 <option value="442">4-4-2</option>
                 <option value="433">4-3-3</option>
+                <option value="433d">4-3-3 (Defensive)</option>
                 <option value="352">3-5-2</option>
             </select>
         </div>
@@ -343,13 +374,8 @@
                         <div class="player-info">
                             <div class="player-position" style="--position-color: {{ player.teammemberprofile.position.color }}">{{ player.teammemberprofile.position.code }}</div>
                             <div class="player-condition">
-                                {% if player.condition_symbol %}
-                                    <span class="condition-arrow condition-{{ player.teammemberprofile.condition|lower }}">
-                                        <svg><use href="#condition-{{ player.teammemberprofile.condition|lower }}"/></svg>
-                                    </span>
-                                {% else %}
-                                    •
-                                {% endif %}
+                                {% if player.teammemberprofile.condition == 'INJURED' %}+
+                                {% else %}→{% endif %}
                             </div>
                         </div>
                     </div>
@@ -392,6 +418,19 @@ document.addEventListener('DOMContentLoaded', function() {
             { id: 'cm1', label: 'CM' },
             { id: 'cm2', label: 'CM' },
             { id: 'cm3', label: 'CM' },
+            { id: 'lw', label: 'LW' },
+            { id: 'st', label: 'ST' },
+            { id: 'rw', label: 'RW' }
+        ],
+        '433d': [
+            { id: 'gk', label: 'GK' },
+            { id: 'lb', label: 'LB' },
+            { id: 'cb1', label: 'CB' },
+            { id: 'cb2', label: 'CB' },
+            { id: 'rb', label: 'RB' },
+            { id: 'cm1', label: 'CM' },
+            { id: 'cdm', label: 'CDM' },
+            { id: 'cm2', label: 'CM' },
             { id: 'lw', label: 'LW' },
             { id: 'st', label: 'ST' },
             { id: 'rw', label: 'RW' }
