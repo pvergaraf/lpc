@@ -26,6 +26,7 @@
                             <th class="text-center">Assists</th>
                             <th class="text-center">Yellow Cards</th>
                             <th class="text-center">Red Cards</th>
+                            <th class="text-center">MVP ⭐️</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -58,6 +59,7 @@
                             <td class="text-center">{{ stats|get_item:player.id|get_item:'assists' }}</td>
                             <td class="text-center">{{ stats|get_item:player.id|get_item:'yellow_cards' }}</td>
                             <td class="text-center">{{ stats|get_item:player.id|get_item:'red_cards' }}</td>
+                            <td class="text-center">{{ stats|get_item:player.id|get_item:'mvp_matches' }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>

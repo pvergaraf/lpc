@@ -11,6 +11,7 @@ from .utils.logging_utils import log_error
 import traceback
 import logging
 from django.core.exceptions import ValidationError
+from django.db.models import Count, Sum, Q
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -357,6 +358,7 @@ class Match(models.Model):
     home_score = models.PositiveIntegerField(null=True, blank=True)
     away_score = models.PositiveIntegerField(null=True, blank=True)
     notes = models.TextField(blank=True)
+    is_official = models.BooleanField(default=False, help_text="Indicates if this is an official match")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -432,6 +434,7 @@ class PlayerMatchStats(models.Model):
     assists = models.PositiveIntegerField(default=0)
     yellow_cards = models.PositiveIntegerField(default=0)
     red_cards = models.PositiveIntegerField(default=0)
+    is_mvp = models.BooleanField(default=False, help_text="Indicates if the player was MVP of this match")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -453,13 +456,17 @@ class PlayerMatchStats(models.Model):
         if season:
             stats = stats.filter(match__season=season)
         
-        return {
-            'matches_played': stats.filter(played=True).count(),
-            'goals': stats.aggregate(total_goals=models.Sum('goals'))['total_goals'] or 0,
-            'assists': stats.aggregate(total_assists=models.Sum('assists'))['total_assists'] or 0,
-            'yellow_cards': stats.aggregate(total_yellows=models.Sum('yellow_cards'))['total_yellows'] or 0,
-            'red_cards': stats.aggregate(total_reds=models.Sum('red_cards'))['total_reds'] or 0
-        }
+        totals = stats.aggregate(
+            matches_played=Count('id', filter=Q(played=True)),
+            goals=Sum('goals'),
+            assists=Sum('assists'),
+            yellow_cards=Sum('yellow_cards'),
+            red_cards=Sum('red_cards'),
+            mvp_matches=Count('id', filter=Q(is_mvp=True))
+        )
+        
+        # Replace None values with 0
+        return {k: v or 0 for k, v in totals.items()}
 
 @receiver(post_save, sender=TeamMember)
 def create_team_member_profile(sender, instance, created, **kwargs):

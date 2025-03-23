@@ -2192,158 +2192,76 @@ def player_card(request, team_id, user_id):
 
 @login_required
 def match_stats_edit(request, team_id, season_id, match_id):
-    log_error(
-        request=request,
-        error_message="Match stats edit page accessed",
-        error_type="ViewAccess",
-        extra_context={
-            "user_email": request.user.email,
-            "user_id": request.user.id,
-            "team_id": team_id,
-            "season_id": season_id,
-            "match_id": match_id,
-            "path": request.path,
-            "method": request.method
-        }
-    )
+    team = get_object_or_404(Team, id=team_id)
+    season = get_object_or_404(Season, id=season_id, team=team)
+    match = get_object_or_404(Match, id=match_id, season=season)
+    team_member = get_object_or_404(TeamMember, team=team, user=request.user, is_active=True)
     
-    try:
-        team = get_object_or_404(Team, id=team_id)
-        season = get_object_or_404(Season, id=season_id, team=team)
-        match = get_object_or_404(Match, id=match_id, season=season)
-        
-        # Check if user is team admin
-        if not is_user_team_admin(request.user, team):
-            log_error(
-                request=request,
-                error_message="Unauthorized access attempt to match stats edit",
-                error_type="PermissionError",
-                extra_context={
-                    "user_email": request.user.email,
-                    "user_id": request.user.id,
-                    "team_id": team_id,
-                    "match_id": match_id
-                }
-            )
-            raise PermissionDenied("You must be a team admin to edit match stats.")
-        
-        # Get all active players in the team
-        players = TeamMember.objects.filter(
-            team=team,
-            is_active=True,
-            teammemberprofile__active_player=True,
-            role=TeamMember.Role.PLAYER
-        ).select_related('user', 'teammemberprofile')
-        
-        log_error(
-            request=request,
-            error_message="Retrieved active players for match stats",
-            error_type="ViewDebug",
-            extra_context={
-                "team_id": team_id,
-                "match_id": match_id,
-                "active_players_count": players.count(),
-                "player_ids": list(players.values_list('id', flat=True))
-            }
+    if not team_member.is_team_admin and team_member.role != TeamMember.Role.MANAGER:
+        messages.error(request, "You don't have permission to edit match stats.")
+        return redirect('teams:season_detail', team_id=team.id, season_id=match.season.id)
+    
+    # Get all active players
+    players = TeamMember.objects.filter(
+        team=team,
+        is_active=True,
+        teammemberprofile__active_player=True,
+        role=TeamMember.Role.PLAYER
+    ).select_related('user', 'teammemberprofile')
+    
+    # Get or create stats for all players and store in a dictionary
+    stats_dict = {}
+    for player in players:
+        stat, created = PlayerMatchStats.objects.get_or_create(
+            match=match,
+            player=player,
+            defaults={'played': False}
         )
-        
-        # Get or create stats for each player
-        stats_dict = {}
-        for player in players:
-            stat, created = PlayerMatchStats.objects.get_or_create(
-                match=match,
-                player=player,
-                defaults={'played': False}
-            )
-            stats_dict[player.id] = {
-                'played': stat.played,
-                'goals': stat.goals,
-                'assists': stat.assists,
-                'yellow_cards': stat.yellow_cards,
-                'red_cards': stat.red_cards
-            }
-        
-        if request.method == 'POST':
-            try:
-                with transaction.atomic():
-                    for player in players:
-                        player_stats = PlayerMatchStats.objects.get(match=match, player=player)
-                        player_stats.played = request.POST.get(f'played_{player.id}') == 'on'
-                        player_stats.goals = int(request.POST.get(f'goals_{player.id}', 0))
-                        player_stats.assists = int(request.POST.get(f'assists_{player.id}', 0))
-                        player_stats.yellow_cards = int(request.POST.get(f'yellow_cards_{player.id}', 0))
-                        player_stats.red_cards = int(request.POST.get(f'red_cards_{player.id}', 0))
-                        player_stats.save()
-                        
-                        log_error(
-                            request=request,
-                            error_message="Updated player match stats",
-                            error_type="StatsUpdate",
-                            extra_context={
-                                "player_id": player.id,
-                                "player_email": player.user.email,
-                                "match_id": match_id,
-                                "stats": {
-                                    "played": player_stats.played,
-                                    "goals": player_stats.goals,
-                                    "assists": player_stats.assists,
-                                    "yellow_cards": player_stats.yellow_cards,
-                                    "red_cards": player_stats.red_cards
-                                }
-                            }
-                        )
-                
-                messages.success(request, 'Match statistics updated successfully.')
-                return redirect('teams:season_detail', team_id=team_id, season_id=season_id)
-            except Exception as e:
-                log_error(
-                    request=request,
-                    error_message=f"Error updating match statistics: {str(e)}",
-                    error_type="StatsUpdateError",
-                    extra_context={
-                        "error": str(e),
-                        "traceback": traceback.format_exc(),
-                        "team_id": team_id,
-                        "match_id": match_id,
-                        "post_data": dict(request.POST)
-                    }
-                )
-                messages.error(request, f'Error updating match statistics: {str(e)}')
-        
-        context = {
-            'team': team,
-            'season': season,
-            'match': match,
-            'players': players,
-            'stats': stats_dict
+        stats_dict[player.id] = {
+            'id': stat.id,
+            'played': stat.played,
+            'goals': stat.goals,
+            'assists': stat.assists,
+            'yellow_cards': stat.yellow_cards,
+            'red_cards': stat.red_cards,
+            'is_mvp': stat.is_mvp
         }
+    
+    if request.method == 'POST':
+        # Reset all MVP flags first
+        PlayerMatchStats.objects.filter(match=match).update(is_mvp=False)
         
-        log_error(
-            request=request,
-            error_message="Rendering match stats edit template",
-            error_type="ViewDebug",
-            extra_context={
-                "context_keys": list(context.keys()),
-                "stats_count": len(stats_dict)
-            }
-        )
+        # Get the selected MVP
+        mvp_id = request.POST.get('mvp')
         
-        return render(request, 'teams/match_stats_edit.html', context)
+        # Update stats for each player
+        for player in players:
+            stat = PlayerMatchStats.objects.get(match=match, player=player)
+            stat.played = request.POST.get(f'played_{player.id}') == 'on'
+            stat.goals = int(request.POST.get(f'goals_{player.id}', 0))
+            stat.assists = int(request.POST.get(f'assists_{player.id}', 0))
+            stat.yellow_cards = int(request.POST.get(f'yellow_cards_{player.id}', 0))
+            stat.red_cards = int(request.POST.get(f'red_cards_{player.id}', 0))
+            
+            # Set MVP if this player was selected
+            if mvp_id and str(player.id) == mvp_id:
+                stat.is_mvp = True
+            
+            stat.save()
         
-    except Exception as e:
-        log_error(
-            request=request,
-            error_message=f"Unexpected error in match stats edit view: {str(e)}",
-            error_type="SystemError",
-            extra_context={
-                "error": str(e),
-                "traceback": traceback.format_exc(),
-                "team_id": team_id,
-                "season_id": season_id,
-                "match_id": match_id
-            }
-        )
-        raise
+        messages.success(request, 'Match statistics updated successfully.')
+        return redirect('teams:season_detail', team_id=team.id, season_id=season.id)
+    
+    context = {
+        'team': team,
+        'match': match,
+        'players': players,
+        'stats': stats_dict,
+        'current_team': team,
+        'current_season': season,
+    }
+    
+    return render(request, 'teams/match_stats_edit.html', context)
 
 @login_required
 def lineup_simulator(request, team_id):

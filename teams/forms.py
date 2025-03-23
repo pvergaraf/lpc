@@ -512,11 +512,17 @@ class MatchForm(forms.ModelForm):
         widget=forms.NumberInput(attrs={'class': 'form-control'}),
         help_text="Away team score"
     )
-
+    is_official = forms.BooleanField(
+        required=False,
+        initial=False,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        help_text="Check if this is an official match"
+    )
+    
     class Meta:
         model = Match
         fields = ['opponent', 'match_date', 'match_time', 'field_number', 
-                 'is_home_game', 'home_score', 'away_score', 'notes']
+                 'is_home_game', 'home_score', 'away_score', 'notes', 'is_official']
         widgets = {
             'opponent': forms.TextInput(attrs={'class': 'form-control'}),
             'is_home_game': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
@@ -526,25 +532,6 @@ class MatchForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.season = kwargs.pop('season', None)
         super().__init__(*args, **kwargs)
-
-    def clean(self):
-        cleaned_data = super().clean()
-        match_date = cleaned_data.get('match_date')
-        home_score = cleaned_data.get('home_score')
-        away_score = cleaned_data.get('away_score')
-        
-        if match_date and self.season:
-            if match_date < self.season.start_date or match_date > self.season.end_date:
-                raise forms.ValidationError(
-                    "Match date must be within the season's date range "
-                    f"({self.season.start_date} to {self.season.end_date})."
-                )
-
-        # Validate that both scores are provided if one is provided
-        if (home_score is not None and away_score is None) or (home_score is None and away_score is not None):
-            raise forms.ValidationError("Both scores must be provided to record a result.")
-
-        return cleaned_data
 
 class PaymentForm(forms.ModelForm):
     class Meta:

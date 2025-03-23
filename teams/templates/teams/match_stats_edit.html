@@ -23,6 +23,7 @@
                             <th class="px-4 py-2 text-center">Assists</th>
                             <th class="px-4 py-2 text-center">Yellow Cards</th>
                             <th class="px-4 py-2 text-center">Red Cards</th>
+                            <th class="px-4 py-2 text-center">MVP ⭐️</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -32,8 +33,8 @@
                                 <div>
                                     <div class="font-medium">
                                         {{ player.user.get_full_name }}
-                                        {% if player.user.profile.player_number %}
-                                        <span class="text-sm text-gray-500">#{{ player.user.profile.player_number }}</span>
+                                        {% if player.teammemberprofile.player_number %}
+                                        <span class="text-sm text-gray-500">#{{ player.teammemberprofile.player_number }}</span>
                                         {% endif %}
                                     </div>
                                 </div>
@@ -63,6 +64,9 @@
                                        value="{{ stats|get_item:player.id|get_item:'red_cards' }}"
                                        min="0" max="1" class="form-input w-16 text-center">
                             </td>
+                            <td class="px-4 py-2 text-center">
+                                <input type="radio" name="mvp" value="{{ player.id }}" {% if stats|get_item:player.id|get_item:"is_mvp" %}checked{% endif %} class="form-radio h-5 w-5 text-blue-600">
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -70,7 +74,7 @@
             </div>
 
             <div class="flex justify-end space-x-4 mt-6">
-                <a href="{% url 'teams:season_detail' team.id season.id %}" 
+                <a href="{% url 'teams:season_detail' team_id=team.id season_id=current_season.id %}" 
                    class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
                     Cancel
                 </a>
