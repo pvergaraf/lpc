@@ -32,17 +32,17 @@
                         {% for player in players %}
                         <tr>
                             <td>
-                                {% if player.user.profile.player_number %}
-                                    {{ player.user.profile.player_number }}
+                                {% if player.teammemberprofile.player_number %}
+                                    {{ player.teammemberprofile.player_number }}
                                 {% else %}
                                     -
                                 {% endif %}
                             </td>
                             <td>
-                                {% if player.user.profile.position %}
+                                {% if player.teammemberprofile.position %}
                                     <div class="position-badge" style="display: inline-block; padding: 6px 12px; background-color: #000000; color: white; font-weight: bold; position: relative; margin: 2px; width: 70px; text-align: center;">
-                                        {{ player.user.profile.position.code }}
-                                        <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 4px; background-color: {{ player.user.profile.position.color }};"></div>
+                                        {{ player.teammemberprofile.position.code }}
+                                        <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 4px; background-color: {{ player.teammemberprofile.position.color }};"></div>
                                     </div>
                                 {% else %}
                                     -
