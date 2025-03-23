@@ -452,10 +452,19 @@ class SeasonForm(forms.ModelForm):
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         help_text="Make this the active season? Only one season can be active at a time."
     )
+    slach_account = forms.CharField(
+        max_length=50,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'e.g. lpcfc'
+        }),
+        help_text="Enter your Slach account name (e.g. lpcfc). This will be used in payment links: slach.cl/account/amount"
+    )
 
     class Meta:
         model = Season
-        fields = ['name', 'start_date', 'end_date', 'is_active']
+        fields = ['name', 'start_date', 'end_date', 'is_active', 'slach_account']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'})
         }
@@ -538,7 +547,9 @@ class PaymentForm(forms.ModelForm):
         model = Payment
         fields = ['name', 'total_amount', 'due_date']
         widgets = {
-            'due_date': forms.DateInput(attrs={'type': 'date'}),
+            'due_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'total_amount': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
         }
 
 class PlayerPaymentForm(forms.ModelForm):

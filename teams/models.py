@@ -327,6 +327,7 @@ class Season(models.Model):
     start_date = models.DateField()
     end_date = models.DateField()
     is_active = models.BooleanField(default=True)
+    slach_account = models.CharField(max_length=50, blank=True, null=True, help_text="Slach account for payment links (e.g. 'lpcfc')")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

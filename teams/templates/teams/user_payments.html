@@ -62,11 +62,13 @@
                                 {% if not payment.admin_verified %}
                                     <div class="d-flex gap-2">
                                         {% if not payment.is_paid %}
-                                            <a href="https://slach.cl/lpcfc/{{ payment.amount|stringformat:'d' }}" 
+                                            {% if season.slach_account %}
+                                            <a href="https://slach.cl/{{ season.slach_account }}/{{ payment.amount|stringformat:'d' }}" 
                                                target="_blank" 
                                                class="btn btn-primary btn-sm">
                                                 <i class="fas fa-credit-card me-1"></i> Pay Now
                                             </a>
+                                            {% endif %}
                                         {% endif %}
                                         <button type="button" 
                                                 class="btn btn-sm {% if payment.is_paid %}btn-outline-success{% else %}btn-success{% endif %} toggle-payment-btn"
