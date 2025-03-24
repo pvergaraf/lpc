@@ -1285,6 +1285,23 @@ def season_edit(request, team_id, season_id):
     })
 
 @login_required
+def season_delete(request, team_id, season_id):
+    team = get_object_or_404(Team, id=team_id)
+    season = get_object_or_404(Season, id=season_id, team=team)
+    team_member = get_object_or_404(TeamMember, team=team, user=request.user, is_active=True)
+    
+    if not (team_member.is_team_admin or team_member.role == TeamMember.Role.MANAGER):
+        return HttpResponseForbidden("You don't have permission to delete seasons.")
+    
+    if request.method == 'POST':
+        season_name = season.name
+        season.delete()
+        messages.success(request, f'Season "{season_name}" has been deleted.')
+        return redirect('teams:season_list', team_id=team.id)
+    
+    return redirect('teams:season_edit', team_id=team.id, season_id=season.id)
+
+@login_required
 def season_detail(request, team_id, season_id):
     team = get_object_or_404(Team, id=team_id)
     season = get_object_or_404(Season, id=season_id, team=team)

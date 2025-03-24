@@ -737,24 +737,16 @@ body {
 
             <!-- Current Season and Matches Section -->
             {% if current_season %}
-                <div class="card mb-4">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">Current Season: {{ current_season.name }}</h5>
-                        <div class="btn-group-header">
-                            <a href="{% url 'teams:season_stats' team_id=current_team.id season_id=current_season.id %}" class="btn btn-outline-primary btn-sm">Season Stats</a>
-                            {% if is_team_admin %}
-                                <a href="{% url 'teams:season_list' current_team.id %}" class="btn btn-dark btn-sm">Manage Seasons</a>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Upcoming Matches -->
                 <div class="card mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">Upcoming Matches</h5>
+                        <div>
+                            <h5 class="card-title mb-2">Upcoming Matches</h5>
+                            <p class="card-subtitle mb-0">Season: {{ current_season.name }}</p>
+                        </div>
                         <div class="btn-group-header">
                             {% if current_season %}
+                                <a href="{% url 'teams:season_stats' team_id=current_team.id season_id=current_season.id %}" class="btn btn-outline-primary btn-sm">Season Stats</a>
                                 <a href="{% url 'teams:season_detail' team_id=current_team.id season_id=current_season.id %}" class="btn btn-outline-primary btn-sm">All Matches</a>
                                 {% if is_team_admin %}
                                     <a href="{% url 'teams:match_create' team_id=current_team.id season_id=current_season.id %}" class="btn btn-dark btn-sm">Add Match</a>

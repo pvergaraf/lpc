@@ -67,6 +67,7 @@ urlpatterns = [
     path('teams/<int:team_id>/seasons/<int:season_id>/', views.season_detail, name='season_detail'),
     path('teams/<int:team_id>/seasons/<int:season_id>/stats/', views.season_stats, name='season_stats'),
     path('teams/<int:team_id>/seasons/<int:season_id>/edit/', views.season_edit, name='season_edit'),
+    path('teams/<int:team_id>/seasons/<int:season_id>/delete/', views.season_delete, name='season_delete'),
     path('teams/<int:team_id>/seasons/<int:season_id>/matches/create/', views.match_create, name='match_create'),
     path('teams/<int:team_id>/seasons/<int:season_id>/matches/<int:match_id>/edit/', views.match_edit, name='match_edit'),
     path('teams/<int:team_id>/seasons/<int:season_id>/matches/<int:match_id>/stats/', views.match_stats_edit, name='match_stats_edit'),
