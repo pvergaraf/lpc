@@ -382,6 +382,20 @@ class Match(models.Model):
             return "vs"
         return f"{self.home_score} - {self.away_score}"
 
+    @property
+    def team_score(self):
+        """Return the team's score regardless of home/away."""
+        if not self.played:
+            return None
+        return self.home_score if self.is_home_game else self.away_score
+        
+    @property
+    def opponent_score(self):
+        """Return the opponent's score regardless of home/away."""
+        if not self.played:
+            return None
+        return self.away_score if self.is_home_game else self.home_score
+
 class Payment(models.Model):
     season = models.ForeignKey(Season, on_delete=models.CASCADE, related_name='payments')
     name = models.CharField(max_length=200)

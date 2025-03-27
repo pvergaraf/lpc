@@ -5,6 +5,32 @@
 
 {% block extra_css %}
 <style>
+/* Dashboard title adjustments */
+.dashboard-welcome-emoji {
+    font-size: 1.6rem;
+    font-weight: 500;
+    color: #475467;
+    margin: 0 0 0 0;
+    padding: 0;
+    text-align: center;
+}
+
+.dashboard-welcome-title {
+    font-size: 1.6rem;
+    font-weight: 500;
+    color: var(--fc-text-primary);
+    margin: 0 0 100px 0;
+    padding: 0;
+    text-align: center;
+}
+
+@media (min-width: 768px) {
+    .dashboard-welcome-title {
+        font-size: 2rem;
+        margin-bottom: 100px;
+    }
+}
+
 .soccer-field {
     background-color: #2E7D32;
     background: #2E7D32;
@@ -149,6 +175,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     width: 100%;
+    color: var(--fc-text-primary);
 }
 
 .player-info {
@@ -345,14 +372,38 @@
         top: -12px;
     }
 }
+
+.text-dark {
+    color: var(--fc-text-primary) !important;
+}
+
+a {
+    color: var(--fc-text-primary);
+    text-decoration: none;
+}
+
+.card-title {
+    color: var(--fc-text-primary);
+    font-weight: 600;
+    margin-bottom: 0;
+}
+
+.player-number {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: var(--fc-text-primary);
+}
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container mt-4">
+<div class="container">
+    <h1 class="dashboard-welcome-emoji">🧑‍🏫</h1>
+    <h1 class="dashboard-welcome-title">Line Up Simulator</h1>
+
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="card-title mb-0">Lineup Simulator - {{ team.name }}</h5>
+            <h5 class="card-title mb-0">{{ team.name }}</h5>
             <select class="form-select formation-select" style="width: auto;">
                 <option value="442">4-4-2</option>
                 <option value="433">4-3-3</option>

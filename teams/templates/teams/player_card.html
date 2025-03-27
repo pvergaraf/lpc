@@ -16,23 +16,19 @@
 }
 
 .fifa-card {
-    background: linear-gradient(135deg, #FFD700 0%, #FDB931 100%);
+    background: white;
     border-radius: 15px;
     padding: 20px;
     position: relative;
     width: 100%;
     max-width: 300px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
-    backface-visibility: hidden;
-    -webkit-backface-visibility: hidden;
+    box-shadow: 0 4px 15px rgba(218, 165, 32, 0.3);
 }
 
 .fifa-card-number {
     font-size: 3.5rem;
     font-weight: bold;
-    color: #333;
+    color: var(--fc-text-primary);
     margin-bottom: 10px;
     text-align: left;
 }
@@ -40,7 +36,7 @@
 .fifa-card-position {
     font-size: 1.8rem;
     font-weight: bold;
-    color: #333;
+    color: var(--fc-text-primary);
     margin-bottom: 20px;
     text-align: left;
     display: flex;
@@ -61,7 +57,7 @@
 .fifa-card-name {
     font-size: 1.5rem;
     font-weight: bold;
-    color: #333;
+    color: var(--fc-text-primary);
     margin-top: 20px;
     text-transform: uppercase;
     border-top: 2px solid rgba(0,0,0,0.1);
@@ -88,7 +84,7 @@
 .fifa-card-details {
     margin-top: 10px;
     margin-bottom: 10px;
-    color: #333;
+    color: var(--fc-text-primary);
 }
 
 .fifa-card-edit {
@@ -159,7 +155,7 @@
 .stats-header {
     font-size: 1.2rem;
     font-weight: bold;
-    color: #333;
+    color: var(--fc-text-primary);
     margin-bottom: 15px;
     padding-bottom: 10px;
     border-bottom: 2px solid #eee;
@@ -186,15 +182,19 @@
 .stat-value {
     font-size: 2rem;
     font-weight: bold;
-    color: #333;
+    color: var(--fc-text-primary);
     line-height: 1;
 }
 
 .stat-label {
     font-size: 0.8rem;
-    color: #666;
+    color: var(--fc-text-primary);
     margin-top: 5px;
     white-space: nowrap;
+}
+
+.text-dark {
+    color: var(--fc-text-primary) !important;
 }
 </style>
 

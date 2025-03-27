@@ -69,4 +69,11 @@ def add_minutes(time_str, minutes):
         new_time = (datetime.combine(datetime.today(), time_obj.time()) + delta).time()
         return new_time
     except (ValueError, TypeError):
-        return time_str 
+        return time_str
+
+@register.filter
+def length_active(queryset):
+    """Count the number of active players in a queryset."""
+    if not queryset:
+        return 0
+    return queryset.filter(teammemberprofile__active_player=True).count() 

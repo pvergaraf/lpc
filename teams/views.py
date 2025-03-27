@@ -107,6 +107,9 @@ def is_admin(user):
 @login_required
 def dashboard(request):
     logger.info(f"Dashboard access for user {request.user.email}")
+    logger.info(f"Request GET parameters: {request.GET}")
+    logger.info(f"Active only parameter: {request.GET.get('active_only', 'not set')}")
+    
     try:
         current_team_id = request.session.get('current_team')
         logger.info(f"Current team ID from session: {current_team_id}")
@@ -136,11 +139,24 @@ def dashboard(request):
         
         # Get upcoming matches if there's a current season
         upcoming_matches = None
+        latest_match = None
         if current_season:
             upcoming_matches = Match.objects.filter(
                 season=current_season,
                 match_date__gte=timezone.now().date()
             ).order_by('match_date', 'match_time')
+            
+            # Get latest match with scores (played match)
+            latest_match = Match.objects.filter(
+                season=current_season,
+                home_score__isnull=False,
+                away_score__isnull=False
+            ).select_related('season').prefetch_related(
+                'player_stats',
+                'player_stats__player',
+                'player_stats__player__user',
+                'player_stats__player__teammemberprofile'
+            ).order_by('-match_date', '-match_time').first()
         
         # Get upcoming birthdays
         upcoming_birthdays = team.get_upcoming_birthdays()
@@ -211,7 +227,9 @@ def dashboard(request):
             'pending_payments': pending_payments,
             'today': timezone.now().date(),
             'team_memberships': team_memberships,  # Add team memberships to context
-            'upcoming_matches': upcoming_matches  # Add upcoming matches to context
+            'upcoming_matches': upcoming_matches,  # Add upcoming matches to context
+            'latest_match': latest_match,  # Add latest match with scores to context
+            'active_only': request.GET.get('active_only', 'false').lower() == 'true'  # Add active_only parameter
         }
         
         # Debug logging
@@ -1874,6 +1892,22 @@ def team_list(request):
             is_active=True
         ).select_related('team')
         
+        # Get current team from session
+        current_team_id = request.session.get('current_team')
+        current_team = None
+        is_team_admin = False
+        current_season = None
+        
+        if current_team_id:
+            try:
+                current_team = Team.objects.get(id=current_team_id)
+                membership = TeamMember.objects.filter(team=current_team, user=request.user).first()
+                if membership:
+                    is_team_admin = membership.is_team_admin or membership.role == TeamMember.Role.MANAGER
+                    current_season = Season.objects.filter(team=current_team, is_active=True).first()
+            except Team.DoesNotExist:
+                pass
+        
         log_error(
             request=request,
             error_message="Team list loaded",
@@ -1899,7 +1933,10 @@ def team_list(request):
             messages.info(request, "You are not a member of any team. Please contact an administrator to join a team.")
         
         return render(request, 'teams/team_list.html', {
-            'team_memberships': team_memberships
+            'team_memberships': team_memberships,
+            'current_team': current_team,
+            'is_team_admin': is_team_admin,
+            'current_season': current_season
         })
     except Exception as e:
         log_error(
@@ -1915,8 +1952,12 @@ def team_list(request):
             }
         )
         messages.error(request, "An error occurred while loading your teams.")
-        # Return to team list instead of dashboard to avoid redirect loop
-        return render(request, 'teams/team_list.html', {'team_memberships': []})
+        return render(request, 'teams/team_list.html', {
+            'team_memberships': [],
+            'current_team': None,
+            'is_team_admin': False,
+            'current_season': None
+        })
 
 @login_required
 def refresh_players(request, team_id, season_id, payment_id):

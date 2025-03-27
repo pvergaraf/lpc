@@ -99,7 +99,7 @@
 }
 
 .card-title {
-    color: #101828;
+    color: var(--fc-text-primary);
     font-weight: 600;
     margin-bottom: 4px;
 }
@@ -136,7 +136,7 @@
 .player-card-number {
     font-size: 2.5rem;
     font-weight: bold;
-    color: #343A40;
+    color: var(--fc-text-primary);
     line-height: 1;
     margin: 0;
 }
@@ -149,7 +149,7 @@
 .player-card-position {
     font-size: 1.2rem;
     font-weight: bold;
-    color: #343A40;
+    color: var(--fc-text-primary);
     display: flex;
     align-items: center;
     gap: 8px;
@@ -195,8 +195,8 @@
 }
 
 .btn-outline-primary {
-    color: #343A40;
-    border-color: #343A40;
+    color: var(--fc-text-primary);
+    border-color: var(--fc-text-primary);
     font-weight: 600;
     padding: 8px 14px;
     border-radius: 8px;
@@ -214,10 +214,82 @@
     text-align: center;
     justify-content: center;
 }
+
+.nav-link {
+    color: var(--fc-text-primary) !important;
+    text-decoration: none;
+}
+
+.player-name {
+    color: var(--fc-text-primary);
+    text-decoration: none;
+}
+
+.text-dark {
+    color: var(--fc-text-primary) !important;
+}
+
+/* Dashboard title adjustments */
+.dashboard-welcome-emoji {
+    font-size: 1.6rem;
+    font-weight: 500;
+    color: #475467;
+    margin: 0 0 0 0;
+    padding: 0;
+    text-align: center;
+}
+
+.dashboard-welcome-title {
+    font-size: 1.6rem;
+    font-weight: 500;
+    color: var(--fc-text-primary);
+    margin: 0 0 100px 0;
+    padding: 0;
+    text-align: center;
+}
+
+.dashboard-welcome-emoji {
+    font-size: 1.6rem;
+    font-weight: 500;
+    color: var(--fc-text-primary);
+    margin: 0 0 0px 0;
+    padding: 0;
+    text-align: center;
+}
+
+@media (min-width: 768px) {
+    .dashboard-welcome-title {
+        font-size: 2rem;
+        margin-bottom: 100px;
+    }
+}
+
+.form-check-input:checked {
+    background-color: var(--fc-text-primary) !important;
+    border-color: var(--fc-text-primary) !important;
+}
+
+.btn-main-action {
+    background-color: var(--fc-text-primary) !important;
+    border-color: var(--fc-text-primary) !important;
+    color: #FFFFFF !important;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 8px;
+    text-align: center;
+    justify-content: center;
+}
+
+.btn-main-action:hover {
+    background-color: #404B5C !important;
+    border-color: #404B5C !important;
+    color: #FFFFFF !important;
+}
 </style>
 
 <div class="container mt-4">
-    <h2>{{ team.name }} - Team Members</h2>
+    <h1 class="dashboard-welcome-emoji">👥</h1>
+    <h1 class="dashboard-welcome-title">{{ team.name }} - Team Members</h1>
 
     {% if pending_invitations %}
     <div class="card mb-4">
@@ -236,31 +308,16 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for member in pending_invitations %}
+                        {% for invitation in pending_invitations %}
                         <tr>
-                            <td>{{ member.email }}</td>
+                            <td>{{ invitation.email }}</td>
+                            <td>{{ invitation.get_role_display }}</td>
+                            <td>{{ invitation.is_admin|yesno:"Yes,No" }}</td>
                             <td>
-                                <span class="badge {% if member.role == 'MANAGER' %}badge-primary{% else %}badge-secondary{% endif %}">
-                                    {{ member.get_role_display }}
-                                </span>
-                            </td>
-                            <td>
-                                {% if member.is_team_admin %}
-                                    <span class="badge badge-primary">Yes</span>
-                                {% else %}
-                                    No
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if user_is_admin %}
-                                <form method="post" action="{% url 'teams:remove_pending_invitation' team.id member.id %}" class="d-inline">
+                                <form method="post" action="{% url 'teams:cancel_invitation' team.id invitation.id %}" class="d-inline">
                                     {% csrf_token %}
-                                    <button type="submit" class="btn btn-sm btn-outline-danger"
-                                            onclick="return confirm('Are you sure you want to cancel this invitation?')">
-                                        Cancel Invitation
-                                    </button>
+                                    <button type="submit" class="btn btn-sm btn-danger">Cancel</button>
                                 </form>
-                                {% endif %}
                             </td>
                         </tr>
                         {% endfor %}
@@ -275,21 +332,18 @@
         <div class="card-header">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <h5 class="card-title mb-0">Active Members</h5>
+                    <h5 class="card-title mb-0">Team members</h5>
                     <small class="text-muted">{{ active_members|length }} active players</small>
                 </div>
                 <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" id="activeFilter" {% if show_active_only %}checked{% endif %}>
-                    <label class="form-check-label" for="activeFilter">Show Active Players Only</label>
+                    <input class="form-check-input" type="checkbox" id="activeFilter" 
+                           {% if 'active_only' in request.GET and request.GET.active_only == 'true' %}checked{% endif %}>
+                    <label class="form-check-label" for="activeFilter">Active Players Only</label>
                 </div>
             </div>
         </div>
         <div class="card-body">
-            {% if user_is_admin %}
-            <div class="mb-4">
-                <a href="{% url 'teams:invite_member' team.id %}" class="btn btn-primary">Invite Member</a>
-            </div>
-            {% endif %}
+            <a href="{% url 'teams:invite_member' team.id %}" class="btn btn-main-action mb-4">Invite Member</a>
             
             <div class="table-responsive">
                 <table class="table table-hover align-middle">
@@ -375,11 +429,11 @@
             </div>
         </div>
     </div>
-
-    <div class="mt-3">
-        <a href="{% url 'teams:dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
-    </div>
 </div>
+
+{% include "teams/condition_icons.html" %}
+
+{% endblock %}
 
 {% block extra_js %}
 <script>
@@ -393,7 +447,4 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
-{% endblock %}
-
-{% include "teams/condition_icons.html" %}
 {% endblock %} 
