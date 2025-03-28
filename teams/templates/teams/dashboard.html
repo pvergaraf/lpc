@@ -1419,9 +1419,9 @@ h1, h2, h3, h4, h5, h6 {
                                         </div>
                                         
                                         <div class="match-info">
-                                            <div class="mb-1">{{ match.match_date|date:"l, M d, Y" }} at {{ match.match_time|time:"g:i A" }}</div>
-                                            <div class="text-highlight mb-1">Arrival time: {{ match.match_time|time:"g:i A"|arrival_time:45 }}</div>
-                                            <div>Field Number: {{ match.field_number }}</div>
+                                            <div class="mb-1">{{ match.match_date|date:"l, M d, Y" }} at {{ match.match_time|format_match_time }}</div>
+                                            <div class="text-highlight mb-1">Arrival time: {{ match.match_time|format_arrival_time }}</div>
+                                            <div>Field Number: {{ match.field_number|format_field_number }}</div>
                                         </div>
 
                                         {% if match.notes %}

@@ -501,13 +501,15 @@ class MatchForm(forms.ModelForm):
         help_text="When is the match?"
     )
     match_time = forms.TimeField(
+        required=False,
         widget=forms.TimeInput(attrs={'type': 'time', 'class': 'form-control'}),
-        help_text="What time is the match?"
+        help_text="What time is the match? (optional)"
     )
     field_number = forms.IntegerField(
         min_value=1,
+        required=False,
         widget=forms.NumberInput(attrs={'class': 'form-control'}),
-        help_text="Enter the field number"
+        help_text="Enter the field number (optional)"
     )
     home_score = forms.IntegerField(
         min_value=0,

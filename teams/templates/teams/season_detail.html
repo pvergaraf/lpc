@@ -80,11 +80,11 @@
                                 {% endif %}
                             </h6>
                             <small class="text-muted">
-                                {{ match.match_date|date:"l, M d, Y" }} at {{ match.match_time|time:"g:i A" }}
+                                {{ match.match_date|date:"l, M d, Y" }} at {{ match.match_time|format_match_time }}
                                 <br>
-                                <span class="text-success">Arrival time: {{ match.match_time|time:"g:i A"|arrival_time:45 }}</span>
+                                <span class="text-success">Arrival time: {{ match.match_time|format_arrival_time }}</span>
                                 <br>
-                                Field Number: {{ match.field_number }}
+                                Field Number: {{ match.field_number|format_field_number }}
                             </small>
                         </div>
                         {% if is_admin %}
@@ -126,11 +126,11 @@
                                 {% endif %}
                             </h6>
                             <small class="text-muted">
-                                {{ match.match_date|date:"l, M d, Y" }} at {{ match.match_time|time:"g:i A" }}
+                                {{ match.match_date|date:"l, M d, Y" }} at {{ match.match_time|format_match_time }}
                                 <br>
-                                <span class="text-success">Arrival time: {{ match.match_time|time:"g:i A"|arrival_time:45 }}</span>
+                                <span class="text-success">Arrival time: {{ match.match_time|format_arrival_time }}</span>
                                 <br>
-                                Field Number: {{ match.field_number }}
+                                Field Number: {{ match.field_number|format_field_number }}
                             </small>
                         </div>
                         {% if is_admin %}

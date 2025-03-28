@@ -76,4 +76,26 @@ def length_active(queryset):
     """Count the number of active players in a queryset."""
     if not queryset:
         return 0
-    return queryset.filter(teammemberprofile__active_player=True).count() 
+    return queryset.filter(teammemberprofile__active_player=True).count()
+
+@register.filter
+def format_match_time(time_obj):
+    """Format match time, showing 'TBD' if not set."""
+    if not time_obj:
+        return "TBD"
+    return time_obj.strftime('%I:%M %p')
+
+@register.filter
+def format_arrival_time(time_obj, minutes_before=45):
+    """Format arrival time, showing 'TBD' if match time not set."""
+    if not time_obj:
+        return "TBD"
+    arrival_time = datetime.combine(date.today(), time_obj) - timedelta(minutes=minutes_before)
+    return arrival_time.strftime('%I:%M %p')
+
+@register.filter
+def format_field_number(field_number):
+    """Format field number, showing 'TBD' if not set."""
+    if not field_number:
+        return "TBD"
+    return str(field_number) 
