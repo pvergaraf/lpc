@@ -256,7 +256,7 @@ body {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background-color: #000000;
+    background-color: var(--fc-text-primary);
     width: 24px;
     height: 24px;
     line-height: 24px;
@@ -511,7 +511,7 @@ body {
 .position-badge {
     display: inline-block;
     padding: 4px 8px;
-    background-color: #000000;
+    background-color: var(--fc-text-primary);
     color: white;
     font-weight: bold;
     position: relative;
@@ -568,10 +568,14 @@ body {
     color: var(--fc-text-primary);
     font-weight: 600;
     margin-bottom: 4px;
+    text-align: left;
 }
 
 .card-header .text-muted {
     font-size: 0.875rem;
+    text-align: left;
+    display: block;
+    margin-bottom: 0;
 }
 
 .card-header .d-flex {
@@ -592,20 +596,33 @@ body {
 .card-header .form-check-label {
     font-size: 0.875rem;
     color: #475467;
+    margin-bottom: 0;
 }
 
 @media (max-width: 576px) {
     .card-header {
         padding: 16px;
+        text-align: left;
     }
 
     .card-header .d-flex {
         flex-direction: column;
         gap: 8px;
+        align-items: flex-start !important;
     }
 
     .card-header .form-check {
         margin-top: 8px;
+    }
+
+    .card-header .card-title,
+    .card-header small.text-muted {
+        text-align: left;
+        width: 100%;
+    }
+
+    .card-header .d-flex.justify-content-between {
+        width: 100%;
     }
 }
 
@@ -872,21 +889,6 @@ body {
     }
 }
 
-.team-logo-circle {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background-color: #343A40;
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 600;
-    font-size: 1.2rem;
-    line-height: 1;
-    text-align: center;
-}
-
 .match-teams {
     display: grid;
     grid-template-columns: 1fr auto 1fr;
@@ -964,7 +966,8 @@ body {
 
 /* Match type badge */
 .match-type-badge {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
     padding: 4px 12px;
     background-color: #F8F9FA;
     border: 1px solid #E9ECEF;
@@ -972,11 +975,10 @@ body {
     font-size: 0.75rem;
     font-weight: 500;
     border-radius: 6px;
-    margin-bottom: 1rem;
-    margin-left: auto;
-    margin-right: auto;
-    display: block;
-    width: fit-content;
+    margin: 0;
+    height: 24px;
+    line-height: 1;
+    white-space: nowrap;
 }
 
 /* Current team  badge */
@@ -1117,29 +1119,6 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Payment section */
-.payment-title {
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: var(--fc-text-primary);
-    margin-bottom: 0.5rem;
-}
-
-/* Match section titles */
-.match-section-title {
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: var(--fc-text-primary);
-    margin-bottom: 1rem;
-}
-
-/* Your Teams section */
-.teams-section-title {
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: var(--fc-text-primary);
-    margin-bottom: 1rem;
-}
-
 .payment-card {
     background: white;
     border: 1px solid #E9ECEF;
@@ -1163,17 +1142,32 @@ h1, h2, h3, h4, h5, h6 {
     margin-bottom: 1rem;
 }
 
-.payment-card .due-date {
-    font-size: 0.9rem;
-    color: var(--fc-text-primary);
-    margin-bottom: 1rem;
+/* Reduce spacing in payment cards */
+.card .card-body .mb-3 {
+    margin-bottom: 0.75rem !important;
 }
 
-.card-header h5.card-title,
-.card-title {
-    color: var(--fc-text-primary);
+/* Adjust the payment card height */
+.card.h-100 {
+    min-height: auto;
+}
+
+/* Payment card specific styles */
+.card .card-body {
+    padding: 1.5rem;
+}
+
+.card .card-body h5.card-title {
+    font-size: 1rem;
     font-weight: 600;
+    color: var(--fc-text-primary);
     margin-bottom: 4px;
+}
+
+.card .card-body h6.card-subtitle {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--fc-text-primary);
 }
 
 .fifa-card-name {
@@ -1253,19 +1247,111 @@ h1, h2, h3, h4, h5, h6 {
     font-weight: 600;
 }
 
-/* Reduce spacing in payment cards */
-.card .card-body .mb-3 {
-    margin-bottom: 0.75rem !important;
-}
-
-/* Adjust the payment card height */
-.card.h-100 {
-    min-height: auto;
-}
-
 .form-check-input:checked {
     background-color: var(--fc-text-primary) !important;
     border-color: var(--fc-text-primary) !important;
+}
+
+/* Ensure proper spacing in the player info row */
+.d-flex.align-items-center.gap-2 {
+    gap: 0.5rem !important;
+}
+
+/* Responsive table styles */
+@media (max-width: 768px) {
+    .table td {
+        padding: 12px 8px;
+    }
+
+    .d-flex.align-items-center.gap-2 {
+        flex-wrap: wrap;
+    }
+
+    /* Adjust badge container on mobile */
+    .d-flex.align-items-center.gap-2 > .match-type-badge {
+        margin-top: 4px;
+        margin-bottom: 4px;
+    }
+
+    /* Ensure player name and badges stack properly */
+    .d-flex.align-items-center.gap-2 > a {
+        margin-right: auto;
+    }
+
+    /* Adjust spacing for position badge and condition arrow */
+    .position-badge {
+        margin-right: 4px;
+    }
+
+    .condition-arrow {
+        margin-right: 8px;
+    }
+}
+
+/* Player column styles */
+.table td .d-flex.align-items-center {
+    flex-wrap: nowrap !important;
+    gap: 8px !important;
+}
+
+.table td .d-flex.align-items-center > * {
+    flex-shrink: 0;
+}
+
+.table td .d-flex.align-items-center a {
+    flex-shrink: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .card-header {
+        padding: 16px;
+    }
+
+    .team-members-header {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .team-members-header .header-left,
+    .team-members-header .header-right {
+        width: 100%;
+    }
+
+    .team-members-header .form-check.form-switch {
+        width: 100%;
+    }
+
+    .card-header .form-check.form-switch {
+        width: 100%;
+    }
+
+    .card-header .form-check.form-switch .form-check-label {
+        font-size: 0.875rem;
+    }
+
+    .card-header .text-muted {
+        margin-bottom: 8px;
+    }
+}
+
+.team-logo-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: var(--fc-text-primary);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 1.2rem;
+    line-height: 1;
+    text-align: center;
 }
 </style>
 
@@ -1599,14 +1685,14 @@ h1, h2, h3, h4, h5, h6 {
                                                             <div class="text-end">
                                                                 <div class="d-flex align-items-center justify-content-end">
                                                                     {% if payment.payment.due_date|date:"Y-m-d" < today %}
-                                                                        <span class="badge badge-primary me-2">Overdue</span>
+                                                                        <span class="match-type-badge me-2">Overdue</span>
                                                                     {% endif %}
                                                                     <small class="text-muted">{{ payment.payment.due_date|date:"M d, Y" }}</small>
                                                                 </div>
                                                                 {% if payment.is_paid and not payment.admin_verified %}
-                                                                    <span class="badge badge-secondary">Pending Approval</span>
+                                                                    <span class="match-type-badge">Pending Approval</span>
                                                                 {% elif not payment.is_paid %}
-                                                                    <span class="badge badge-secondary">Pending</span>
+                                                                    <span class="match-type-badge">Pending</span>
                                                                 {% endif %}
                                                             </div>
                                                         </div>
@@ -1739,26 +1825,16 @@ h1, h2, h3, h4, h5, h6 {
             <!-- 5. TEAM MEMBERS -->
             <div class="card">
                 <div class="card-header">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h5 class="card-title mb-0">Team Members</h5>
-                            <small class="text-muted">{{ team_members|length_active }} active players</small>
-                        </div>
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" id="activeFilter" 
-                                   {% if 'active_only' in request.GET and request.GET.active_only == 'true' %}checked{% endif %}>
-                            <label class="form-check-label" for="activeFilter">Active Players Only</label>
-                        </div>
-                    </div>
+                    <h5 class="card-title">Team Members</h5>
+                    <small class="text-muted">{{ team_members|length_active }} active players</small>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
                         <table class="table table-hover align-middle">
                             <thead>
                                 <tr>
-                                    <th style="width: 80px">#</th>
-                                    <th style="width: 120px">Position</th>
-                                    <th>Name</th>
+                                    <th style="width: 40px">#</th>
+                                    <th>Player</th>
                                     {% if user_is_admin %}
                                     <th style="width: 80px">Actions</th>
                                     {% endif %}
@@ -1768,26 +1844,9 @@ h1, h2, h3, h4, h5, h6 {
                                 {% for member in team_members %}
                                     {% if not active_only or member.teammemberprofile.active_player %}
                                     <tr>
-                                        <td class="fw-bold fs-5">
-                                            {% if member.teammemberprofile.player_number %}
-                                                {% if member.user.profile.country %}
-                                                    {{ member.user.profile.country|country_flag }}
-                                                {% endif %}
-                                                {{ member.teammemberprofile.player_number }}
-                                            {% endif %}
-                                        </td>
                                         <td>
-                                            {% if member.teammemberprofile.position %}
-                                                <div class="d-flex align-items-center">
-                                                    <div class="position-badge" style="--position-color: {{ member.teammemberprofile.position.color }}">
-                                                        {{ member.teammemberprofile.position.code }}
-                                                    </div>
-                                                    {% if member.teammemberprofile.condition %}
-                                                        <span class="condition-arrow condition-{{ member.teammemberprofile.condition|lower }}">
-                                                            <svg><use href="#condition-{{ member.teammemberprofile.condition|lower }}"/></svg>
-                                                        </span>
-                                                    {% endif %}
-                                                </div>
+                                            {% if member.teammemberprofile.player_number %}
+                                                {{ member.teammemberprofile.player_number }}
                                             {% endif %}
                                         </td>
                                         <td>
@@ -1804,22 +1863,30 @@ h1, h2, h3, h4, h5, h6 {
                                                          style="width: 32px; height: 32px; object-fit: cover;">
                                                 {% endif %}
                                                 
-                                                <div class="d-flex align-items-center gap-2">
-                                                    <a href="{% url 'teams:player_card' team_id=team.id user_id=member.user.id %}" 
-                                                       class="text-decoration-none text-dark">
-                                                        {{ member.user.get_full_name }}
-                                                    </a>
-                                                </div>
-                                                <div class="d-flex gap-1">
-                                                    <span class="badge {% if member.role == 'MANAGER' %}badge-primary{% else %}badge-secondary{% endif %}">
+                                                {% if member.teammemberprofile.position %}
+                                                    <div class="position-badge" style="--position-color: {{ member.teammemberprofile.position.color }}">
+                                                        {{ member.teammemberprofile.position.code }}
+                                                    </div>
+                                                    {% if member.teammemberprofile.condition %}
+                                                        <span class="condition-arrow condition-{{ member.teammemberprofile.condition|lower }}">
+                                                            <svg><use href="#condition-{{ member.teammemberprofile.condition|lower }}"/></svg>
+                                                        </span>
+                                                    {% endif %}
+                                                {% endif %}
+                                                <a href="{% url 'teams:player_card' team_id=team.id user_id=member.user.id %}" 
+                                                   class="text-decoration-none text-dark">
+                                                    {{ member.user.get_full_name }}
+                                                </a>
+                                                {% if member.role == 'MANAGER' %}
+                                                    <span class="match-type-badge">
                                                         {{ member.get_role_display }}
                                                     </span>
-                                                    {% if not member.teammemberprofile.active_player and not member.teammemberprofile.is_official %}
-                                                        <span class="badge badge-secondary">Inactive</span>
-                                                    {% elif not member.teammemberprofile.is_official %}
-                                                        <span class="badge badge-secondary">Galleta</span>
-                                                    {% endif %}
-                                                </div>
+                                                {% endif %}
+                                                {% if not member.teammemberprofile.active_player and not member.teammemberprofile.is_official %}
+                                                    <span class="match-type-badge">Inactive</span>
+                                                {% elif not member.teammemberprofile.is_official %}
+                                                    <span class="match-type-badge">Galleta</span>
+                                                {% endif %}
                                             </div>
                                         </td>
                                         {% if user_is_admin %}
@@ -1846,37 +1913,6 @@ h1, h2, h3, h4, h5, h6 {
 {% include "teams/condition_icons.html" %}
 
 <script>
-    // Debug logging for URL parameters and checkbox state
-    const url = new URL(window.location.href);
-    console.log('=== Debug Info ===');
-    console.log('Current URL:', window.location.href);
-    console.log('All URL parameters:', url.searchParams.toString());
-    console.log('active_only parameter:', url.searchParams.get('active_only'));
-    
-    const activeFilter = document.getElementById('activeFilter');
-    if (activeFilter) {
-        console.log('Checkbox initial state:', activeFilter.checked);
-        
-        activeFilter.addEventListener('change', function() {
-            const url = new URL(window.location.href);
-            console.log('Before change - URL params:', url.searchParams.toString());
-            
-            // Remove all instances of active_only first
-            url.searchParams.delete('active_only');
-            
-            // Only add if checked
-            if (this.checked) {
-                url.searchParams.set('active_only', 'true');
-            }
-            
-            console.log('After change - URL params:', url.searchParams.toString());
-            console.log('New checkbox state:', this.checked);
-            console.log('Redirecting to:', url.toString());
-            
-            window.location.href = url.toString();
-        });
-    }
-
     let scrollPosition = 0;
     const html = document.documentElement;
     const body = document.body;

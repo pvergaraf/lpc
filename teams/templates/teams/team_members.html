@@ -28,7 +28,7 @@
 .position-badge {
     display: inline-block;
     padding: 4px 8px;
-    background-color: #000000;
+    background-color: var(--fc-text-primary);
     color: white;
     font-weight: bold;
     position: relative;
@@ -61,7 +61,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background-color: #000000;
+    background-color: var(--fc-text-primary);
     width: 24px;
     height: 24px;
     line-height: 24px;
@@ -95,7 +95,7 @@
 }
 
 .card-body {
-    padding: 24px;
+    padding: 16px;
 }
 
 .card-title {
@@ -285,6 +285,72 @@
     border-color: #404B5C !important;
     color: #FFFFFF !important;
 }
+
+/* Match type badge */
+.match-type-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 12px;
+    background-color: #F8F9FA;
+    border: 1px solid #E9ECEF;
+    color: #475467;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border-radius: 6px;
+    margin: 0;
+    height: 24px;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+/* Responsive table styles */
+@media (max-width: 768px) {
+    .table td {
+        padding: 12px 8px;
+    }
+
+    .d-flex.align-items-center.gap-2 {
+        flex-wrap: wrap;
+    }
+
+    /* Adjust badge container on mobile */
+    .d-flex.align-items-center.gap-2 > .match-type-badge {
+        margin-top: 4px;
+        margin-bottom: 4px;
+    }
+
+    /* Ensure player name and badges stack properly */
+    .d-flex.align-items-center.gap-2 > a {
+        margin-right: auto;
+    }
+
+    /* Adjust spacing for position badge and condition arrow */
+    .position-badge {
+        margin-right: 4px;
+    }
+
+    .condition-arrow {
+        margin-right: 8px;
+    }
+}
+
+/* Player column styles */
+.table td .d-flex.align-items-center {
+    flex-wrap: nowrap !important;
+    gap: 8px !important;
+}
+
+.table td .d-flex.align-items-center > * {
+    flex-shrink: 0;
+}
+
+.table td .d-flex.align-items-center a {
+    flex-shrink: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 </style>
 
 <div class="container mt-4">
@@ -349,9 +415,8 @@
                 <table class="table table-hover align-middle">
                     <thead>
                         <tr>
-                            <th style="width: 80px">#</th>
-                            <th style="width: 120px">Position</th>
-                            <th>Name</th>
+                            <th style="width: 40px">#</th>
+                            <th>Player</th>
                             {% if user_is_admin %}
                             <th style="width: 80px">Actions</th>
                             {% endif %}
@@ -360,26 +425,9 @@
                     <tbody>
                         {% for member in active_members %}
                             <tr>
-                                <td class="fw-bold fs-5">
-                                    {% if member.teammemberprofile.player_number %}
-                                        {% if member.user.profile.country %}
-                                            {{ member.user.profile.country|country_flag }}
-                                        {% endif %}
-                                        {{ member.teammemberprofile.player_number }}
-                                    {% endif %}
-                                </td>
                                 <td>
-                                    {% if member.teammemberprofile.position %}
-                                        <div class="d-flex align-items-center">
-                                            <div class="position-badge" style="--position-color: {{ member.teammemberprofile.position.color }}">
-                                                {{ member.teammemberprofile.position.code }}
-                                            </div>
-                                            {% if member.teammemberprofile.condition %}
-                                                <span class="condition-arrow condition-{{ member.teammemberprofile.condition|lower }}">
-                                                    <svg><use href="#condition-{{ member.teammemberprofile.condition|lower }}"/></svg>
-                                                </span>
-                                            {% endif %}
-                                        </div>
+                                    {% if member.teammemberprofile.player_number %}
+                                        {{ member.teammemberprofile.player_number }}
                                     {% endif %}
                                 </td>
                                 <td>
@@ -396,22 +444,30 @@
                                                  style="width: 32px; height: 32px; object-fit: cover;">
                                         {% endif %}
                                         
-                                        <div class="d-flex align-items-center gap-2">
-                                            <a href="{% url 'teams:player_card' team_id=team.id user_id=member.user.id %}" 
-                                               class="text-decoration-none text-dark">
-                                                {{ member.user.get_full_name }}
-                                            </a>
-                                        </div>
-                                        <div class="d-flex gap-1">
-                                            <span class="badge {% if member.role == 'MANAGER' %}badge-primary{% else %}badge-secondary{% endif %}">
+                                        {% if member.teammemberprofile.position %}
+                                            <div class="position-badge" style="--position-color: {{ member.teammemberprofile.position.color }}">
+                                                {{ member.teammemberprofile.position.code }}
+                                            </div>
+                                            {% if member.teammemberprofile.condition %}
+                                                <span class="condition-arrow condition-{{ member.teammemberprofile.condition|lower }}">
+                                                    <svg><use href="#condition-{{ member.teammemberprofile.condition|lower }}"/></svg>
+                                                </span>
+                                            {% endif %}
+                                        {% endif %}
+                                        <a href="{% url 'teams:player_card' team_id=team.id user_id=member.user.id %}" 
+                                           class="text-decoration-none text-dark">
+                                            {{ member.user.get_full_name }}
+                                        </a>
+                                        {% if member.role == 'MANAGER' %}
+                                            <span class="match-type-badge">
                                                 {{ member.get_role_display }}
                                             </span>
-                                            {% if not member.teammemberprofile.active_player and not member.teammemberprofile.is_official %}
-                                                <span class="badge badge-secondary">Inactive</span>
-                                            {% elif not member.teammemberprofile.is_official %}
-                                                <span class="badge badge-secondary">Galleta</span>
-                                            {% endif %}
-                                        </div>
+                                        {% endif %}
+                                        {% if not member.teammemberprofile.active_player and not member.teammemberprofile.is_official %}
+                                            <span class="match-type-badge">Inactive</span>
+                                        {% elif not member.teammemberprofile.is_official %}
+                                            <span class="match-type-badge">Galleta</span>
+                                        {% endif %}
                                     </div>
                                 </td>
                                 {% if user_is_admin %}
