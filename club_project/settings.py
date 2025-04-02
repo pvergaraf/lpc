@@ -252,14 +252,24 @@ LOGGING = {
 
 # S3 Static Files Configuration
 AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
+AWS_DEFAULT_ACL = 'public-read'
+AWS_LOCATION = 'media'
 
 # Storage backends
 STORAGES = {
     "default": {
         "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+        "OPTIONS": {
+            "location": "media",
+            "default_acl": "public-read",
+        },
     },
     "staticfiles": {
         "BACKEND": "storages.backends.s3boto3.S3StaticStorage",
+        "OPTIONS": {
+            "location": "static",
+            "default_acl": "public-read",
+        },
     }
 }
 
