@@ -252,38 +252,14 @@ LOGGING = {
 
 # S3 Static Files Configuration
 AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
-AWS_S3_OBJECT_PARAMETERS = {
-    'CacheControl': 'max-age=86400',
-}
-AWS_LOCATION = 'media'
-
-# Important: Remove ACL settings since the bucket doesn't support them
-AWS_DEFAULT_ACL = None
-AWS_QUERYSTRING_AUTH = False
 
 # Storage backends
 STORAGES = {
     "default": {
         "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
-        "OPTIONS": {
-            "location": "media",
-            # Remove ACL settings
-            "default_acl": None,
-            "object_parameters": {
-                'CacheControl': 'max-age=86400',
-            },
-        },
     },
     "staticfiles": {
         "BACKEND": "storages.backends.s3boto3.S3StaticStorage",
-        "OPTIONS": {
-            "location": "static",
-            # Remove ACL settings
-            "default_acl": None,
-            "object_parameters": {
-                'CacheControl': 'max-age=86400',
-            },
-        },
     }
 }
 

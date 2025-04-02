@@ -12,8 +12,6 @@ import traceback
 import logging
 from django.core.exceptions import ValidationError
 from django.db.models import Count, Sum, Q
-import io
-from django.core.files.base import ContentFile
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -247,9 +245,7 @@ class Team(models.Model):
             # Process the team photo if it exists and has changed
             if self.team_photo and (is_new or self.team_photo.name != 'team_photos/default.png'):
                 try:
-                    # Open the image from S3
-                    img_temp = self.team_photo.read()
-                    img = Image.open(io.BytesIO(img_temp))
+                    img = Image.open(self.team_photo.path)
                     
                     # Convert to RGB if necessary
                     if img.mode != 'RGB':
@@ -271,25 +267,8 @@ class Team(models.Model):
                     if min_dim > 300:
                         img = img.resize((300, 300), Image.Resampling.LANCZOS)
                     
-                    # Save the processed image back to S3
-                    output = io.BytesIO()
-                    img.save(output, format='JPEG', quality=90, optimize=True)
-                    output.seek(0)
-                    
-                    # Generate a new filename with the same name but processed
-                    filename = os.path.splitext(os.path.basename(self.team_photo.name))[0]
-                    new_filename = f'team_photos/processed_{filename}.jpg'
-                    
-                    # Save to S3
-                    self.team_photo.save(
-                        new_filename,
-                        ContentFile(output.getvalue()),
-                        save=False
-                    )
-                    
-                    # Save the model to update the new filename
-                    super().save(update_fields=['team_photo'])
-                    
+                    # Save the processed image
+                    img.save(self.team_photo.path, quality=90, optimize=True)
                 except Exception as e:
                     logger.error(f"Error processing team photo for team {self.name}: {str(e)}")
                     # If there's an error processing the image, set it to default
