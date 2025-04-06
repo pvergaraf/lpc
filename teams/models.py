@@ -228,31 +228,51 @@ class Team(models.Model):
 
         try:
             is_new = self.pk is None
+            logger.info(f"Saving team {self.name} (ID: {self.pk})")
+            logger.info(f"Team photo field: {self.team_photo}")
+            
+            if self.team_photo:
+                logger.info(f"Team photo details - Name: {self.team_photo.name}, Size: {self.team_photo.size if hasattr(self.team_photo, 'size') else 'N/A'}")
             
             if not is_new and self.team_photo:
                 try:
                     old_instance = Team.objects.get(pk=self.pk)
+                    logger.info(f"Old team photo: {old_instance.team_photo.name if old_instance.team_photo else 'None'}")
+                    logger.info(f"New team photo: {self.team_photo.name}")
+                    
                     if (old_instance.team_photo and 
                         old_instance.team_photo != self.team_photo and 
                         old_instance.team_photo.name != 'team_photos/default.png'):
-                        # Delete the old picture only if it's not the default
-                        old_instance.team_photo.delete(save=False)
+                        logger.info(f"Attempting to delete old team photo: {old_instance.team_photo.path}")
+                        try:
+                            old_instance.team_photo.delete(save=False)
+                            logger.info("Successfully deleted old team photo")
+                        except Exception as delete_error:
+                            logger.error(f"Error deleting old team photo: {str(delete_error)}")
                 except Team.DoesNotExist:
-                    pass
+                    logger.warning(f"Could not find existing team with ID {self.pk}")
+                except Exception as e:
+                    logger.error(f"Error handling old team photo: {str(e)}")
+                    logger.error(traceback.format_exc())
 
             super().save(*args, **kwargs)
+            logger.info(f"Successfully saved team {self.name} to database")
 
             # Process the team photo if it exists and has changed
             if self.team_photo and (is_new or self.team_photo.name != 'team_photos/default.png'):
                 try:
+                    logger.info(f"Processing team photo: {self.team_photo.path}")
                     img = Image.open(self.team_photo.path)
+                    logger.info(f"Image opened successfully. Format: {img.format}, Mode: {img.mode}, Size: {img.size}")
                     
                     # Convert to RGB if necessary
                     if img.mode != 'RGB':
+                        logger.info(f"Converting image from {img.mode} to RGB")
                         img = img.convert('RGB')
                     
                     # Get the minimum dimension to make it square
                     min_dim = min(img.width, img.height)
+                    logger.info(f"Cropping image to square with dimensions {min_dim}x{min_dim}")
                     
                     # Calculate cropping box
                     left = (img.width - min_dim) // 2
@@ -262,20 +282,28 @@ class Team(models.Model):
                     
                     # Crop to square
                     img = img.crop((left, top, right, bottom))
+                    logger.info("Successfully cropped image to square")
                     
                     # Resize if larger than 300x300
                     if min_dim > 300:
+                        logger.info("Resizing image to 300x300")
                         img = img.resize((300, 300), Image.Resampling.LANCZOS)
                     
                     # Save the processed image
+                    logger.info(f"Saving processed image to {self.team_photo.path}")
                     img.save(self.team_photo.path, quality=90, optimize=True)
+                    logger.info("Successfully saved processed image")
+                    
                 except Exception as e:
                     logger.error(f"Error processing team photo for team {self.name}: {str(e)}")
+                    logger.error(f"Full traceback: {traceback.format_exc()}")
                     # If there's an error processing the image, set it to default
                     self.team_photo = 'team_photos/default.png'
+                    logger.info("Setting team photo to default due to processing error")
                     super().save(update_fields=['team_photo'])
         except Exception as e:
             logger.error(f"Error saving team {self.name}: {str(e)}")
+            logger.error(f"Full traceback: {traceback.format_exc()}")
             raise
 
     def get_upcoming_birthdays(self, days=15):
