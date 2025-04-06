@@ -202,7 +202,7 @@ class TeamMember(models.Model):
         return f"{self.email} (Invited) - {self.team.name}"
 
     def save(self, *args, **kwargs):
-        logger = logging.getLogger('django')
+        logger = logging.getLogger('teams')
         try:
             logger.info(f"Saving TeamMember: user={self.user}, team={self.team}, role={self.role}")
             super().save(*args, **kwargs)
@@ -224,7 +224,7 @@ class Team(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
-        logger = logging.getLogger('django')
+        logger = logging.getLogger('teams')
 
         try:
             is_new = self.pk is None
@@ -514,7 +514,7 @@ class PlayerMatchStats(models.Model):
 @receiver(post_save, sender=TeamMember)
 def create_team_member_profile(sender, instance, created, **kwargs):
     """Create a TeamMemberProfile when a TeamMember is created."""
-    logger = logging.getLogger('django')
+    logger = logging.getLogger('teams')
     
     try:
         logger.info(f"Signal handler: TeamMember post_save for {instance.pk}, created={created}")
