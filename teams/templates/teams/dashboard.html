@@ -1835,7 +1835,7 @@ h1, h2, h3, h4, h5, h6 {
                                 <tr>
                                     <th style="width: 40px">#</th>
                                     <th>Player</th>
-                                    {% if user_is_admin %}
+                                    {% if is_team_admin %}
                                     <th style="width: 80px">Actions</th>
                                     {% endif %}
                                 </tr>
@@ -1889,7 +1889,7 @@ h1, h2, h3, h4, h5, h6 {
                                                 {% endif %}
                                             </div>
                                         </td>
-                                        {% if user_is_admin %}
+                                        {% if is_team_admin %}
                                         <td>
                                             <a href="{% url 'teams:edit_member' team_id=team.id user_id=member.user.id %}" 
                                                class="btn btn-sm btn-outline-primary">
@@ -1965,7 +1965,7 @@ h1, h2, h3, h4, h5, h6 {
             
             // Get team and season IDs from data attributes
             const teamId = '{{ current_team.id }}';
-            const seasonId = '{{ current_season.id }}';
+            const seasonId = '{% if current_season %}{{ current_season.id }}{% else %}{% endif %}';
             
             try {
                 const response = await fetch(`/teams/${teamId}/season/${seasonId}/payments/${paymentId}/player/${paymentId}/toggle/`, {

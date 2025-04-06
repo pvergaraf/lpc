@@ -295,42 +295,41 @@ class CustomLogoutView(LogoutView):
 def team_members(request, team_id):
     log_error(
         request=request,
-        error_message="Team members page access - ENTRY POINT",
-        error_type="ViewDebug",
+        error_message="Team members page access",
+        error_type="UserActivity",
         extra_context={
             "user_email": request.user.email,
             "user_id": request.user.id,
             "team_id": team_id,
             "path": request.path,
-            "method": request.method,
-            "session_id": request.session.session_key,
-            "current_team_in_session": request.session.get('current_team'),
-            "all_session_data": dict(request.session)
+            "method": request.method
         }
     )
     
     try:
         team = get_object_or_404(Team, id=team_id)
+        
+        # Check if user is a member of the team
         team_member = get_object_or_404(TeamMember, team=team, user=request.user, is_active=True)
         
-        # Get the filter parameter
-        show_active_only = request.GET.get('active_only', 'false').lower() == 'true'
+        # Get show_active_only parameter
+        show_active_only = request.GET.get('show_active_only', 'false').lower() == 'true'
         
-        # Get active members with fresh data
-        active_members_query = TeamMember.objects.select_related(
+        # Base query for active members
+        active_members_query = TeamMember.objects.filter(
+            team=team,
+            is_active=True
+        ).select_related(
             'user',
             'teammemberprofile',
             'teammemberprofile__position'
-        ).filter(
-            team=team,
-            is_active=True
-        ).order_by(
-            'teammemberprofile__player_number'
-        ).distinct()
+        )
         
-        # Apply active filter if requested
-        if show_active_only:
-            active_members_query = active_members_query.filter(teammemberprofile__active_player=True)
+        # Get all team memberships for the user
+        team_memberships = TeamMember.objects.filter(
+            user=request.user,
+            is_active=True
+        ).select_related('team').order_by('team__name')
         
         # Force a fresh query by adding a timestamp
         active_members = active_members_query.extra(
@@ -375,9 +374,10 @@ def team_members(request, team_id):
             'user': request.user,
             'user_is_admin': team_member.is_team_admin or team_member.role == TeamMember.Role.MANAGER,
             'show_active_only': show_active_only,
-            'current_team': team,  # Add this for navbar
-            'current_season': current_season,  # Add this for navbar
-            'is_team_admin': team_member.is_team_admin or team_member.role == TeamMember.Role.MANAGER  # Add this for navbar
+            'current_team': team,
+            'current_season': current_season,
+            'is_team_admin': team_member.is_team_admin or team_member.role == TeamMember.Role.MANAGER,
+            'team_memberships': team_memberships  # Add team memberships to context
         }
         
         log_error(
@@ -388,46 +388,25 @@ def team_members(request, team_id):
                 "template": "teams/team_members.html",
                 "context_keys": list(context.keys()),
                 "is_team_admin": context['is_team_admin'],
-                "current_team_id": context['current_team'].id,
-                "has_current_season": current_season is not None
+                "current_team_id": team.id,
+                "has_current_season": bool(current_season)
             }
         )
         
         return render(request, 'teams/team_members.html', context)
         
-    except (Team.DoesNotExist, TeamMember.DoesNotExist) as e:
-        log_error(
-            request=request,
-            error_message="Team members access denied - Object not found",
-            error_type="AuthorizationError",
-            extra_context={
-                "user_email": request.user.email,
-                "user_id": request.user.id,
-                "team_id": team_id,
-                "error": str(e),
-                "error_type": type(e).__name__,
-                "exception_class": e.__class__.__name__
-            }
-        )
-        messages.error(request, "You don't have access to this team.")
-        return redirect('teams:team_list')
     except Exception as e:
         log_error(
             request=request,
-            error_message="Unexpected error in team members view",
-            error_type="SystemError",
+            error_message=str(e),
+            error_type="ViewError",
             extra_context={
-                "user_email": request.user.email,
-                "user_id": request.user.id,
                 "team_id": team_id,
-                "error": str(e),
-                "error_type": type(e).__name__,
-                "traceback": traceback.format_exc(),
-                "exception_class": e.__class__.__name__
+                "error": str(e)
             }
         )
         messages.error(request, "An error occurred while loading team members.")
-        return redirect('teams:team_list')
+        return redirect('teams:dashboard')
 
 @login_required
 def invite_member(request, team_id):
@@ -1336,13 +1315,21 @@ def season_detail(request, team_id, season_id):
     # Get upcoming birthdays
     upcoming_birthdays = team.get_upcoming_birthdays()
     
+    # Get team memberships for the user
+    team_memberships = TeamMember.objects.filter(
+        user=request.user,
+        is_active=True
+    ).select_related('team').order_by('team__name')
+    
     context = {
         'team': team,
         'season': season,
         'upcoming_matches': upcoming_matches,
         'past_matches': past_matches,
         'is_admin': team_member.is_team_admin or team_member.role == TeamMember.Role.MANAGER,
-        'upcoming_birthdays': upcoming_birthdays if upcoming_birthdays else None
+        'upcoming_birthdays': upcoming_birthdays if upcoming_birthdays else None,
+        'team_memberships': team_memberships,  # Add team memberships to context
+        'current_team': team  # Add current team for navbar consistency
     }
     return render(request, 'teams/season_detail.html', context)
 
