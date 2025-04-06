@@ -1190,6 +1190,69 @@ h1, h2, h3, h4, h5, h6 {
     color: var(--fc-text-primary);
 }
 
+/* Team Stats styles */
+.stat-card {
+    background-color: var(--fc-background);
+    border-radius: 8px;
+    padding: 16px 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease;
+    height: 100%;
+    min-height: 110px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+.stat-card:hover {
+    transform: translateY(-3px);
+}
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--fc-text-primary);
+    text-align: center;
+    width: 100%;
+    line-height: 1.2;
+}
+
+.stat-label {
+    font-size: 0.85rem;
+    color: var(--fc-text-secondary);
+    font-weight: 500;
+    text-align: center;
+    width: 100%;
+    line-height: 1.2;
+}
+
+@media (max-width: 767px) {
+    .row-cols-2 > .col {
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+    
+    .stat-value {
+        font-size: 1.3rem;
+    }
+    
+    .stat-label {
+        font-size: 0.75rem;
+    }
+    
+    .card-body {
+        padding: 16px 12px;
+    }
+    
+    .stat-card {
+        padding: 12px 4px;
+    }
+}
+
 /* Button styles */
 .btn-main-action {
     background-color: var(--fc-text-primary) !important;
@@ -1659,7 +1722,73 @@ h1, h2, h3, h4, h5, h6 {
                 </div>
             </div>
 
-            <!-- 2. PAYMENTS -->
+            <!-- 3. TEAM STATS -->
+            {% if current_season %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0 d-flex align-items-center">
+                        Team Stats
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if team_stats %}
+                    <div class="row row-cols-2 row-cols-md-5 g-3">
+                        <!-- Matches Played -->
+                        <div class="col">
+                            <div class="stat-card">
+                                <div class="stat-value">{{ team_stats.matches_played }}</div>
+                                <div class="stat-label">Matches</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Win/Draw/Loss -->
+                        <div class="col">
+                            <div class="stat-card">
+                                <div class="stat-value">{{ team_stats.wins }}-{{ team_stats.draws }}-{{ team_stats.losses }}</div>
+                                <div class="stat-label">W-D-L</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Goals -->
+                        <div class="col">
+                            <div class="stat-card">
+                                <div class="stat-value">{{ team_stats.goals_scored }}-{{ team_stats.goals_conceded }}</div>
+                                <div class="stat-label">Goals For-Against</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Goal Difference -->
+                        <div class="col">
+                            <div class="stat-card">
+                                <div class="stat-value {% if team_stats.goal_difference > 0 %}text-success{% elif team_stats.goal_difference < 0 %}text-danger{% endif %}">
+                                    {% if team_stats.goal_difference > 0 %}+{% endif %}{{ team_stats.goal_difference }}
+                                </div>
+                                <div class="stat-label">Goal Diff</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Win Percentage -->
+                        <div class="col">
+                            <div class="stat-card">
+                                <div class="stat-value">{{ team_stats.winning_percentage|floatformat:0 }}%</div>
+                                <div class="stat-label">Win Rate</div>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <div class="mb-3">
+                            <i class="fas fa-chart-line fa-3x text-secondary"></i>
+                        </div>
+                        <h5 class="fw-bold">No stats available yet</h5>
+                        <p class="text-muted">Team statistics will appear here after playing matches</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- 4. PAYMENTS -->
             <div class="card">
                 <div class="card-header">
                     <h5 class="card-title mb-0 d-flex align-items-center">
@@ -1774,7 +1903,7 @@ h1, h2, h3, h4, h5, h6 {
                 </div>
             </div>
             
-            <!-- 4. UPCOMING BIRTHDAYS -->
+            <!-- 5. UPCOMING BIRTHDAYS -->
             {% if upcoming_birthdays %}
             <div class="card mb-4">
                 <div class="card-header">
@@ -1821,8 +1950,8 @@ h1, h2, h3, h4, h5, h6 {
                 </div>
             </div>
             {% endif %}
-
-            <!-- 5. TEAM MEMBERS -->
+            
+            <!-- 6. TEAM MEMBERS -->
             <div class="card">
                 <div class="card-header">
                     <h5 class="card-title">Team Members</h5>

@@ -158,6 +158,59 @@ def dashboard(request):
                 'player_stats__player__teammemberprofile'
             ).order_by('-match_date', '-match_time').first()
         
+        # Calculate team stats
+        team_stats = None
+        if current_season:
+            # Get all played matches in the current season
+            played_matches = Match.objects.filter(
+                season=current_season,
+                home_score__isnull=False,
+                away_score__isnull=False
+            )
+            
+            matches_played = played_matches.count()
+            
+            if matches_played > 0:
+                # Initialize stats
+                wins = 0
+                draws = 0
+                losses = 0
+                goals_scored = 0
+                goals_conceded = 0
+                
+                # Calculate stats from each match
+                for match in played_matches:
+                    team_score = match.team_score
+                    opponent_score = match.opponent_score
+                    
+                    # Count wins, draws, losses
+                    if team_score > opponent_score:
+                        wins += 1
+                    elif team_score == opponent_score:
+                        draws += 1
+                    else:
+                        losses += 1
+                    
+                    # Accumulate goals
+                    goals_scored += team_score
+                    goals_conceded += opponent_score
+                
+                # Calculate derived stats
+                goal_difference = goals_scored - goals_conceded
+                winning_percentage = (wins / matches_played) * 100 if matches_played > 0 else 0
+                
+                # Store in dictionary
+                team_stats = {
+                    'matches_played': matches_played,
+                    'wins': wins,
+                    'draws': draws,
+                    'losses': losses,
+                    'goals_scored': goals_scored,
+                    'goals_conceded': goals_conceded,
+                    'goal_difference': goal_difference,
+                    'winning_percentage': winning_percentage
+                }
+        
         # Get upcoming birthdays
         upcoming_birthdays = team.get_upcoming_birthdays()
         
@@ -229,7 +282,8 @@ def dashboard(request):
             'team_memberships': team_memberships,  # Add team memberships to context
             'upcoming_matches': upcoming_matches,  # Add upcoming matches to context
             'latest_match': latest_match,  # Add latest match with scores to context
-            'active_only': request.GET.get('active_only', 'false').lower() == 'true'  # Add active_only parameter
+            'active_only': request.GET.get('active_only', 'false').lower() == 'true',  # Add active_only parameter
+            'team_stats': team_stats,  # Add team stats to context
         }
         
         # Debug logging
