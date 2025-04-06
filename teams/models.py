@@ -12,6 +12,9 @@ import traceback
 import logging
 from django.core.exceptions import ValidationError
 from django.db.models import Count, Sum, Q
+import io
+import uuid
+from django.core.files.base import ContentFile
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -243,7 +246,7 @@ class Team(models.Model):
                     if (old_instance.team_photo and 
                         old_instance.team_photo != self.team_photo and 
                         old_instance.team_photo.name != 'team_photos/default.png'):
-                        logger.info(f"Attempting to delete old team photo: {old_instance.team_photo.path}")
+                        logger.info(f"Attempting to delete old team photo: {old_instance.team_photo.name}")
                         try:
                             old_instance.team_photo.delete(save=False)
                             logger.info("Successfully deleted old team photo")
@@ -255,14 +258,13 @@ class Team(models.Model):
                     logger.error(f"Error handling old team photo: {str(e)}")
                     logger.error(traceback.format_exc())
 
-            super().save(*args, **kwargs)
-            logger.info(f"Successfully saved team {self.name} to database")
-
             # Process the team photo if it exists and has changed
             if self.team_photo and (is_new or self.team_photo.name != 'team_photos/default.png'):
                 try:
-                    logger.info(f"Processing team photo: {self.team_photo.path}")
-                    img = Image.open(self.team_photo.path)
+                    logger.info("Opening team photo from storage")
+                    # Read the image into memory
+                    img_temp = self.team_photo.read()
+                    img = Image.open(io.BytesIO(img_temp))
                     logger.info(f"Image opened successfully. Format: {img.format}, Mode: {img.mode}, Size: {img.size}")
                     
                     # Convert to RGB if necessary
@@ -289,9 +291,22 @@ class Team(models.Model):
                         logger.info("Resizing image to 300x300")
                         img = img.resize((300, 300), Image.Resampling.LANCZOS)
                     
-                    # Save the processed image
-                    logger.info(f"Saving processed image to {self.team_photo.path}")
-                    img.save(self.team_photo.path, quality=90, optimize=True)
+                    # Save the processed image to a buffer
+                    logger.info("Saving processed image to buffer")
+                    buffer = io.BytesIO()
+                    img.save(buffer, format='PNG', quality=90, optimize=True)
+                    buffer.seek(0)
+                    
+                    # Generate a unique filename
+                    filename = f"team_photos/{uuid.uuid4()}.png"
+                    logger.info(f"Saving processed image as {filename}")
+                    
+                    # Save the buffer to storage
+                    self.team_photo.save(
+                        filename,
+                        ContentFile(buffer.getvalue()),
+                        save=False
+                    )
                     logger.info("Successfully saved processed image")
                     
                 except Exception as e:
@@ -300,7 +315,10 @@ class Team(models.Model):
                     # If there's an error processing the image, set it to default
                     self.team_photo = 'team_photos/default.png'
                     logger.info("Setting team photo to default due to processing error")
-                    super().save(update_fields=['team_photo'])
+
+            super().save(*args, **kwargs)
+            logger.info(f"Successfully saved team {self.name} to database")
+            
         except Exception as e:
             logger.error(f"Error saving team {self.name}: {str(e)}")
             logger.error(f"Full traceback: {traceback.format_exc()}")
