@@ -160,6 +160,7 @@ def dashboard(request):
         
         # Calculate team stats
         team_stats = None
+        all_matches_stats = None
         if current_season:
             # Get all played matches in the current season
             played_matches = Match.objects.filter(
@@ -168,15 +169,61 @@ def dashboard(request):
                 away_score__isnull=False
             )
             
-            matches_played = played_matches.count()
+            # Calculate stats for official matches only
+            official_matches = played_matches.filter(is_official=True)
+            official_matches_count = official_matches.count()
             
-            if matches_played > 0:
-                # Initialize stats
-                wins = 0
-                draws = 0
-                losses = 0
-                goals_scored = 0
-                goals_conceded = 0
+            if official_matches_count > 0:
+                # Initialize stats for official matches
+                official_wins = 0
+                official_draws = 0
+                official_losses = 0
+                official_goals_scored = 0
+                official_goals_conceded = 0
+                
+                # Calculate stats from each official match
+                for match in official_matches:
+                    team_score = match.team_score
+                    opponent_score = match.opponent_score
+                    
+                    # Count wins, draws, losses
+                    if team_score > opponent_score:
+                        official_wins += 1
+                    elif team_score == opponent_score:
+                        official_draws += 1
+                    else:
+                        official_losses += 1
+                    
+                    # Accumulate goals
+                    official_goals_scored += team_score
+                    official_goals_conceded += opponent_score
+                
+                # Calculate derived stats
+                official_goal_difference = official_goals_scored - official_goals_conceded
+                official_winning_percentage = (official_wins / official_matches_count) * 100 if official_matches_count > 0 else 0
+                
+                # Store in dictionary
+                team_stats = {
+                    'matches_played': official_matches_count,
+                    'wins': official_wins,
+                    'draws': official_draws,
+                    'losses': official_losses,
+                    'goals_scored': official_goals_scored,
+                    'goals_conceded': official_goals_conceded,
+                    'goal_difference': official_goal_difference,
+                    'winning_percentage': official_winning_percentage
+                }
+            
+            # Calculate stats for all matches (including friendlies)
+            all_matches_count = played_matches.count()
+            
+            if all_matches_count > 0:
+                # Initialize stats for all matches
+                all_wins = 0
+                all_draws = 0
+                all_losses = 0
+                all_goals_scored = 0
+                all_goals_conceded = 0
                 
                 # Calculate stats from each match
                 for match in played_matches:
@@ -185,30 +232,30 @@ def dashboard(request):
                     
                     # Count wins, draws, losses
                     if team_score > opponent_score:
-                        wins += 1
+                        all_wins += 1
                     elif team_score == opponent_score:
-                        draws += 1
+                        all_draws += 1
                     else:
-                        losses += 1
+                        all_losses += 1
                     
                     # Accumulate goals
-                    goals_scored += team_score
-                    goals_conceded += opponent_score
+                    all_goals_scored += team_score
+                    all_goals_conceded += opponent_score
                 
                 # Calculate derived stats
-                goal_difference = goals_scored - goals_conceded
-                winning_percentage = (wins / matches_played) * 100 if matches_played > 0 else 0
+                all_goal_difference = all_goals_scored - all_goals_conceded
+                all_winning_percentage = (all_wins / all_matches_count) * 100 if all_matches_count > 0 else 0
                 
                 # Store in dictionary
-                team_stats = {
-                    'matches_played': matches_played,
-                    'wins': wins,
-                    'draws': draws,
-                    'losses': losses,
-                    'goals_scored': goals_scored,
-                    'goals_conceded': goals_conceded,
-                    'goal_difference': goal_difference,
-                    'winning_percentage': winning_percentage
+                all_matches_stats = {
+                    'matches_played': all_matches_count,
+                    'wins': all_wins,
+                    'draws': all_draws,
+                    'losses': all_losses,
+                    'goals_scored': all_goals_scored,
+                    'goals_conceded': all_goals_conceded,
+                    'goal_difference': all_goal_difference,
+                    'winning_percentage': all_winning_percentage
                 }
         
         # Get upcoming birthdays
@@ -284,6 +331,7 @@ def dashboard(request):
             'latest_match': latest_match,  # Add latest match with scores to context
             'active_only': request.GET.get('active_only', 'false').lower() == 'true',  # Add active_only parameter
             'team_stats': team_stats,  # Add team stats to context
+            'all_matches_stats': all_matches_stats,  # Add all matches stats to context
         }
         
         # Debug logging

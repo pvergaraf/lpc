@@ -1191,6 +1191,16 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Team Stats styles */
+.row-cols-2.row-cols-md-5 {
+    margin-left: -8px;
+    margin-right: -8px;
+}
+
+.row-cols-2.row-cols-md-5 > .col {
+    padding-left: 8px;
+    padding-right: 8px;
+}
+
 .stat-card {
     background-color: var(--fc-background);
     border-radius: 8px;
@@ -1205,6 +1215,7 @@ h1, h2, h3, h4, h5, h6 {
     min-height: 110px;
     width: 100%;
     margin: 0 auto;
+    aspect-ratio: 1.1;
 }
 
 .stat-card:hover {
@@ -1230,10 +1241,27 @@ h1, h2, h3, h4, h5, h6 {
     line-height: 1.2;
 }
 
+/* Form switch styling */
+.form-check.form-switch {
+    position: relative;
+    min-height: 24px;
+    padding-left: 2.5rem;
+}
+
+.form-check-input {
+    margin-top: 0.15rem;
+    margin-left: -2.5rem;
+    background-color: #fff;
+    border-color: rgba(0, 0, 0, 0.25);
+    height: 1.25rem;
+    width: 2.25rem !important;
+    cursor: pointer;
+}
+
 @media (max-width: 767px) {
     .row-cols-2 > .col {
-        flex: 0 0 50%;
-        max-width: 50%;
+        flex: 0 0 auto;
+        width: 50%;
     }
     
     .stat-value {
@@ -1250,6 +1278,40 @@ h1, h2, h3, h4, h5, h6 {
     
     .stat-card {
         padding: 12px 4px;
+        height: auto;
+        min-height: 100px;
+        aspect-ratio: 1;
+    }
+    
+    /* Mobile toggle switch improvements */
+    .form-check.form-switch {
+        margin: 0;
+        padding-left: 2.5rem;
+        display: flex;
+        align-items: center;
+    }
+    
+    .form-check-input {
+        margin-right: 8px;
+        margin-left: -2.5rem;
+        width: 2.25rem !important;
+    }
+    
+    .form-check-label {
+        font-size: 0.85rem;
+        margin-bottom: 0;
+    }
+    
+    /* Team stats card header styling */
+    .card-header span {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: var(--fc-text-primary);
+    }
+    
+    /* Fixed header layout for mobile */
+    .card-header .d-flex.flex-column {
+        gap: 8px;
     }
 }
 
@@ -1415,6 +1477,121 @@ h1, h2, h3, h4, h5, h6 {
     font-size: 1.2rem;
     line-height: 1;
     text-align: center;
+}
+
+.form-check.form-switch {
+    position: relative;
+    min-height: 24px;
+    padding-left: 2.5rem;
+}
+
+.form-check-input {
+    margin-top: 0.15rem;
+    margin-left: -2.5rem;
+    background-color: #fff;
+    border-color: rgba(0, 0, 0, 0.25);
+    height: 1.25rem;
+    width: 2.25rem !important;
+    cursor: pointer;
+}
+
+@media (max-width: 767px) {
+    .row-cols-2 > .col {
+        flex: 0 0 auto;
+        width: 50%;
+    }
+    
+    .stat-value {
+        font-size: 1.3rem;
+    }
+    
+    .stat-label {
+        font-size: 0.75rem;
+    }
+    
+    .card-body {
+        padding: 16px 12px;
+    }
+    
+    .stat-card {
+        padding: 12px 4px;
+        height: auto;
+        min-height: 100px;
+        aspect-ratio: 1;
+    }
+    
+    /* Mobile toggle switch improvements */
+    .form-check.form-switch {
+        margin: 0;
+        padding-left: 2.5rem;
+        display: flex;
+        align-items: center;
+    }
+    
+    .form-check-input {
+        margin-right: 8px;
+        margin-left: -2.5rem;
+        width: 2.25rem !important;
+    }
+    
+    .form-check-label {
+        font-size: 0.85rem;
+        margin-bottom: 0;
+    }
+    
+    /* Team stats card header styling */
+    .card-header span {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: var(--fc-text-primary);
+    }
+    
+    /* Fixed header layout for mobile */
+    .card-header .d-flex.flex-column {
+        gap: 8px;
+    }
+}
+
+/* Team Stats specific styles */
+.stat-card {
+    height: 0;
+    padding-bottom: 100%; /* Creates a square aspect ratio */
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-card-content {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+}
+
+/* Switch toggle improvements */
+.form-switch .form-check-input {
+    width: 2.5em !important;
+    margin-left: -2.5em;
+}
+
+/* Fix for same-sized boxes */
+.row-cols-2.row-cols-md-5 > .col {
+    margin-bottom: 16px;
+}
+
+@media (max-width: 767px) {
+    .card-header .form-check.form-switch {
+        align-self: flex-start;
+    }
+    
+    .form-check-label {
+        padding-top: 2px;
+    }
 }
 </style>
 
@@ -1726,52 +1903,120 @@ h1, h2, h3, h4, h5, h6 {
             {% if current_season %}
             <div class="card mb-4">
                 <div class="card-header">
-                    <h5 class="card-title mb-0 d-flex align-items-center">
-                        Team Stats
-                    </h5>
+                    <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between w-100 gap-2">
+                        <h5 class="card-title mb-0">Team Stats</h5>
+                        <div class="form-check form-switch ms-0">
+                            <input class="form-check-input" type="checkbox" id="officialMatchesToggle" checked>
+                            <label class="form-check-label small" for="officialMatchesToggle">Only officials</label>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body">
-                    {% if team_stats %}
-                    <div class="row row-cols-2 row-cols-md-5 g-3">
+                    {% if team_stats or all_matches_stats %}
+                    <div class="row row-cols-2 row-cols-md-5 g-3" id="officialStatsContainer" style="display: {% if team_stats %}flex{% else %}none{% endif %};">
                         <!-- Matches Played -->
                         <div class="col">
                             <div class="stat-card">
-                                <div class="stat-value">{{ team_stats.matches_played }}</div>
-                                <div class="stat-label">Matches</div>
+                                <div class="stat-card-content">
+                                    <div class="stat-value">{{ team_stats.matches_played }}</div>
+                                    <div class="stat-label">Matches</div>
+                                </div>
                             </div>
                         </div>
                         
                         <!-- Win/Draw/Loss -->
                         <div class="col">
                             <div class="stat-card">
-                                <div class="stat-value">{{ team_stats.wins }}-{{ team_stats.draws }}-{{ team_stats.losses }}</div>
-                                <div class="stat-label">W-D-L</div>
+                                <div class="stat-card-content">
+                                    <div class="stat-value">{{ team_stats.wins }}-{{ team_stats.draws }}-{{ team_stats.losses }}</div>
+                                    <div class="stat-label">W-D-L</div>
+                                </div>
                             </div>
                         </div>
                         
                         <!-- Goals -->
                         <div class="col">
                             <div class="stat-card">
-                                <div class="stat-value">{{ team_stats.goals_scored }}-{{ team_stats.goals_conceded }}</div>
-                                <div class="stat-label">Goals For-Against</div>
+                                <div class="stat-card-content">
+                                    <div class="stat-value">{{ team_stats.goals_scored }}-{{ team_stats.goals_conceded }}</div>
+                                    <div class="stat-label">Goals For-Against</div>
+                                </div>
                             </div>
                         </div>
                         
                         <!-- Goal Difference -->
                         <div class="col">
                             <div class="stat-card">
-                                <div class="stat-value {% if team_stats.goal_difference > 0 %}text-success{% elif team_stats.goal_difference < 0 %}text-danger{% endif %}">
-                                    {% if team_stats.goal_difference > 0 %}+{% endif %}{{ team_stats.goal_difference }}
+                                <div class="stat-card-content">
+                                    <div class="stat-value {% if team_stats.goal_difference > 0 %}text-success{% elif team_stats.goal_difference < 0 %}text-danger{% endif %}">
+                                        {% if team_stats.goal_difference > 0 %}+{% endif %}{{ team_stats.goal_difference }}
+                                    </div>
+                                    <div class="stat-label">Goal Diff</div>
                                 </div>
-                                <div class="stat-label">Goal Diff</div>
                             </div>
                         </div>
                         
                         <!-- Win Percentage -->
                         <div class="col">
                             <div class="stat-card">
-                                <div class="stat-value">{{ team_stats.winning_percentage|floatformat:0 }}%</div>
-                                <div class="stat-label">Win Rate</div>
+                                <div class="stat-card-content">
+                                    <div class="stat-value">{{ team_stats.winning_percentage|floatformat:0 }}%</div>
+                                    <div class="stat-label">Win Rate</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row row-cols-2 row-cols-md-5 g-3" id="allStatsContainer" style="display: {% if all_matches_stats and not team_stats %}flex{% else %}none{% endif %};">
+                        <!-- Matches Played -->
+                        <div class="col">
+                            <div class="stat-card">
+                                <div class="stat-card-content">
+                                    <div class="stat-value">{{ all_matches_stats.matches_played }}</div>
+                                    <div class="stat-label">Matches</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Win/Draw/Loss -->
+                        <div class="col">
+                            <div class="stat-card">
+                                <div class="stat-card-content">
+                                    <div class="stat-value">{{ all_matches_stats.wins }}-{{ all_matches_stats.draws }}-{{ all_matches_stats.losses }}</div>
+                                    <div class="stat-label">W-D-L</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Goals -->
+                        <div class="col">
+                            <div class="stat-card">
+                                <div class="stat-card-content">
+                                    <div class="stat-value">{{ all_matches_stats.goals_scored }}-{{ all_matches_stats.goals_conceded }}</div>
+                                    <div class="stat-label">Goals For-Against</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Goal Difference -->
+                        <div class="col">
+                            <div class="stat-card">
+                                <div class="stat-card-content">
+                                    <div class="stat-value {% if all_matches_stats.goal_difference > 0 %}text-success{% elif all_matches_stats.goal_difference < 0 %}text-danger{% endif %}">
+                                        {% if all_matches_stats.goal_difference > 0 %}+{% endif %}{{ all_matches_stats.goal_difference }}
+                                    </div>
+                                    <div class="stat-label">Goal Diff</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Win Percentage -->
+                        <div class="col">
+                            <div class="stat-card">
+                                <div class="stat-card-content">
+                                    <div class="stat-value">{{ all_matches_stats.winning_percentage|floatformat:0 }}%</div>
+                                    <div class="stat-label">Win Rate</div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2136,6 +2381,25 @@ h1, h2, h3, h4, h5, h6 {
             }
         });
     });
+
+    // Toggle between official and all matches stats
+    const officialMatchesToggle = document.getElementById('officialMatchesToggle');
+    const officialStatsContainer = document.getElementById('officialStatsContainer');
+    const allStatsContainer = document.getElementById('allStatsContainer');
+
+    if (officialMatchesToggle && officialStatsContainer && allStatsContainer) {
+        officialMatchesToggle.addEventListener('change', function() {
+            if (this.checked) {
+                // Show official matches stats
+                officialStatsContainer.style.display = 'flex';
+                allStatsContainer.style.display = 'none';
+            } else {
+                // Show all matches stats
+                officialStatsContainer.style.display = 'none';
+                allStatsContainer.style.display = 'flex';
+            }
+        });
+    }
 
     // Initialize progress bars
     document.querySelectorAll('.progress-bar').forEach(bar => {
