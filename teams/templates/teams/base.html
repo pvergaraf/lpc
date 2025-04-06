@@ -180,6 +180,7 @@
         min-width: 180px;
     }
 
+    /* Remove global show styles */
     .dropdown-item {
         border-radius: 6px;
         padding: 8px 12px;
@@ -249,12 +250,18 @@
 
         .nav-item {
             height: auto;
+            position: relative;
+            display: block;
+            width: 100%;
         }
 
         .nav-link {
             padding: 12px 16px !important;
             border-radius: 6px;
             height: auto;
+            width: 100%;
+            display: flex;
+            justify-content: flex-start;
         }
 
         .nav-link:hover {
@@ -268,14 +275,42 @@
             border: none;
             padding: 0;
             background: transparent;
+            position: static !important;
+            width: 100%;
+            float: none;
+            display: none;
+        }
+
+        .dropdown-menu.show {
+            display: block !important;
+            position: static !important;
+            margin-left: 16px;
+            width: calc(100% - 16px);
+            inset: auto !important;
+            transform: none !important;
+        }
+
+        .dropdown-menu-end {
+            right: auto !important;
+            left: auto !important;
+            float: none !important;
+            position: static !important;
         }
 
         .dropdown-item {
             padding: 12px 16px;
+            width: 100%;
         }
 
         .nav-item.ms-4 {
             margin-left: 0 !important;
+        }
+
+        .dropdown-toggle::after {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
         }
     }
 
@@ -393,71 +428,48 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-    // Debug script to analyze navbar styles
+    // Mobile dropdown enhancement
     document.addEventListener('DOMContentLoaded', function() {
-        // Add debug class to navbar
-        const navbar = document.querySelector('.navbar');
-        navbar.classList.add('debug-styles');
-
-        // Log computed styles for key elements
-        const elements = {
-            navbar: '.navbar',
-            container: '.navbar > .container',
-            brand: '.navbar-brand',
-            navItems: '.nav-item',
-            navLinks: '.nav-link'
-        };
-
-        console.group('Navbar Style Analysis');
-        
-        Object.entries(elements).forEach(([name, selector]) => {
-            const el = document.querySelector(selector);
-            if (!el) return;
+        // Only apply mobile fixes when screen width is below 992px
+        const handleResize = function() {
+            const isMobile = window.innerWidth < 992;
             
-            const styles = window.getComputedStyle(el);
-            console.group(`${name} Computed Styles`);
-            console.log('Display:', styles.display);
-            console.log('Position:', styles.position);
-            console.log('Height:', styles.height);
-            console.log('Padding:', styles.padding);
-            console.log('Margin:', styles.margin);
-            console.log('Gap:', styles.gap);
-            console.log('Max Width:', styles.maxWidth);
-            console.log('Flex Properties:', {
-                display: styles.display,
-                flexDirection: styles.flexDirection,
-                alignItems: styles.alignItems,
-                justifyContent: styles.justifyContent
-            });
-            console.groupEnd();
-        });
-
-        // Check specificity conflicts
-        const styleSheets = document.styleSheets;
-        console.group('Style Rules Affecting Navbar');
-        Array.from(styleSheets).forEach(sheet => {
-            try {
-                Array.from(sheet.cssRules).forEach(rule => {
-                    if (rule.selectorText && rule.selectorText.includes('navbar')) {
-                        console.log('Rule:', rule.selectorText);
-                        console.log('Specificity:', calculateSpecificity(rule.selectorText));
+            // Apply different behaviors based on screen size
+            if (isMobile) {
+                // Make sure all dropdowns are initially hidden on mobile
+                document.querySelectorAll('.dropdown-menu').forEach(menu => {
+                    if (!menu.classList.contains('show')) {
+                        menu.style.display = 'none';
                     }
                 });
-            } catch (e) {
-                console.log('Could not read stylesheet (likely external)');
+            } else {
+                // Reset any mobile-specific styles on desktop
+                document.querySelectorAll('.dropdown-menu').forEach(menu => {
+                    menu.style.display = '';
+                });
+            }
+        };
+        
+        // Run initially
+        handleResize();
+        
+        // Update on window resize
+        window.addEventListener('resize', handleResize);
+        
+        // Handle dropdown events
+        document.addEventListener('shown.bs.dropdown', function(e) {
+            if (window.innerWidth < 992) {
+                const dropdown = e.target.querySelector('.dropdown-menu');
+                if (dropdown) dropdown.style.display = 'block';
             }
         });
-        console.groupEnd();
-
-        // Helper to calculate selector specificity
-        function calculateSpecificity(selector) {
-            const idCount = (selector.match(/#/g) || []).length;
-            const classCount = (selector.match(/\./g) || []).length;
-            const elementCount = (selector.match(/[a-z]/g) || []).length;
-            return [idCount, classCount, elementCount];
-        }
-
-        console.groupEnd();
+        
+        document.addEventListener('hidden.bs.dropdown', function(e) {
+            if (window.innerWidth < 992) {
+                const dropdown = e.target.querySelector('.dropdown-menu');
+                if (dropdown) dropdown.style.display = 'none';
+            }
+        });
     });
     </script>
     {% block extra_js %}{% endblock %}
