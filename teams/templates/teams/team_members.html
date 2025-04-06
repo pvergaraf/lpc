@@ -378,9 +378,9 @@
                         <tr>
                             <td>{{ invitation.email }}</td>
                             <td>{{ invitation.get_role_display }}</td>
-                            <td>{{ invitation.is_admin|yesno:"Yes,No" }}</td>
+                            <td>{{ invitation.is_team_admin|yesno:"Yes,No" }}</td>
                             <td>
-                                <form method="post" action="{% url 'teams:cancel_invitation' team.id invitation.id %}" class="d-inline">
+                                <form method="post" action="{% url 'teams:remove_pending_invitation' team.id invitation.id %}" class="d-inline">
                                     {% csrf_token %}
                                     <button type="submit" class="btn btn-sm btn-danger">Cancel</button>
                                 </form>
@@ -417,7 +417,7 @@
                         <tr>
                             <th style="width: 40px">#</th>
                             <th>Player</th>
-                            {% if user_is_admin %}
+                            {% if is_team_admin %}
                             <th style="width: 80px">Actions</th>
                             {% endif %}
                         </tr>
@@ -470,7 +470,7 @@
                                         {% endif %}
                                     </div>
                                 </td>
-                                {% if user_is_admin %}
+                                {% if is_team_admin %}
                                 <td>
                                     <a href="{% url 'teams:edit_member' team_id=team.id user_id=member.user.id %}" 
                                        class="btn btn-sm btn-outline-primary">

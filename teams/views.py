@@ -293,29 +293,42 @@ class CustomLogoutView(LogoutView):
 
 @login_required
 def team_members(request, team_id):
+    # Initial request logging with session data
     log_error(
         request=request,
-        error_message="Team members page access",
+        error_message="Team members page access - DETAILED",
         error_type="UserActivity",
         extra_context={
             "user_email": request.user.email,
             "user_id": request.user.id,
             "team_id": team_id,
-            "path": request.path,
-            "method": request.method
+            "session_data": {
+                "current_team": request.session.get('current_team'),
+                "session_id": request.session.session_key
+            }
         }
     )
     
     try:
         team = get_object_or_404(Team, id=team_id)
         
-        # Check if user is a member of the team
+        # Log team membership check
         team_member = get_object_or_404(TeamMember, team=team, user=request.user, is_active=True)
+        log_error(
+            request=request,
+            error_message="Team membership verification",
+            error_type="ViewDebug",
+            extra_context={
+                "team_member_id": team_member.id,
+                "team_id": team.id,
+                "is_active": team_member.is_active,
+                "role": team_member.role,
+                "is_team_admin": team_member.is_team_admin
+            }
+        )
         
-        # Get show_active_only parameter
         show_active_only = request.GET.get('show_active_only', 'false').lower() == 'true'
         
-        # Base query for active members
         active_members_query = TeamMember.objects.filter(
             team=team,
             is_active=True
@@ -325,27 +338,30 @@ def team_members(request, team_id):
             'teammemberprofile__position'
         )
         
-        # Get all team memberships for the user
+        # Get and log all team memberships
         team_memberships = TeamMember.objects.filter(
             user=request.user,
             is_active=True
         ).select_related('team').order_by('team__name')
         
-        # Force a fresh query by adding a timestamp
-        active_members = active_members_query.extra(
-            select={'_timestamp': "'%s'" % timezone.now().isoformat()}
-        ).annotate(
-            position_order=Case(
-                When(teammemberprofile__position__type='GK', then=Value(1)),
-                When(teammemberprofile__position__type='DEF', then=Value(2)),
-                When(teammemberprofile__position__type='MID', then=Value(3)),
-                When(teammemberprofile__position__type='ATT', then=Value(4)),
-                default=Value(5),
-                output_field=IntegerField(),
-            )
-        ).order_by('position_order', 'teammemberprofile__player_number')
+        log_error(
+            request=request,
+            error_message="User team memberships",
+            error_type="ViewDebug",
+            extra_context={
+                "total_memberships": team_memberships.count(),
+                "memberships": [
+                    {
+                        "team_id": tm.team.id,
+                        "team_name": tm.team.name,
+                        "is_active": tm.is_active
+                    }
+                    for tm in team_memberships
+                ]
+            }
+        )
         
-        # Get pending invitations
+        # Get pending invitations and current season
         pending_invitations = TeamMember.objects.filter(
             team=team,
             is_active=False,
@@ -353,56 +369,76 @@ def team_members(request, team_id):
             invitation_accepted=False
         )
         
-        log_error(
-            request=request,
-            error_message="Team members loaded successfully",
-            error_type="ViewDebug",
-            extra_context={
-                "active_members_count": active_members.count(),
-                "pending_invitations_count": pending_invitations.count(),
-                "show_active_only": show_active_only
-            }
-        )
-        
-        # Get current season for the team
         current_season = Season.objects.filter(team=team, is_active=True).first()
+        
+        # Prepare context with consistent naming
+        is_team_admin = team_member.is_team_admin or team_member.role == TeamMember.Role.MANAGER
         
         context = {
             'team': team,
-            'active_members': active_members,
+            'active_members': active_members_query,
             'pending_invitations': pending_invitations,
             'user': request.user,
-            'user_is_admin': team_member.is_team_admin or team_member.role == TeamMember.Role.MANAGER,
+            'is_team_admin': is_team_admin,  # Use consistent naming
             'show_active_only': show_active_only,
             'current_team': team,
             'current_season': current_season,
-            'is_team_admin': team_member.is_team_admin or team_member.role == TeamMember.Role.MANAGER,
-            'team_memberships': team_memberships  # Add team memberships to context
+            'team_memberships': team_memberships
         }
         
         log_error(
             request=request,
-            error_message="About to render template",
+            error_message="Context prepared for template",
             error_type="ViewDebug",
             extra_context={
-                "template": "teams/team_members.html",
                 "context_keys": list(context.keys()),
-                "is_team_admin": context['is_team_admin'],
-                "current_team_id": team.id,
-                "has_current_season": bool(current_season)
+                "team_id": team.id,
+                "has_current_season": bool(current_season),
+                "user_teams_count": team_memberships.count(),
+                "active_members_count": active_members_query.count(),
+                "is_team_admin": is_team_admin
             }
         )
         
         return render(request, 'teams/team_members.html', context)
         
+    except TeamMember.DoesNotExist as e:
+        log_error(
+            request=request,
+            error_message="Team membership not found",
+            error_type="NotFoundError",
+            extra_context={
+                "team_id": team_id,
+                "user_id": request.user.id,
+                "user_email": request.user.email,
+                "user_teams": [
+                    {
+                        "team_id": tm.team.id,
+                        "team_name": tm.team.name
+                    }
+                    for tm in TeamMember.objects.filter(user=request.user, is_active=True)
+                ]
+            }
+        )
+        messages.error(request, "You are not a member of this team.")
+        return redirect('teams:team_list')
+        
     except Exception as e:
         log_error(
             request=request,
-            error_message=str(e),
-            error_type="ViewError",
+            error_message="Unexpected error in team members view",
+            error_type="SystemError",
             extra_context={
                 "team_id": team_id,
-                "error": str(e)
+                "user_id": request.user.id,
+                "user_email": request.user.email,
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "traceback": traceback.format_exc(),
+                "session_data": {
+                    "current_team": request.session.get('current_team'),
+                    "session_id": request.session.session_key
+                }
             }
         )
         messages.error(request, "An error occurred while loading team members.")
