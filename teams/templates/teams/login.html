@@ -197,8 +197,8 @@
             
             <div class="form-row">
                 <div class="form-check">
-                    <input type="checkbox" name="remember_me" class="form-check-input" id="remember-me">
-                    <label class="form-check-label" for="remember-me">Remember me</label>
+                    {{ form.remember_me }}
+                    <label class="form-check-label" for="{{ form.remember_me.id_for_label }}">Remember me</label>
                 </div>
                 <a href="{% url 'teams:password_reset' %}" class="forgot-password">Forgot password</a>
             </div>
