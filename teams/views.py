@@ -200,7 +200,9 @@ def dashboard(request):
                 
                 # Calculate derived stats
                 official_goal_difference = official_goals_scored - official_goals_conceded
-                official_winning_percentage = (official_wins / official_matches_count) * 100 if official_matches_count > 0 else 0
+                official_points = (official_wins * 3) + official_draws
+                official_max_points = official_matches_count * 3
+                official_points_percentage = (official_points / official_max_points) * 100 if official_matches_count > 0 else 0
                 
                 # Store in dictionary
                 team_stats = {
@@ -211,7 +213,7 @@ def dashboard(request):
                     'goals_scored': official_goals_scored,
                     'goals_conceded': official_goals_conceded,
                     'goal_difference': official_goal_difference,
-                    'winning_percentage': official_winning_percentage
+                    'points_percentage': official_points_percentage
                 }
             
             # Calculate stats for all matches (including friendlies)
@@ -244,7 +246,9 @@ def dashboard(request):
                 
                 # Calculate derived stats
                 all_goal_difference = all_goals_scored - all_goals_conceded
-                all_winning_percentage = (all_wins / all_matches_count) * 100 if all_matches_count > 0 else 0
+                all_points = (all_wins * 3) + all_draws
+                all_max_points = all_matches_count * 3
+                all_points_percentage = (all_points / all_max_points) * 100 if all_matches_count > 0 else 0
                 
                 # Store in dictionary
                 all_matches_stats = {
@@ -255,7 +259,7 @@ def dashboard(request):
                     'goals_scored': all_goals_scored,
                     'goals_conceded': all_goals_conceded,
                     'goal_difference': all_goal_difference,
-                    'winning_percentage': all_winning_percentage
+                    'points_percentage': all_points_percentage
                 }
         
         # Get upcoming birthdays
