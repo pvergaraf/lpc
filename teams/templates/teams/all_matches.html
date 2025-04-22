@@ -1,0 +1,386 @@
+{% extends 'teams/base.html' %}
+{% load static %}
+{% load teams_tags %}
+
+{% block title %}{{ team.name }} - All Matches{% endblock %}
+
+{% block content %}
+<style>
+.badge {
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 10px;
+    line-height: 1.21em;
+    padding: 4px 8px;
+    border-radius: 12px;
+}
+
+.badge-primary {
+    background-color: #343A40;
+    color: #FFFFFF;
+}
+
+.badge-secondary {
+    background-color: #ADB5BD;
+    color: #343A40;
+}
+
+.match-type-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 12px;
+    background-color: #F8F9FA;
+    border: 1px solid #E9ECEF;
+    color: #475467;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border-radius: 6px;
+    margin: 0;
+    height: 24px;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.card {
+    border: 1px solid #E9ECEF;
+    border-radius: 12px;
+    box-shadow: 0px 1px 3px rgba(16, 24, 40, 0.1), 0px 1px 2px rgba(16, 24, 40, 0.06);
+}
+
+.card-header {
+    background: none;
+    border-bottom: 1px solid #E9ECEF;
+    padding: 24px;
+}
+
+.card-body {
+    padding: 16px;
+}
+
+.card-title {
+    color: var(--fc-text-primary);
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.match-score {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--fc-text-primary);
+}
+
+.team-logo-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background-color: var(--fc-text-primary);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 1rem;
+    line-height: 1;
+    text-align: center;
+}
+
+.match-admin-btn {
+    display: inline-block;
+    background-color: #343A40;
+    color: #FFFFFF;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: 6px;
+    text-decoration: none;
+    margin: 0 4px;
+}
+
+.match-admin-btn:hover {
+    background-color: #212529;
+    color: #FFFFFF;
+    text-decoration: none;
+}
+
+.page-title {
+    font-size: 2rem;
+    font-weight: 500;
+    color: var(--fc-text-primary);
+    margin: 0;
+    line-height: 1.2;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.title-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 0;
+    margin-bottom: 32px;
+    text-align: center;
+}
+
+.match-card {
+    border: 1px solid #E9ECEF;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    box-shadow: 0px 1px 3px rgba(16, 24, 40, 0.1), 0px 1px 2px rgba(16, 24, 40, 0.06);
+    background-color: #fff;
+    overflow: hidden;
+}
+
+.match-card-header {
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #E9ECEF;
+    background-color: #F8F9FA;
+}
+
+.match-date {
+    font-weight: 500;
+    color: #475467;
+    font-size: 0.875rem;
+}
+
+.match-card-body {
+    padding: 16px;
+}
+
+.match-teams-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.team-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 40%;
+}
+
+.team-name-text {
+    font-weight: 500;
+    color: var(--fc-text-primary);
+    font-size: 0.875rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.match-score-display {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--fc-text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.match-card-footer {
+    padding: 12px 16px;
+    border-top: 1px solid #E9ECEF;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+    .container {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+    
+    .title-container {
+        padding: 24px 0;
+        margin-bottom: 16px;
+    }
+    
+    .page-title {
+        font-size: 1.5rem;
+    }
+    
+    .card-header {
+        padding: 16px;
+    }
+    
+    .d-md-none {
+        display: block !important;
+    }
+    
+    .d-none-md {
+        display: none !important;
+    }
+    
+    .match-card-body {
+        padding: 12px;
+    }
+    
+    .team-name-text {
+        font-size: 0.8rem;
+        max-width: 90px;
+    }
+    
+    .match-score-display {
+        font-size: 1.1rem;
+    }
+    
+    .team-logo-circle {
+        width: 28px;
+        height: 28px;
+        font-size: 0.9rem;
+    }
+}
+</style>
+
+<div class="title-container">
+    <div class="text-center mb-2">📓</div>
+    <h1 class="page-title">
+        {{ team.name }} - All Matches
+    </h1>
+</div>
+
+<div class="container">
+    <!-- Traditional table for larger screens -->
+    <div class="card d-none d-md-block">
+        <div class="card-header">
+            <h5 class="card-title">All Matches</h5>
+            <small class="text-muted">{{ matches|length }} matches played</small>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Match</th>
+                            <th>Score</th>
+                            <th>Type</th>
+                            {% if is_team_admin %}
+                            <th style="width: 120px">Actions</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for match in matches %}
+                        <tr>
+                            <td>{{ match.match_date|date:"M d, Y" }}</td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    {% if team.team_photo %}
+                                        <img src="{{ team.team_photo.url }}" 
+                                             alt="{{ team.name }}" 
+                                             class="rounded-circle"
+                                             style="width: 32px; height: 32px; object-fit: cover;">
+                                    {% else %}
+                                        <div class="team-logo-circle">
+                                            {{ team.name|slice:":1" }}
+                                        </div>
+                                    {% endif %}
+                                    <span>{{ team.name }}</span>
+                                    <span class="mx-2">vs</span>
+                                    <div class="team-logo-circle">
+                                        {{ match.opponent|slice:":1" }}
+                                    </div>
+                                    <span>{{ match.opponent }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="match-score">
+                                    {% if match.team_score is not None and match.opponent_score is not None %}
+                                        {{ match.team_score }} - {{ match.opponent_score }}
+                                    {% endif %}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="match-type-badge">
+                                    {% if match.is_official %}Official Match{% else %}Friendly Match{% endif %}
+                                </span>
+                            </td>
+                            {% if is_team_admin %}
+                            <td>
+                                <a href="{% url 'teams:match_detail' team.id match.id %}" 
+                                   class="match-admin-btn">
+                                    Detail
+                                </a>
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile-optimized card layout -->
+    <div class="d-md-none">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0">All Matches</h5>
+            <small class="text-muted">{{ matches|length }} matches played</small>
+        </div>
+        
+        {% for match in matches %}
+        <div class="match-card">
+            <div class="match-card-header">
+                <span class="match-date">{{ match.match_date|date:"M d, Y" }}</span>
+                <span class="match-type-badge">
+                    {% if match.is_official %}Official{% else %}Friendly{% endif %}
+                </span>
+            </div>
+            <div class="match-card-body">
+                <div class="match-teams-container">
+                    <div class="team-info">
+                        {% if team.team_photo %}
+                            <img src="{{ team.team_photo.url }}" 
+                                 alt="{{ team.name }}" 
+                                 class="rounded-circle"
+                                 style="width: 28px; height: 28px; object-fit: cover;">
+                        {% else %}
+                            <div class="team-logo-circle">
+                                {{ team.name|slice:":1" }}
+                            </div>
+                        {% endif %}
+                        <span class="team-name-text">{{ team.name }}</span>
+                    </div>
+                    
+                    <div class="match-score-display">
+                        {% if match.team_score is not None and match.opponent_score is not None %}
+                            <span>{{ match.team_score }}</span>
+                            <span>-</span>
+                            <span>{{ match.opponent_score }}</span>
+                        {% else %}
+                            <span>vs</span>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="team-info">
+                        <div class="team-logo-circle">
+                            {{ match.opponent|slice:":1" }}
+                        </div>
+                        <span class="team-name-text">{{ match.opponent }}</span>
+                    </div>
+                </div>
+            </div>
+            
+            {% if is_team_admin %}
+            <div class="match-card-footer">
+                <span></span> <!-- Empty span for flex spacing -->
+                <a href="{% url 'teams:match_detail' team.id match.id %}" 
+                   class="match-admin-btn">
+                    View Details
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %} 

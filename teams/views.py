@@ -318,13 +318,16 @@ def dashboard(request):
                 )
             ).order_by('payment__due_date')
         
+        # Check if user is admin
+        is_admin_user = is_admin(request.user)
+        
         context = {
             'team': team,
             'membership': membership,
             'profile': profile,
             'current_team': team,
             'current_season': current_season,
-            'is_team_admin': membership.is_team_admin or membership.role == TeamMember.Role.MANAGER,
+            'is_team_admin': is_user_team_admin(request.user, team),
             'upcoming_birthdays': upcoming_birthdays if upcoming_birthdays else None,
             'team_members': team_members,
             'current_team_member': membership,
@@ -336,6 +339,7 @@ def dashboard(request):
             'active_only': request.GET.get('active_only', 'false').lower() == 'true',  # Add active_only parameter
             'team_stats': team_stats,  # Add team stats to context
             'all_matches_stats': all_matches_stats,  # Add all matches stats to context
+            'admin_urls': {'is_admin': is_admin_user},  # For the base template
         }
         
         # Debug logging
@@ -3003,4 +3007,92 @@ def match_delete(request, team_id, season_id, match_id):
     
     # If not POST, redirect to match edit page
     return redirect('teams:match_edit', team_id=team.id, season_id=season.id, match_id=match.id)
+
+@login_required
+def all_matches(request, team_id):
+    team = get_object_or_404(Team, id=team_id)
+    current_season = Season.objects.filter(team=team, is_active=True).first()
+    
+    # Get all matches for the team through season
+    matches = Match.objects.filter(season__team=team).order_by('-match_date', '-match_time')
+    
+    context = {
+        'team': team,
+        'current_season': current_season,
+        'matches': matches,
+        'is_team_admin': is_user_team_admin(request.user, team),
+    }
+    
+    return render(request, 'teams/all_matches.html', context)
+
+@login_required
+def match_detail(request, team_id, match_id):
+    team = get_object_or_404(Team, id=team_id)
+    match = get_object_or_404(
+        Match.objects.select_related('season')
+                    .prefetch_related(
+                        'player_stats',
+                        'player_stats__player',
+                        'player_stats__player__user',
+                        'player_stats__player__user__profile',
+                        'player_stats__player__teammemberprofile',
+                        'player_stats__player__teammemberprofile__position'
+                    ),
+        id=match_id,
+        season__team=team
+    )
+    
+    # Get all active players
+    players = TeamMember.objects.filter(
+        team=team,
+        is_active=True,
+        teammemberprofile__active_player=True,
+        role=TeamMember.Role.PLAYER
+    ).select_related(
+        'user', 
+        'teammemberprofile', 
+        'teammemberprofile__position'
+    ).order_by(
+        'teammemberprofile__position__type',
+        'teammemberprofile__player_number'
+    )
+    
+    # Get or create stats for all players and store in a list
+    player_stats = []
+    for player in players:
+        stat, created = PlayerMatchStats.objects.get_or_create(
+            match=match,
+            player=player,
+            defaults={'played': False}
+        )
+        player_stats.append(stat)
+    
+    # Get the MVP (player of the match) from player stats
+    player_of_match = match.player_stats.filter(is_mvp=True).first()
+    
+    # Get team memberships for the navigation
+    team_memberships = TeamMember.objects.filter(
+        user=request.user,
+        is_active=True
+    ).select_related('team').prefetch_related('team__seasons')
+    
+    # Get current season
+    current_season = get_current_season(team)
+    
+    # Check if user is admin
+    is_admin_user = is_admin(request.user)
+    
+    context = {
+        'team': team,
+        'match': match,
+        'player_stats': player_stats,  # Pass the ordered list of player stats
+        'player_of_match': player_of_match,
+        'is_team_admin': is_user_team_admin(request.user, team),
+        'current_team': team,  # For the base template
+        'team_memberships': team_memberships,  # For the base template
+        'current_season': current_season,  # For the base template
+        'admin_urls': {'is_admin': is_admin_user},  # For the base template
+    }
+    
+    return render(request, 'teams/match_detail.html', context)
 

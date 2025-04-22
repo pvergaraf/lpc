@@ -93,6 +93,8 @@ urlpatterns = [
     path('profile/<int:user_id>/', views.view_profile, name='view_profile'),
     # Put the team_list URL pattern last
     path('teams/', views.team_list, name='team_list'),
+    path('<int:team_id>/matches/', views.all_matches, name='all_matches'),
+    path('<int:team_id>/matches/<int:match_id>/', views.match_detail, name='match_detail'),
 ]
 
 # Log URL patterns after they're defined

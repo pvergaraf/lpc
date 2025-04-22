@@ -1,0 +1,406 @@
+{% extends 'teams/base.html' %}
+{% load static %}
+{% load teams_tags %}
+
+{% block title %}{{ team.name }} - Match Details{% endblock %}
+
+{% block extra_css %}
+<style>
+.match-card {
+    border: 1px solid #E9ECEF;
+    border-radius: 12px;
+    box-shadow: 0px 1px 3px rgba(16, 24, 40, 0.1), 0px 1px 2px rgba(16, 24, 40, 0.06);
+    background: white;
+    width: 100%;
+    margin: 0 auto 2rem;
+}
+
+.match-card .card-header {
+    background: none;
+    border-bottom: 1px solid #E9ECEF;
+    padding: 1rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.match-card .card-body {
+    padding: 1.5rem;
+    text-align: center;
+}
+
+.match-type {
+    display: inline-block;
+    padding: 4px 12px;
+    background-color: #F8F9FA;
+    border: 1px solid #E9ECEF;
+    color: #475467;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border-radius: 6px;
+    margin-bottom: 1.5rem;
+}
+
+.match-teams {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.team-logo {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background-color: var(--fc-text-primary);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+}
+
+.team-name {
+    font-weight: 500;
+    color: var(--fc-text-primary);
+    margin: 0;
+    font-size: 0.875rem;
+    max-width: 100px;
+    text-align: center;
+}
+
+.match-score {
+    font-size: 2rem;
+    font-weight: 600;
+    color: var(--fc-text-primary);
+    margin: 0;
+    min-width: 100px;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.match-score-separator {
+    color: #475467;
+    font-weight: 400;
+}
+
+.match-date {
+    color: #475467;
+    font-size: 0.875rem;
+    margin-top: 1.5rem;
+}
+
+.player-stats {
+    margin-top: 2rem;
+}
+
+.player-stats .card {
+    border: 1px solid #E9ECEF;
+    border-radius: 12px;
+    box-shadow: 0px 1px 3px rgba(16, 24, 40, 0.1), 0px 1px 2px rgba(16, 24, 40, 0.06);
+}
+
+.player-stats .card-header {
+    background: none;
+    border-bottom: 1px solid #E9ECEF;
+    padding: 1rem 1.5rem;
+}
+
+.player-stats .card-title {
+    color: var(--fc-text-primary);
+    font-weight: 600;
+    margin: 0;
+}
+
+.player-stats .table {
+    margin: 0;
+}
+
+.player-stats .table th {
+    font-weight: 500;
+    color: #475467;
+}
+
+.player-of-match {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1.5rem;
+    gap: 0.5rem;
+}
+
+.player-of-match img {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.player-of-match .player-name {
+    font-weight: 500;
+    color: var(--fc-text-primary);
+    font-size: 0.875rem;
+    max-width: none;
+}
+
+.player-of-match .player-label {
+    color: #475467;
+    font-size: 0.75rem;
+}
+
+.vs {
+    color: #475467;
+    font-size: 1rem;
+    font-weight: 500;
+    margin: 0 0.5rem;
+}
+
+.team-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 100px;
+}
+
+.position-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: baseline;
+    border-radius: 0.25rem;
+    background-color: #344054;
+    color: white;
+}
+
+.position-badge.gk {
+    border-bottom: 2px solid #dc3545;
+}
+
+.position-badge.rb, .position-badge.lb, .position-badge.cb {
+    border-bottom: 2px solid #0d6efd;
+}
+
+.position-badge.cm, .position-badge.cdm, .position-badge.cam, .position-badge.lm, .position-badge.rm, .position-badge.wm {
+    border-bottom: 2px solid #198754;
+}
+
+.position-badge.st, .position-badge.cf, .position-badge.lw, .position-badge.rw {
+    border-bottom: 2px solid #fd7e14;
+}
+
+/* Mobile optimizations */
+@media (max-width: 576px) {
+    .container {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+    
+    .match-card .card-body {
+        padding: 1rem;
+    }
+    
+    .match-teams {
+        gap: 0.5rem;
+    }
+    
+    .match-score {
+        font-size: 1.75rem;
+        min-width: 80px;
+    }
+    
+    .team-container {
+        min-width: 80px;
+    }
+    
+    .team-name {
+        font-size: 0.75rem;
+        max-width: 80px;
+    }
+    
+    .player-stats .table {
+        font-size: 0.875rem;
+    }
+    
+    .player-stats .card-body {
+        padding: 0.75rem;
+    }
+    
+    .player-stats .table th, 
+    .player-stats .table td {
+        padding: 0.5rem 0.25rem;
+    }
+    
+    /* Stack the player name and avatar for better mobile display */
+    .d-flex.align-items-center {
+        gap: 0.5rem;
+    }
+}
+
+@media (min-width: 768px) {
+    .match-card {
+        max-width: 500px;
+    }
+
+    .match-teams {
+        gap: 2rem;
+    }
+
+    .team-logo {
+        width: 64px;
+        height: 64px;
+        font-size: 1.5rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .team-name {
+        font-size: 1rem;
+        max-width: 120px;
+    }
+
+    .match-score {
+        font-size: 2.5rem;
+        min-width: 120px;
+        gap: 1rem;
+    }
+
+    .team-container {
+        min-width: 120px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Match Card -->
+    <div class="match-card">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Match Details</h5>
+        </div>
+        <div class="card-body">
+            <div class="match-type">
+                {% if match.is_official %}Official Match{% else %}Friendly Match{% endif %}
+            </div>
+            
+            <div class="match-teams">
+                <div class="team-container">
+                    {% if team.team_photo %}
+                        <img src="{{ team.team_photo.url }}" alt="{{ team.name }}" class="team-logo">
+                    {% else %}
+                        <div class="team-logo">{{ team.name|slice:":1" }}</div>
+                    {% endif %}
+                    <p class="team-name">{{ team.name }}</p>
+                </div>
+                
+                <div class="match-score">
+                    {% if match.team_score is not None and match.opponent_score is not None %}
+                        <span>{{ match.team_score }}</span>
+                        <span class="match-score-separator">-</span>
+                        <span>{{ match.opponent_score }}</span>
+                    {% endif %}
+                </div>
+                
+                <div class="team-container">
+                    <div class="team-logo">{{ match.opponent|slice:":1" }}</div>
+                    <p class="team-name">{{ match.opponent }}</p>
+                </div>
+            </div>
+            
+            <div class="match-date">
+                {{ match.match_date|date:"l, M d, Y" }}
+            </div>
+
+            {% if player_of_match %}
+            <div class="player-of-match">
+                <div class="d-flex align-items-center gap-2">
+                    {% if player_of_match.player.teammemberprofile.profile_picture %}
+                        <img src="{{ player_of_match.player.teammemberprofile.profile_picture.url }}" 
+                             alt="{{ player_of_match.player.user.get_full_name }}"
+                             class="rounded-circle"
+                             style="width: 32px; height: 32px; object-fit: cover;">
+                    {% else %}
+                        <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center text-white" style="width: 32px; height: 32px;">
+                            {{ player_of_match.player.user.get_full_name|make_list|first|upper }}
+                        </div>
+                    {% endif %}
+                    <div>
+                        <div class="player-name">{{ player_of_match.player.user.get_full_name }}</div>
+                        <div class="player-label">Player of the Match</div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Player Stats Table -->
+    <div class="player-stats">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">Player Statistics</h5>
+            </div>
+            <div class="card-body px-2 px-md-3">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Player</th>
+                                <th class="text-center">Position</th>
+                                <th class="text-center">Goals</th>
+                                <th class="text-center">Assists</th>
+                                <th class="text-center d-none d-sm-table-cell">Yellow</th>
+                                <th class="text-center d-none d-sm-table-cell">Red</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stat in player_stats %}
+                            <tr>
+                                <td class="align-middle">
+                                    <div class="d-flex align-items-center">
+                                        {% if stat.player.teammemberprofile.profile_picture %}
+                                            <img src="{{ stat.player.teammemberprofile.profile_picture.url }}" alt="{{ stat.player.user.get_full_name }}" class="rounded-circle me-2" style="width: 32px; height: 32px; object-fit: cover;">
+                                        {% else %}
+                                            <div class="rounded-circle me-2 bg-secondary d-flex align-items-center justify-content-center text-white" style="width: 32px; height: 32px;">
+                                                {{ stat.player.user.get_full_name|make_list|first|upper }}
+                                            </div>
+                                        {% endif %}
+                                        <div>
+                                            <a href="/teams/{{ team.id }}/player/{{ stat.player.user.id }}/" class="text-decoration-none text-dark">
+                                                {{ stat.player.user.get_full_name }}
+                                            </a>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    {% if stat.player.teammemberprofile.position %}
+                                        <span class="position-badge {{ stat.player.teammemberprofile.position.code|lower }}">
+                                            {{ stat.player.teammemberprofile.position.code }}
+                                        </span>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">{{ stat.goals }}</td>
+                                <td class="text-center">{{ stat.assists }}</td>
+                                <td class="text-center d-none d-sm-table-cell">{{ stat.yellow_cards }}</td>
+                                <td class="text-center d-none d-sm-table-cell">{{ stat.red_cards }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

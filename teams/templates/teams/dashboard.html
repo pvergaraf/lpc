@@ -1800,7 +1800,10 @@ h1, h2, h3, h4, h5, h6 {
                     {% if current_season %}
                         <div class="card mb-4">
                             <div class="card-header">
-                                <h5 class="card-title mb-0">Last match</h5>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h5 class="card-title mb-0">Last match</h5>
+                                    <a href="{% url 'teams:all_matches' current_team.id %}" class="text-decoration-underline text-dark">View all matches</a>
+                                </div>
                             </div>
                             <div class="card-body">
                                 {% if latest_match %}
